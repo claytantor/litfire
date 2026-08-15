@@ -1,0 +1,48 @@
+{
+  "name": "litfire",
+  "version": "0.1.0",
+  "description": "A terminal chat interface built with Ink",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "litfire": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx source/cli.tsx",
+    "build": "tsup",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint source test",
+    "lint:fix": "oxlint --fix source test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
+  },
+  "dependencies": {
+    "ink": "^7.1.1",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
+    "meow": "^14.1.0",
+    "react": "^19.2.8",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.12",
+    "@types/react": "^19.2.18",
+    "ink-testing-library": "^4.0.0",
+    "oxlint": "^1.78.0",
+    "prettier": "^3.9.6",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
