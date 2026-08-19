@@ -38,6 +38,10 @@
 | `/time gregorian <epoch>`      | Bind the clock to Earth/Sol time                 |
 | `/time custom`                 | Read it through a calendar formula you wrote     |
 | `/time at <date>`              | Convert a date to seconds, or back               |
+| `/moment [<id>]`               | Moments in clock order, or one of them           |
+| `/moment <id> at <when>`       | Set or change a moment’s time                    |
+| `/moment <id> edit`            | Write its description in the buffer              |
+| `/moment new <name>`           | Create a moment and open the buffer              |
 | `/situation place <id> <arc>`  | Move a situation out of the inbox                |
 | `/help`, `/quit`               |                                                  |
 

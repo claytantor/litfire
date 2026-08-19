@@ -1,4 +1,4 @@
-import {grouped, MAX_INSTANT, MIN_INSTANT, type Instant} from './instant.js';
+import {grouped, MAX_INSTANT, MIN_INSTANT, toInstant, type Instant} from './instant.js';
 
 /**
  * Turns an instant into something an author can read, and back.
@@ -215,4 +215,23 @@ export function gregorian(options: GregorianOptions): Calendar {
 			return seconds >= MIN_INSTANT && seconds <= MAX_INSTANT ? seconds : undefined;
 		},
 	};
+}
+
+/**
+ * Reads a written time as an instant, either notation.
+ *
+ * A bare integer is already an instant; anything else is a date for the bound
+ * calendar to read. Deciding from the input rather than asking is what lets
+ * `/time at` and `/moment <id> at` take the same argument, and it means an
+ * author who has the seconds in hand never has to convert them first.
+ *
+ * Grouped digits are accepted because that is how the tool prints them, and
+ * pasting back what was just read out should work.
+ */
+export function readWhen(written: string, calendar: Calendar): Instant | undefined {
+	const trimmed = written.trim();
+	if (trimmed === '') {
+		return undefined;
+	}
+	return toInstant(trimmed.replaceAll(',', '')) ?? calendar.parse?.(trimmed);
 }

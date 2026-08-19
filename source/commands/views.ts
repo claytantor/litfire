@@ -1059,3 +1059,122 @@ export function renderTime(project: Project, calendar: Calendar, note?: string):
 
 	return lines;
 }
+
+/**
+ * `/moment` — every moment, in clock order, with what each one holds.
+ *
+ * Undated moments are listed last rather than hidden. A moment recorded before
+ * the author knows when it happened is the normal way a timeline gets built,
+ * and a list that dropped them would make the vault look emptier than it is.
+ */
+export function renderMoments(project: Project, calendar: Calendar): Line[] {
+	const {moments} = project.vault;
+
+	if (moments.length === 0) {
+		return [
+			heading('moments'),
+			muted('none yet — /moment new <name> creates one'),
+			muted('or /timeline interview draws them out'),
+		];
+	}
+
+	const dated = moments
+		.filter((m): m is typeof m & {at: Instant} => m.at !== undefined)
+		.toSorted((a, b) => compareInstants(a.at, b.at));
+	const undated = moments
+		.filter(m => m.at === undefined)
+		.toSorted((a, b) => a.id.localeCompare(b.id));
+
+	const anchored = (id: string) =>
+		project.vault.situations.filter(s => s.moment === id).length;
+
+	const lines: Line[] = [
+		heading('moments'),
+		muted(
+			`${plural(moments.length, 'moment')} · ${String(dated.length)} dated · ${calendar.name}`,
+		),
+		blank(),
+	];
+
+	const rows = dated.map(moment => [
+		`  ${moment.id}`,
+		moment.name ?? '',
+		calendar.format(moment.at),
+		plural(moment.events.length, 'event'),
+		anchored(moment.id) === 0 ? '' : plural(anchored(moment.id), 'scene'),
+	]);
+	for (const row of columns(rows)) {
+		lines.push(text(row));
+	}
+
+	if (undated.length > 0) {
+		lines.push(blank(), muted('undated — recorded, but not on the clock'));
+		for (const moment of undated) {
+			lines.push(muted(`  ${moment.id}  ${moment.name ?? ''}`));
+		}
+		lines.push(muted('/moment <id> at <date> places one'));
+	}
+
+	return lines;
+}
+
+/** One moment: where it sits, what it changes, and what hangs off it. */
+export function renderMoment(
+	project: Project,
+	momentId: string,
+	calendar: Calendar,
+): Line[] {
+	const moment = project.vault.moments.find(candidate => candidate.id === momentId);
+	if (moment === undefined) {
+		return [
+			error(`no moment '${momentId}'`),
+			muted('/moment lists them · /moment new <name> creates one'),
+		];
+	}
+
+	const lines: Line[] = [
+		heading(`${moment.id}${moment.name ? ` — ${moment.name}` : ''}`),
+	];
+
+	if (moment.at === undefined) {
+		lines.push(
+			warn('undated — not on the clock, so nothing it carries reaches the ledger'),
+			muted(`/moment ${moment.id} at <date> places it`),
+		);
+	} else {
+		lines.push(
+			text(`at           ${grouped(moment.at)}`),
+			text(`reads as     ${calendar.format(moment.at)}`),
+			text(`from origin  ${describeDuration(moment.at)}`),
+		);
+	}
+
+	lines.push(blank(), muted('what it changes'));
+	if (moment.events.length === 0) {
+		lines.push(muted('  (no ledger events)'));
+	} else {
+		for (const event of moment.events) {
+			lines.push(text(`  ${event.type}  ${event.actor}`));
+		}
+	}
+
+	// The two things that hang off a moment, so its removal is never a surprise.
+	const scenes = project.vault.situations.filter(s => s.moment === moment.id);
+	const arcs = project.vault.arcs.filter(a => a.starts_after === moment.id);
+
+	if (scenes.length > 0) {
+		lines.push(blank(), muted('scenes anchored here'));
+		for (const scene of scenes) {
+			lines.push(text(`  ${scene.id}${scene.title ? ` — ${scene.title}` : ''}`));
+		}
+	}
+
+	if (arcs.length > 0) {
+		lines.push(blank(), muted('arcs starting after it'));
+		for (const arc of arcs) {
+			lines.push(text(`  ${arc.id}${arc.name ? ` — ${arc.name}` : ''}`));
+		}
+	}
+
+	return lines;
+}

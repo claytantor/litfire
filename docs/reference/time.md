@@ -150,6 +150,47 @@ epoch      2031-08-15T19:33:00-07:00
 
 Wiki moment pages carry both for the same reason.
 
+## Creating and editing a moment
+
+```
+/moment new The Substrate Patch
+```
+
+Slugs the name into an id, writes `timeline/moments/the-substrate-patch.md`, and
+opens the [native buffer](../guide/writing-a-scene.md) so you can describe what
+changes there. It starts **undated** on purpose: a moment you have just thought
+of usually has no date yet, and demanding one would either block the thought or
+invent a number.
+
+```
+/moment the-substrate-patch at -26174880000000123
+/moment inannas-first-memory at 2036-08-15 02:30:00
+```
+
+`at` takes either notation — whole seconds, or a date the bound calendar reads —
+and reports back what it understood, so a misread date is visible immediately:
+
+```
+inannas-first-memory at 157,791,420
+reads as 2036-08-15 02:30:00 · ~5 years from origin
+```
+
+| Form                       | Does                                    |
+| -------------------------- | --------------------------------------- |
+| `/moment`                  | Every moment, dated ones in clock order |
+| `/moment <id>`             | One moment, and what hangs off it       |
+| `/moment <id> at <when>`   | Set or change its time                  |
+| `/moment <id> edit`        | Write its description in the buffer     |
+| `/moment <id> name <text>` | Rename it                               |
+| `/moment new <name>`       | Create one, and open the buffer         |
+
+Changing the time never touches the description, and renaming never touches the
+time — every verb rewrites frontmatter and writes the body back byte-identical.
+As with `/situation`, the verb may come before or after the id.
+
+`/moment <id>` also lists the scenes anchored to it and the arcs that start
+after it, so removing or re-dating a moment is never a surprise.
+
 ## Converting a date
 
 ```

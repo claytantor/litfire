@@ -13,6 +13,7 @@ export {
 export {
 	gregorian,
 	OUT_OF_RANGE,
+	readWhen,
 	rawSeconds,
 	type Calendar,
 	type GregorianOptions,

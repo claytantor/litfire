@@ -1,14 +1,20 @@
-import {readdir, readFile, rename, writeFile} from 'node:fs/promises';
+import {mkdir, readdir, readFile, rename, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import type {Project} from '../core/project.js';
-import {arcSchema, chapterSchema, situationSchema} from '../domain/schema.js';
+import {
+	arcSchema,
+	chapterSchema,
+	momentSchema,
+	situationSchema,
+} from '../domain/schema.js';
 import {
 	calendarFor,
 	CALENDAR_FORMULA_ID,
 	describeDuration,
 	gregorian,
+	grouped,
+	readWhen,
 	timeSchema,
-	toInstant,
 } from '../time/index.js';
 import {partitionChapters} from '../chapters/index.js';
 import {renderManuscript} from '../chapters/manuscript.js';
@@ -86,6 +92,8 @@ import {
 	renderQuestions,
 	renderArc,
 	renderArcs,
+	renderMoment,
+	renderMoments,
 	renderTime,
 	renderCast,
 	renderSheet,
@@ -931,8 +939,7 @@ const time: Command = {
 				formatted: context.project.calendarText,
 			});
 
-			const asInstant = toInstant(written.replaceAll(',', ''));
-			const instant = asInstant ?? calendar.parse?.(written);
+			const instant = readWhen(written, calendar);
 
 			if (instant === undefined) {
 				// A calendar formula formats and cannot read back. That is a real
@@ -985,6 +992,201 @@ const time: Command = {
 		});
 		const lines = renderTime(context.project, calendar, note);
 		return {lines, paged: lines.length > 14, title: 'time'};
+	},
+};
+
+const MOMENT_VERBS = new Set(['show', 'edit', 'at', 'name']);
+
+/**
+ * `/moment` — the points on the clock a story hangs on.
+ *
+ * Until now a moment could only arrive from a timeline interview or be
+ * hand-written, which left no way to correct one: an author who mistyped a date
+ * had to open the file and count zeros. Editing the time is the whole reason
+ * this exists, so `at` takes either notation and reports what it read back.
+ */
+const moment: Command = {
+	name: 'moment',
+	usage: '/moment <id> [show|edit|at <when>|name <text>] · /moment new [name]',
+	summary: 'points on the in-world clock: create one, time it, describe it',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const {calendar, note} = calendarFor(context.project.vault.time, {
+			formatted: context.project.calendarText,
+		});
+		const [sub, ...rest] = args;
+
+		// `new` leads, because everything after it is a free-text name.
+		if (sub === 'new') {
+			const name = rest.join(' ').trim();
+			if (name === '') {
+				return {lines: [error('usage: /moment new <name>')]};
+			}
+
+			const id =
+				name
+					.toLowerCase()
+					.replaceAll(/[^a-z0-9]+/g, '-')
+					.replace(/^-|-$/g, '') || 'moment';
+
+			if (context.project.vault.moments.some(candidate => candidate.id === id)) {
+				return {
+					lines: [
+						error(`moment '${id}' already exists`),
+						muted(`/moment ${id} to see it, or pick another name`),
+					],
+				};
+			}
+
+			const file = resolve(context.root, VAULT.moments, `${id}.md`);
+			await mkdir(resolve(context.root, VAULT.moments), {recursive: true});
+			await writeFile(
+				file,
+				stringifyDocument({
+					// Deliberately undated. A moment an author has just thought of
+					// usually has no date yet, and demanding one here would either
+					// block the thought or invent a number (P5).
+					data: momentSchema.parse({id, name}),
+					body: '\nWhat changes here, and what becomes possible that was not.\n',
+				}),
+				{encoding: 'utf8', flag: 'wx'},
+			);
+
+			return {
+				lines: [
+					ok(`created ${path.relative(context.root, file)}`),
+					muted(`/moment ${id} at <date> puts it on the clock`),
+				],
+				openEditor: file,
+				dirty: true,
+			};
+		}
+
+		const verb = args.find(argument => MOMENT_VERBS.has(argument));
+		const positional = args.filter(argument => !MOMENT_VERBS.has(argument));
+		const [id] = positional;
+
+		/** Rewrites a moment's frontmatter, body untouched. Undefined means it worked. */
+		const patch = async (
+			target: string,
+			data: Record<string, unknown>,
+		): Promise<string | undefined> => {
+			const file = resolve(context.root, VAULT.moments, `${target}.md`);
+			const raw = await readFile(file, 'utf8').catch(() => undefined);
+			if (raw === undefined) {
+				return `no moment '${target}' — /moment new <name> creates one`;
+			}
+
+			const document = parseDocument(raw);
+			const merged = {...document.data, ...data};
+			try {
+				momentSchema.parse(merged);
+			} catch (caught) {
+				return caught instanceof Error ? caught.message.split('\n')[0]! : String(caught);
+			}
+
+			await writeFile(
+				file,
+				stringifyDocument({data: merged, body: document.body}),
+				'utf8',
+			);
+			return undefined;
+		};
+
+		if (verb === 'at') {
+			const target = id;
+			const written = positional.slice(1).join(' ').trim();
+			if (target === undefined || written === '') {
+				return {
+					lines: [
+						error('usage: /moment <id> at <date | seconds>'),
+						muted('takes either notation — /time at converts between them'),
+					],
+				};
+			}
+
+			const instant = readWhen(written, calendar);
+			if (instant === undefined) {
+				return {
+					lines: [
+						error(`'${written}' is not a time ${calendar.name} can read`),
+						muted(
+							calendar.parse === undefined
+								? 'a calendar formula is one-way — give whole seconds'
+								: 'give whole seconds, or a date the bound calendar reads',
+						),
+						...(note === undefined ? [] : [muted(note)]),
+					],
+				};
+			}
+
+			// Writing the bigint, not a string: this is the clock, and it round-trips
+			// through YAML at full precision only as an integer.
+			const failed = await patch(target, {at: instant});
+			if (failed !== undefined) {
+				return {lines: [error(failed)]};
+			}
+
+			return {
+				lines: [
+					ok(`${target} at ${grouped(instant)}`),
+					muted(
+						`reads as ${calendar.format(instant)} · ${describeDuration(instant)} from origin`,
+					),
+				],
+				dirty: true,
+			};
+		}
+
+		if (verb === 'name') {
+			const target = id;
+			const name = positional.slice(1).join(' ').trim();
+			if (target === undefined || name === '') {
+				return {lines: [error('usage: /moment <id> name <text>')]};
+			}
+			const failed = await patch(target, {name});
+			return failed === undefined
+				? {lines: [ok(`${target} is now “${name}”`)], dirty: true}
+				: {lines: [error(failed)]};
+		}
+
+		if (verb === 'edit') {
+			if (!id) {
+				return {lines: [error('usage: /moment <id> edit')]};
+			}
+			const file = resolve(context.root, VAULT.moments, `${id}.md`);
+			const exists = await readFile(file, 'utf8').then(
+				() => true,
+				() => false,
+			);
+			return exists
+				? {lines: [], openEditor: file}
+				: {lines: [error(`no moment '${id}' — /moment new <name> creates one`)]};
+		}
+
+		if (
+			(verb === undefined || verb === 'show') &&
+			id !== undefined &&
+			positional.length === 1
+		) {
+			const lines = renderMoment(context.project, id, calendar);
+			return {lines, paged: lines.length > 14, title: `moment ${id}`};
+		}
+
+		if (args.length === 0) {
+			const lines = renderMoments(context.project, calendar);
+			return {lines, paged: lines.length > 14, title: 'moments'};
+		}
+
+		return {
+			lines: [
+				error('usage: /moment <id> [show|edit|at <when>|name <text>]'),
+				muted('/moment new <name> creates one'),
+			],
+		};
 	},
 };
 
@@ -2078,6 +2280,7 @@ export const commands: readonly Command[] = [
 	lint,
 	questions,
 	arc,
+	moment,
 	time,
 	situation,
 	provider,

@@ -32,14 +32,21 @@ The dependencies run one way, so this order never makes you back up.
 
 ### 1. A moment to hang the clock on
 
-Moments come from the timeline interview:
+```
+/moment new The Breach
+/moment the-breach at 2036-08-15 02:30:00
+```
+
+`/moment new` opens the buffer so you can describe what changes there; `at`
+takes whole seconds or a date, once a calendar is bound. The timeline interview
+produces them too:
 
 ```
 /timeline interview
 ```
 
-Or write `timeline/moments/<id>.md` yourself with an `at:` — an integer, in
-whatever unit your story counts. `/primitives moment` lists what exists.
+`/moment` lists what exists. See [the in-world clock](../reference/time.md) for
+the calendar and the units.
 
 ::: tip Undated moments are real
 A moment with no `at:` is recorded but not placed. It will not enter the replay
