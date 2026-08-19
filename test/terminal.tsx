@@ -183,6 +183,12 @@ export function mount(
 		debug,
 		exitOnCtrlC: false,
 		patchConsole: false,
+		// Ink resolves interactivity as `interactive ?? (!isInCi && stdout.isTTY)`,
+		// so under CI it stops redrawing live and writes nothing until unmount —
+		// every frame assertion then reads an empty screen and fails as though
+		// the content were missing. This harness exists to simulate a real
+		// terminal, so it says so rather than letting the environment decide.
+		interactive: true,
 		...extra,
 	});
 
