@@ -1,7 +1,7 @@
 import {readdir, readFile, rename, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import type {Project} from '../core/project.js';
-import {chapterSchema, situationSchema} from '../domain/schema.js';
+import {arcSchema, chapterSchema, situationSchema} from '../domain/schema.js';
 import {partitionChapters} from '../chapters/index.js';
 import {renderManuscript} from '../chapters/manuscript.js';
 import {
@@ -76,6 +76,8 @@ import {
 	renderPrimitives,
 	renderCharacter,
 	renderQuestions,
+	renderArc,
+	renderArcs,
 	renderCast,
 	renderSheet,
 	renderSystem,
@@ -238,7 +240,7 @@ const sheet: Command = {
 
 /**
  * Finds a situation's file by reading ids out of frontmatter rather than
- * guessing its slug, the same way `/situation place` does. Placed situations sit
+ * guessing its slug, the same way the linking verbs do. Placed situations sit
  * flat in `situations/`, unplaced ones in `situations/inbox/`.
  */
 async function findSituationFile(root: string, id: string): Promise<string | undefined> {
@@ -283,7 +285,7 @@ const status: Command = {
 					lines: [
 						error(`'${situationId}' has no state in the replay sequence`),
 						muted(
-							'an unplaced situation has no point in time — /situation place it first',
+							'an unplaced situation has no point in time — /situation <id> arc <arc> first',
 						),
 					],
 				};
@@ -375,7 +377,7 @@ const chapter: Command = {
 						error(`'${startsAt}' is not in the replay sequence`),
 						muted(
 							exists
-								? 'it is unplaced — /situation place it on an arc first'
+								? 'it is unplaced — /situation <id> arc <arc> places it'
 								: 'no situation by that id',
 						),
 					],
@@ -789,17 +791,206 @@ const questions: Command = {
 	},
 };
 
+const ARC_VERBS = new Set(['show', 'order', 'after']);
+
+/**
+ * `/arc` — the narrative order situations are placed into.
+ *
+ * An arc has to exist before a situation can be placed on one, and until now
+ * nothing created one: an author either hand-wrote `timeline/arcs/arc-01.md` or
+ * had no arcs at all, which left the wiki with no arc pages and every situation
+ * stuck in the inbox.
+ */
+const arc: Command = {
+	name: 'arc',
+	usage: '/arc [<id> [show|order <n>|after <moment>]] · /arc new [title]',
+	summary: 'the narrative order: create arcs, order them, anchor them',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const [sub, ...rest] = args;
+
+		// As with `/situation new`, the verb leads because the rest is a title.
+		if (sub === 'new') {
+			const arcs = context.project.vault.arcs;
+			const id = `arc-${String(arcs.length + 1).padStart(2, '0')}`;
+			const title = rest.join(' ') || 'Untitled';
+			const file = resolve(context.root, VAULT.arcs, `${id}.md`);
+
+			await writeFile(
+				file,
+				stringifyDocument({
+					data: arcSchema.parse({
+						id,
+						name: title,
+						// Arcs count 1, 2, 3 — D3's sparse step is for situations *within*
+						// an arc, where an insertion between two existing scenes is
+						// routine. Arcs are reordered far less often and read better
+						// numbered the way the scaffold numbers them.
+						order:
+							Math.max(
+								0,
+								...arcs.map(a => a.order).filter((o): o is number => o !== undefined),
+							) + 1,
+					}),
+					body: `\nWhat this arc is about, and what failure looks like in it.\n`,
+				}),
+				{encoding: 'utf8', flag: 'wx'},
+			);
+
+			return {
+				lines: [
+					ok(`created ${path.relative(context.root, file)}`),
+					muted(`/arc ${id} after <moment> anchors it on the clock`),
+					muted(`/situation <id> arc ${id} places a scene on it`),
+				],
+				dirty: true,
+			};
+		}
+
+		const verb = args.find(argument => ARC_VERBS.has(argument));
+		const positional = args.filter(argument => !ARC_VERBS.has(argument));
+		const [id] = positional;
+
+		if (verb === 'order') {
+			const [, value] = positional;
+			const order = Number(value);
+			if (!id || value === undefined || !Number.isInteger(order)) {
+				return {lines: [error('usage: /arc <id> order <integer>')]};
+			}
+			const patched = await patchArc(context.root, id, {order});
+			return 'error' in patched
+				? {lines: [error(patched.error)]}
+				: {lines: [ok(`${id} replays at order ${String(order)}`)], dirty: true};
+		}
+
+		if (verb === 'after') {
+			const [, momentId] = positional;
+			if (!id || !momentId) {
+				return {lines: [error('usage: /arc <id> after <moment>')]};
+			}
+			if (!context.project.vault.moments.some(m => m.id === momentId)) {
+				return {
+					lines: [
+						error(`no moment '${momentId}'`),
+						muted('/primitives moment lists them'),
+					],
+				};
+			}
+			const patched = await patchArc(context.root, id, {starts_after: momentId});
+			return 'error' in patched
+				? {lines: [error(patched.error)]}
+				: {
+						lines: [
+							ok(`${id} starts after ${momentId}`),
+							// This is the link that lets moments interleave ahead of the
+							// arc's situations, which is what gives their scenes a clock
+							// position to inherit.
+							muted('its situations now inherit a moment from the sequence'),
+						],
+						dirty: true,
+					};
+		}
+
+		if (
+			(verb === undefined || verb === 'show') &&
+			id !== undefined &&
+			positional.length === 1
+		) {
+			const lines = renderArc(context.project, id);
+			return {lines, paged: lines.length > 14, title: `arc ${id}`};
+		}
+
+		if (args.length === 0) {
+			const lines = renderArcs(context.project);
+			return {lines, paged: lines.length > 14, title: 'arcs'};
+		}
+
+		return {
+			lines: [
+				error('usage: /arc [<id> [show|order <n>|after <moment>]]'),
+				muted('/arc new [title] creates one'),
+			],
+		};
+	},
+};
+
+/** The arc counterpart of `patchSituation`; same reasoning about the body. */
+async function patchArc(
+	root: string,
+	id: string,
+	patch: Record<string, unknown>,
+): Promise<{file: string} | {error: string}> {
+	const file = resolve(root, VAULT.arcs, `${id}.md`);
+	const raw = await readFile(file, 'utf8').catch(() => undefined);
+	if (raw === undefined) {
+		return {error: `no arc '${id}' — /arc new <title> creates one`};
+	}
+
+	const document = parseDocument(raw);
+	const data = {...document.data, ...patch};
+	try {
+		arcSchema.parse(data);
+	} catch (caught) {
+		return {
+			error: caught instanceof Error ? caught.message.split('\n')[0]! : String(caught),
+		};
+	}
+
+	await writeFile(file, stringifyDocument({data, body: document.body}), 'utf8');
+	return {file};
+}
+
 /**
  * Words that are verbs rather than an id, so the two can be told apart wherever
  * they appear. `new` is absent deliberately — it is handled before this is
  * consulted, because its remaining arguments are a free-text title.
+ *
+ * `arc` and `place` are separate verbs on purpose. `arc:` is where a scene sits
+ * in the narrative order and `place:` is where it happens; one verb meaning both
+ * is the kind of collision that makes a workflow impossible to write down.
  */
-const SITUATION_VERBS = new Set(['show', 'edit', 'place']);
+const SITUATION_VERBS = new Set(['show', 'edit', 'arc', 'place', 'moment', 'cast']);
+
+/**
+ * Rewrites one situation's frontmatter, leaving the body byte-identical.
+ *
+ * Every linking verb goes through here, so the author's prose is untouchable by
+ * construction rather than by each verb remembering (P6). The schema is
+ * re-parsed after patching, so a bad link is refused before it reaches disk
+ * instead of turning into a load issue on the next recompute.
+ */
+async function patchSituation(
+	root: string,
+	id: string,
+	patch: Record<string, unknown>,
+): Promise<{file: string} | {error: string}> {
+	const file = await findSituationFile(root, id);
+	if (file === undefined) {
+		return {error: `no file for situation '${id}'`};
+	}
+
+	const document = parseDocument(await readFile(file, 'utf8'));
+	const data = {...document.data, ...patch};
+
+	try {
+		situationSchema.parse(data);
+	} catch (caught) {
+		return {
+			error: caught instanceof Error ? caught.message.split('\n')[0]! : String(caught),
+		};
+	}
+
+	await writeFile(file, stringifyDocument({data, body: document.body}), 'utf8');
+	return {file};
+}
 
 const situation: Command = {
 	name: 'situation',
-	usage: '/situation <id> [show|edit|place <arc>] · /situation new [title]',
-	summary: 'show a scene\u2019s cast, write one, scaffold, or place it',
+	usage: '/situation <id> [show|edit|cast|place|moment|arc] · new [title]',
+	summary: 'show a scene\u2019s cast, write it, and link it to the world',
 	async run(args, context) {
 		if (!context.project) {
 			return needsProject();
@@ -835,7 +1026,7 @@ const situation: Command = {
 			return {
 				lines: [
 					ok(`created ${path.relative(context.root, file)}`),
-					muted(`place it with /situation place ${id} <arc>`),
+					muted(`then: /situation ${id} cast <character>… · place · moment · arc`),
 				],
 				openEditor: file,
 				dirty: true,
@@ -867,13 +1058,97 @@ const situation: Command = {
 			return {lines: [], openEditor: file};
 		}
 
+		// Anchor the scene on the clock. This is the link every character state in
+		// it is addressed by: without a moment, the cast has no point in time and
+		// the states read as unplaced.
+		if (verb === 'moment') {
+			const [id, momentId] = positional;
+			if (!id || !momentId) {
+				return {lines: [error('usage: /situation <id> moment <moment>')]};
+			}
+			if (!context.project.vault.moments.some(m => m.id === momentId)) {
+				return {
+					lines: [
+						error(`no moment '${momentId}'`),
+						muted('/primitives moment lists them · /timeline interview makes one'),
+					],
+				};
+			}
+
+			const patched = await patchSituation(context.root, id, {moment: momentId});
+			if ('error' in patched) {
+				return {lines: [error(patched.error)]};
+			}
+			return {lines: [ok(`${id} happens at ${momentId}`)], dirty: true};
+		}
+
+		// Where it happens. Places have no schema — free prose in a directory — so
+		// an unwritten one is a note, not a refusal (P4): the wiki builds a place
+		// page from any id a situation names.
 		if (verb === 'place') {
+			const [id, placeId] = positional;
+			if (!id || !placeId) {
+				return {lines: [error('usage: /situation <id> place <place>')]};
+			}
+
+			const patched = await patchSituation(context.root, id, {place: placeId});
+			if ('error' in patched) {
+				return {lines: [error(patched.error)]};
+			}
+
+			const file = resolve(context.root, VAULT.places, `${placeId}.md`);
+			const written = await readFile(file, 'utf8').then(
+				() => undefined,
+				() => `no places/${placeId}.md yet — the wiki will still link it`,
+			);
+			return {
+				lines: [ok(`${id} happens at ${placeId}`), ...(written ? [muted(written)] : [])],
+				dirty: true,
+			};
+		}
+
+		// Who is in it. Additive, because a cast is assembled over several passes
+		// and replacing it on every call would make each new name cost the last.
+		if (verb === 'cast') {
+			const [id, ...names] = positional;
+			if (!id || names.length === 0) {
+				return {lines: [error('usage: /situation <id> cast <character>…')]};
+			}
+
+			const found = context.project.vault.situations.find(s => s.id === id);
+			if (!found) {
+				return {lines: [error(`no situation '${id}'`)]};
+			}
+
+			const known = new Set(context.project.vault.characters.map(c => c.id));
+			const unknown = names.filter(name => !known.has(name));
+			const cast = [...new Set([...found.characters, ...names])].toSorted();
+
+			const patched = await patchSituation(context.root, id, {characters: cast});
+			if ('error' in patched) {
+				return {lines: [error(patched.error)]};
+			}
+
+			return {
+				lines: [
+					ok(`${id} cast: ${cast.join(', ')}`),
+					// Reported, never refused: naming someone before writing their page
+					// is a normal order to work in, and the checks will keep asking.
+					...unknown.map(name => muted(`no character page for '${name}' yet`)),
+				],
+				dirty: true,
+			};
+		}
+
+		if (verb === 'arc') {
 			const [id, arcId] = positional;
 			if (!id || !arcId) {
-				return {lines: [error('usage: /situation <id> place <arc>')]};
+				return {lines: [error('usage: /situation <id> arc <arc>')]};
 			}
-			if (!context.project.vault.arcs.some(arc => arc.id === arcId)) {
-				return {lines: [error(`no arc '${arcId}'`)]};
+			if (!context.project.vault.arcs.some(candidate => candidate.id === arcId)) {
+				return {
+					lines: [error(`no arc '${arcId}'`), muted('/arc new <title> creates one')],
+				};
 			}
 
 			const found = context.project.vault.situations.find(s => s.id === id);
@@ -938,7 +1213,10 @@ const situation: Command = {
 
 		return {
 			lines: [
-				error('usage: /situation <id> [show|edit|place <arc>]'),
+				error('usage: /situation <id> [show|edit]'),
+				muted(
+					'link it:  cast <character>… · place <place> · moment <moment> · arc <arc>',
+				),
 				muted('/situation new [title] scaffolds one and opens the buffer'),
 			],
 		};
@@ -1602,6 +1880,7 @@ export const commands: readonly Command[] = [
 	themes,
 	lint,
 	questions,
+	arc,
 	situation,
 	provider,
 	project,

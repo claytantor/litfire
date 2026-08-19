@@ -115,7 +115,7 @@ describe('writing a situation', () => {
 		expect(said(await dispatch(`/situation ${id} show`))).toContain(id);
 	});
 
-	it('places with the id on either side of the verb', async () => {
+	it('takes the arc verb with the id on either side', async () => {
 		const created = await dispatch('/situation new A Scene');
 		const id = String(
 			parseDocument(await readFile(created.openEditor!, 'utf8')).data['id'],
@@ -123,8 +123,8 @@ describe('writing a situation', () => {
 
 		// Whatever the outcome, it must be identical for both forms and must never
 		// be a complaint about the argument order.
-		const verbFirst = await dispatch(`/situation place ${id} arc-01`);
-		const idFirst = await dispatch(`/situation ${id} place arc-01`);
+		const verbFirst = await dispatch(`/situation arc ${id} arc-01`);
+		const idFirst = await dispatch(`/situation ${id} arc arc-01`);
 
 		expect(said(idFirst)).toBe(said(verbFirst));
 		expect(said(idFirst)).not.toContain('usage:');

@@ -44,6 +44,7 @@ export default defineConfig({
 					{text: 'Getting started', link: '/guide/getting-started'},
 					{text: 'Commands', link: '/guide/commands'},
 					{text: 'Writing a scene', link: '/guide/writing-a-scene'},
+					{text: 'Populating a situation', link: '/guide/populating-a-situation'},
 					{text: 'Interviews', link: '/guide/interviews'},
 					{text: 'Review gate', link: '/guide/review-gate'},
 					{text: 'The reviewer', link: '/guide/reviewer'},

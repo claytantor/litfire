@@ -42,34 +42,42 @@ Then, in the TUI:
 
 ## Commands
 
-| Command                       | Behaviour                                        |
-| ----------------------------- | ------------------------------------------------ |
-| `/init [idiom] [path]`        | Scaffold a vault; asks the idiom if omitted      |
-| `/project [path]`             | Switch vaults, or list recent ones               |
-| `/consent`                    | Allow this vault's formulas to execute           |
-| `/sheet <character> [at]`     | Replayed state, optionally at a point in the run |
-| `/status <character> [at]`    | The same state as an in-world status block       |
-| `/status write <char> <sit>`  | Place that block inside a situation              |
-| `/pacing`                     | Planned vs actual level by arc                   |
-| `/timeline`                   | Structural view; world events, arcs, inbox       |
-| `/themes`                     | Leaf-level coverage with upward rollup           |
-| `/<kind> show`                | What that interview has produced so far          |
-| `/<kind> resume`              | Continue the saved interview                     |
-| `/<kind> extract`             | Re-run extraction over its saved transcript      |
-| `/chapter [id\|new\|move]`    | Cut the sequence into chapters; show the seams   |
-| `/export [path]`              | Assemble the chapters into a manuscript          |
-| `/wiki [build\|serve\|stop]`  | Derived cross-reference, browsable over http     |
-| `/reviewer`                   | Literary editor over the rendered corpus         |
-| `/lint`                       | Deterministic checks                             |
-| `/questions`                  | Open question queue                              |
-| `/provider`                   | Choose an LLM provider, key, and model           |
-| `/provider status`            | Show configured providers and masked keys        |
-| `/provider clear <id>`        | Remove a stored key                              |
-| `/situation <id>`             | A scene’s cast: who is in it, and what they hold |
-| `/situation <id> edit`        | Write a scene in the native buffer               |
-| `/situation new [title]`      | Scaffold a scene and open it in the buffer       |
-| `/situation place <id> <arc>` | Move a situation out of the inbox                |
-| `/help`, `/quit`              |                                                  |
+| Command                        | Behaviour                                        |
+| ------------------------------ | ------------------------------------------------ |
+| `/init [idiom] [path]`         | Scaffold a vault; asks the idiom if omitted      |
+| `/project [path]`              | Switch vaults, or list recent ones               |
+| `/consent`                     | Allow this vault's formulas to execute           |
+| `/sheet <character> [at]`      | Replayed state, optionally at a point in the run |
+| `/status <character> [at]`     | The same state as an in-world status block       |
+| `/status write <char> <sit>`   | Place that block inside a situation              |
+| `/pacing`                      | Planned vs actual level by arc                   |
+| `/timeline`                    | Structural view; world events, arcs, inbox       |
+| `/themes`                      | Leaf-level coverage with upward rollup           |
+| `/<kind> show`                 | What that interview has produced so far          |
+| `/<kind> resume`               | Continue the saved interview                     |
+| `/<kind> extract`              | Re-run extraction over its saved transcript      |
+| `/chapter [id\|new\|move]`     | Cut the sequence into chapters; show the seams   |
+| `/export [path]`               | Assemble the chapters into a manuscript          |
+| `/wiki [build\|serve\|stop]`   | Derived cross-reference, browsable over http     |
+| `/reviewer`                    | Literary editor over the rendered corpus         |
+| `/lint`                        | Deterministic checks                             |
+| `/questions`                   | Open question queue                              |
+| `/provider`                    | Choose an LLM provider, key, and model           |
+| `/provider status`             | Show configured providers and masked keys        |
+| `/provider clear <id>`         | Remove a stored key                              |
+| `/situation <id>`              | A scene’s cast: who is in it, and what they hold |
+| `/situation <id> edit`         | Write a scene in the native buffer               |
+| `/situation <id> cast <name>…` | Add characters to the scene                      |
+| `/situation <id> place <id>`   | Where the scene happens                          |
+| `/situation <id> moment <id>`  | Anchor the scene on the clock                    |
+| `/situation <id> arc <id>`     | Place it on an arc, out of the inbox             |
+| `/situation new [title]`       | Scaffold a scene and open it in the buffer       |
+| `/arc [<id>]`                  | Arcs, or one arc with the scenes on it           |
+| `/arc new [title]`             | Create an arc                                    |
+| `/arc <id> after <moment>`     | Anchor an arc on the clock                       |
+| `/arc <id> order <n>`          | Set its replay order                             |
+| `/situation place <id> <arc>`  | Move a situation out of the inbox                |
+| `/help`, `/quit`               |                                                  |
 
 Output taller than the viewport opens a windowed pager (`↑↓`, space, `g`/`G`, `q`).
 
@@ -87,13 +95,14 @@ two manuscripts together. Deleting `.litrpg/` costs only convenience (DoD 11).
 The README is the short version. Everything below lives on the
 [documentation site](https://claytantor.github.io/litfire/), which is built from `docs/` in this repository.
 
-| Guide                                                                         |                                                   |
-| ----------------------------------------------------------------------------- | ------------------------------------------------- |
-| [Writing a scene](https://claytantor.github.io/litfire/guide/writing-a-scene) | The native prose buffer                           |
-| [Interviews](https://claytantor.github.io/litfire/guide/interviews)           | How the world gets built, and the interview agent |
-| [Review gate](https://claytantor.github.io/litfire/guide/review-gate)         | How a model-proposed write reaches disk           |
-| [The reviewer](https://claytantor.github.io/litfire/guide/reviewer)           | A literary editor over the rendered corpus        |
-| [Projects and vaults](https://claytantor.github.io/litfire/guide/projects)    | Switching vaults, and what a vault holds          |
+| Guide                                                                                       |                                                   |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| [Writing a scene](https://claytantor.github.io/litfire/guide/writing-a-scene)               | The native prose buffer                           |
+| [Populating a situation](https://claytantor.github.io/litfire/guide/populating-a-situation) | Linking a scene to characters, places and moments |
+| [Interviews](https://claytantor.github.io/litfire/guide/interviews)                         | How the world gets built, and the interview agent |
+| [Review gate](https://claytantor.github.io/litfire/guide/review-gate)                       | How a model-proposed write reaches disk           |
+| [The reviewer](https://claytantor.github.io/litfire/guide/reviewer)                         | A literary editor over the rendered corpus        |
+| [Projects and vaults](https://claytantor.github.io/litfire/guide/projects)                  | Switching vaults, and what a vault holds          |
 
 | Concepts                                                                             |                                                    |
 | ------------------------------------------------------------------------------------ | -------------------------------------------------- |

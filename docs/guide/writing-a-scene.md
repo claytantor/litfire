@@ -9,13 +9,13 @@ The verb may come before or after the id, so `/situation sit-001 edit` and
 their arguments the same way. Without a verb, an id shows the scene's cast
 instead; `show` says so explicitly.
 
-| Form                          | Does                                 |
-| ----------------------------- | ------------------------------------ |
-| `/situation <id>`             | Show the cast — the reading view     |
-| `/situation <id> show`        | The same, said explicitly            |
-| `/situation <id> edit`        | Open the scene in the buffer         |
-| `/situation <id> place <arc>` | Move it out of the inbox onto an arc |
-| `/situation new [title]`      | Scaffold one and open it             |
+| Form                        | Does                                 |
+| --------------------------- | ------------------------------------ |
+| `/situation <id>`           | Show the cast — the reading view     |
+| `/situation <id> show`      | The same, said explicitly            |
+| `/situation <id> edit`      | Open the scene in the buffer         |
+| `/situation <id> arc <arc>` | Move it out of the inbox onto an arc |
+| `/situation new [title]`    | Scaffold one and open it             |
 
 `new` is the one form whose verb must come first, because everything after it is
 a free-text title — a scene called "The Place" would otherwise lose a word.
@@ -47,7 +47,7 @@ one letter at a time is, for prose, the same as having no undo. A run ends when
 you delete, press enter, paste, or move the cursor away.
 
 **The buffer edits the body, never the frontmatter.** A situation's frontmatter
-is what `/situation place`, extraction, and the ledger maintain; the prose is
+is what the linking verbs, extraction, and the ledger maintain; the prose is
 the author's alone (P6), and that is the half the buffer opens on. Frontmatter
 is written back exactly as it was parsed, so a save can normalise its formatting
 but can never change its meaning. To edit it, use Obsidian or any editor — the

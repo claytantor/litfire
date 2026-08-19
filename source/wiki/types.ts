@@ -24,6 +24,7 @@ export type WikiKind =
 	| 'skill'
 	| 'item'
 	| 'arc'
+	| 'situation'
 	| 'theme'
 	| 'index';
 

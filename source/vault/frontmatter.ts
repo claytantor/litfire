@@ -54,7 +54,7 @@ export function stringifyDocument(document: Document): string {
 	});
 
 	// Exactly one newline after the closing fence, which is what `parseDocument`
-	// strips. `/situation place` rewrites frontmatter in an author's file, so
+	// strips. The linking verbs rewrite frontmatter in an author's file, so
 	// these two must be exact inverses or the tool would nibble at prose (P6).
 	return `${FENCE}\n${yamlText}${FENCE}\n${document.body}`;
 }

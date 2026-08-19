@@ -320,7 +320,7 @@ export function renderCast(project: Project, situationId: string): Line[] {
 			warn('unplaced — no moment on the clock precedes this scene'),
 			muted(
 				situation.arc === undefined
-					? '/situation place it on an arc, or set moment: in its frontmatter'
+					? '/situation <id> moment <moment> anchors it on the clock'
 					: 'set moment: in its frontmatter, or date a moment before it',
 			),
 		);
@@ -873,6 +873,112 @@ export function renderCharacter(project: Project, id: string): Line[] {
 					`ledger: level ${replayed.level}, xp ${replayed.xp} · /sheet ${id} for detail`,
 				),
 	);
+
+	return lines;
+}
+
+/**
+ * Every arc, in replay order — the spine situations are placed onto.
+ *
+ * An arc with no order sorts last rather than being hidden, the same way
+ * `buildSequence` replays it last: an unordered arc is a normal in-progress
+ * state, and a list that omitted it would be lying about what exists.
+ */
+export function renderArcs(project: Project): Line[] {
+	const {arcs, situations} = project.vault;
+
+	if (arcs.length === 0) {
+		return [
+			heading('arcs'),
+			muted('none yet — /arc new <title> creates one'),
+			muted('a situation cannot be placed until an arc exists'),
+		];
+	}
+
+	const ordered = arcs.toSorted(
+		(a, b) =>
+			(a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER) ||
+			a.id.localeCompare(b.id),
+	);
+
+	const rows = ordered.map(arc => {
+		const held = situations.filter(situation => situation.arc === arc.id).length;
+		return [
+			`  ${arc.id}`,
+			arc.name ?? '',
+			arc.order === undefined ? 'unplaced' : `order ${String(arc.order)}`,
+			arc.starts_after === undefined ? 'unanchored' : `after ${arc.starts_after}`,
+			plural(held, 'situation'),
+		];
+	});
+
+	return [
+		heading('arcs'),
+		muted(`${plural(arcs.length, 'arc')} · ${plural(situations.length, 'situation')}`),
+		blank(),
+		...columns(rows).map(row => text(row)),
+	];
+}
+
+/** One arc: where it sits, what it holds, and what it intends. */
+export function renderArc(project: Project, arcId: string): Line[] {
+	const arc = project.vault.arcs.find(candidate => candidate.id === arcId);
+	if (arc === undefined) {
+		return [
+			error(`no arc '${arcId}'`),
+			muted('/arc lists them · /arc new <title> creates one'),
+		];
+	}
+
+	const held = project.vault.situations
+		.filter(situation => situation.arc === arc.id)
+		.toSorted(
+			(a, b) =>
+				(a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER) ||
+				a.id.localeCompare(b.id),
+		);
+
+	const lines: Line[] = [
+		heading(`${arc.id}${arc.name ? ` — ${arc.name}` : ''}`),
+		muted(
+			[
+				arc.order === undefined ? 'unplaced' : `order ${String(arc.order)}`,
+				arc.starts_after === undefined
+					? 'not anchored to the clock'
+					: `starts after ${arc.starts_after}`,
+			].join(' · '),
+		),
+	];
+
+	// Said plainly, because an unanchored arc is why its situations report no
+	// moment — and that is not obvious from looking at the situations.
+	if (arc.starts_after === undefined) {
+		lines.push(muted(`/arc ${arc.id} after <moment> gives its scenes a clock position`));
+	}
+
+	lines.push(blank(), muted('situations'));
+	if (held.length === 0) {
+		lines.push(muted('  (none)'), muted(`  /situation <id> arc ${arc.id} places one`));
+	} else {
+		for (const situation of held) {
+			const order = situation.order === undefined ? '—' : String(situation.order);
+			lines.push(
+				text(
+					`  ${order.padStart(3)}  ${situation.id}${situation.title ? ` — ${situation.title}` : ''}`,
+				),
+			);
+		}
+	}
+
+	const milestones = Object.entries(arc.milestone);
+	if (milestones.length > 0) {
+		lines.push(blank(), muted('milestone — intended power at the end of this arc'));
+		for (const [characterId, milestone] of milestones) {
+			const level = milestone.level === undefined ? '—' : `L${String(milestone.level)}`;
+			lines.push(text(`  ${characterId}  ${level}`));
+		}
+		lines.push(muted('/pacing compares this against replay'));
+	}
 
 	return lines;
 }

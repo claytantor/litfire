@@ -148,3 +148,50 @@ check runs on every commit.
 
 Repository settings must have Pages source set to "GitHub Actions". No workflow
 can set it, and it is the most common reason a correct workflow deploys nothing.
+
+## D9 — The situation is the hub
+
+**Committed:** every world link hangs off a situation, and every link has a verb.
+
+A vault could hold characters, places, moments and artifacts and still build an
+almost empty wiki. Place pages are derived from `situation.place`, character
+appearances are the scenes they are cast in, and a moment's scenes are the ones
+anchored to it — so a vault whose only situation named nothing produced a wiki
+with no places, no arcs and no scenes, which read as the wiki being broken
+rather than as the scene being unlinked.
+
+Nothing set those links. `situation.moment` had existed since character state
+landed with no command to write it, `characters:` and `place:` could only be
+reached by hand-editing frontmatter or by extraction, and no command created an
+arc at all — so `/situation place <id> <arc>` could never succeed in a fresh
+vault, because there was never an arc to place onto.
+
+Four decisions:
+
+- **`arc` and `place` are separate verbs.** `/situation <id> place <arc>` used
+  to mean "put this on an arc" while `place:` in the same file meant "where it
+  happens". One word for a narrative position and a location made the workflow
+  impossible to write down. `arc:` and `place:` are now each set by a verb of
+  the same name.
+- **Structural links are checked; descriptive ones are not.** A moment or an arc
+  must exist, because a typo would silently move a scene on the clock or in the
+  replay order. A place or a character need not: places have no schema at all,
+  and naming someone before writing their page is a normal order to work in. The
+  link is made and the gap is reported (P4).
+- **Situations are a wiki kind.** The page lists what is still unlinked, with
+  the command that fixes each gap, rather than rendering a tidy stub that looks
+  finished.
+- **Linking never touches the body.** Every verb goes through one patch helper
+  that rewrites frontmatter and writes the body back byte-identical, so P6 holds
+  by construction rather than by each verb remembering.
+
+Two bugs surfaced while verifying the flow end to end. `readAuthorBody` looked
+only for `<directory>/<id>.md`, so a scene stored as `sit-002-the-ledger-room.md`
+never showed its own prose on its own wiki page; it now finds a page by
+frontmatter id, and looks in the inbox for scenes that are still unplaced. And
+`/arc new` numbered arcs with D3's sparse step, producing `arc-02` at order 11 —
+arcs now count 1, 2, 3, since D3's reasoning is about inserting a scene between
+two others _within_ an arc.
+
+The whole flow is documented in `docs/guide/populating-a-situation.md` and
+verified end to end in `test/situation-workflow.test.ts`.

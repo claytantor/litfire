@@ -135,7 +135,7 @@ describe('/status write', () => {
 		const output = said(await dispatch('/status write carl sit-903'));
 
 		expect(output).toContain("'sit-903' has no state in the replay sequence");
-		expect(output).toContain('/situation place');
+		expect(output).toContain('/situation <id> arc');
 	});
 
 	it('refuses a situation that does not exist', async () => {

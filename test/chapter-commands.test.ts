@@ -87,7 +87,7 @@ describe('/chapter new', () => {
 		const output = said(await dispatch('/chapter new sit-903'));
 
 		expect(output).toContain('not in the replay sequence');
-		expect(output).toContain('/situation place');
+		expect(output).toContain('/situation <id> arc');
 	});
 
 	it('refuses a situation that does not exist', async () => {

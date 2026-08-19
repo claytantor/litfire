@@ -1,4 +1,4 @@
-import {readFileSync} from 'node:fs';
+import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import type {Project} from '../core/project.js';
 import type {
 	Arc,
@@ -19,6 +19,7 @@ import {
 	type Setting,
 } from '../genre/types.js';
 import type {Step} from '../ledger/replay.js';
+import {castOf, momentByStep} from '../ledger/state.js';
 import {parseDocument} from '../vault/frontmatter.js';
 import {resolve, VAULT} from '../vault/paths.js';
 import type {Wiki, WikiKind, WikiPage} from './types.js';
@@ -44,6 +45,7 @@ const KIND_ORDER: readonly Exclude<WikiKind, 'index'>[] = [
 	'skill',
 	'item',
 	'arc',
+	'situation',
 	'theme',
 ];
 
@@ -101,12 +103,48 @@ function bySequenceThenId(ctx: StepContext) {
  * synchronously rather than pulling the rest of the module onto `fs/promises`.
  */
 function readAuthorBody(root: string, directory: string, id: string): string | undefined {
+	for (const file of authorFiles(root, directory, id)) {
+		try {
+			const raw = readFileSync(file, 'utf8');
+			const body = parseDocument(raw).body.trim();
+			if (body !== '') {
+				return body;
+			}
+		} catch {
+			continue;
+		}
+	}
+	return undefined;
+}
+
+/**
+ * Where a page's source might be, best guess first.
+ *
+ * Most kinds are `<directory>/<id>.md` and stop at the first candidate. A
+ * situation is not: `/situation new` slugs the title into the filename, so
+ * `sit-002` lives in `sit-002-the-ledger-room.md`, and looking only for
+ * `sit-002.md` meant a scene's own prose never appeared on its own page — the
+ * one page it most obviously belongs on.
+ */
+function authorFiles(root: string, directory: string, id: string): string[] {
+	const direct = resolve(root, directory, `${id}.md`);
+	if (existsSync(direct)) {
+		return [direct];
+	}
+
 	try {
-		const raw = readFileSync(resolve(root, directory, `${id}.md`), 'utf8');
-		const body = parseDocument(raw).body.trim();
-		return body === '' ? undefined : body;
+		return readdirSync(resolve(root, directory), {withFileTypes: true})
+			.filter(entry => entry.isFile() && entry.name.endsWith('.md'))
+			.map(entry => resolve(root, directory, entry.name))
+			.filter(file => {
+				try {
+					return parseDocument(readFileSync(file, 'utf8')).data['id'] === id;
+				} catch {
+					return false;
+				}
+			});
 	} catch {
-		return undefined;
+		return [];
 	}
 }
 
@@ -1094,6 +1132,125 @@ function buildArcPage(arc: Arc, project: Project, ctx: StepContext): WikiPage {
 // Themes
 // ---------------------------------------------------------------------------
 
+/**
+ * One situation: the scene as a hub.
+ *
+ * Everything else in the wiki hangs off this page's links — a place exists in
+ * the wiki because a situation names it, a character's appearances are the
+ * situations they are cast in, and a moment's scenes are the ones anchored to
+ * it. A situation that names nothing leaves the rest of the wiki empty, which
+ * is why this page says plainly what is still unlinked instead of rendering a
+ * tidy stub.
+ */
+function buildSituationPage(
+	situation: Situation,
+	project: Project,
+	ctx: StepContext,
+): WikiPage {
+	const clock = momentByStep(project.replay.sequence, project.vault.situations);
+	const cast = castOf(project.replay, clock, situation);
+	const arc = project.vault.arcs.find(a => a.id === situation.arc);
+
+	const placed = ctx.sequence.some(
+		step => step.kind === 'situation' && step.id === situation.id,
+	);
+
+	const facts = [
+		arc ? `[[${arc.id}]]` : 'unplaced',
+		cast.moment === undefined ? 'no moment' : `[[${cast.moment}]]`,
+		situation.place === undefined ? 'nowhere' : `[[${situation.place}]]`,
+		plural(situation.characters.length, 'character'),
+	].join(' · ');
+
+	// What is missing is the useful half of this page while a scene is being
+	// built up, so it is listed rather than left for the author to infer.
+	const gaps: string[] = [];
+	if (situation.arc === undefined) {
+		gaps.push(`- No arc. \`/situation ${situation.id} arc <arc>\` places it.`);
+	}
+	if (cast.moment === undefined) {
+		gaps.push(
+			`- No moment on the clock, so every character state here is unplaced. ` +
+				`\`/situation ${situation.id} moment <moment>\` anchors it.`,
+		);
+	}
+	if (situation.place === undefined) {
+		gaps.push(`- No place. \`/situation ${situation.id} place <place>\` sets one.`);
+	}
+	if (situation.characters.length === 0) {
+		gaps.push(
+			`- Nobody in it. \`/situation ${situation.id} cast <character>…\` adds them.`,
+		);
+	}
+
+	const castLines =
+		cast.states.length === 0
+			? situation.characters.length === 0
+				? ['_Nobody is cast in this scene yet._']
+				: situation.characters.map(id => `- [[${id}]] — no state at this point`)
+			: cast.states.map(state => {
+					const stats = Object.entries(state.stats)
+						.toSorted(([a], [b]) => a.localeCompare(b))
+						.map(([id, value]) => `${id} ${String(value)}`)
+						.join(', ');
+					const held =
+						state.artifacts.length === 0
+							? 'no artifacts'
+							: state.artifacts.map(id => `[[${id}]]`).join(', ');
+					return `- [[${state.character}]] — level ${String(state.level)}${
+						stats === '' ? '' : `, ${stats}`
+					} · ${held}`;
+				});
+
+	const body = [
+		`# ${situation.title ?? situation.id}`,
+		'',
+		BANNER,
+		'',
+		facts,
+		'',
+		...(gaps.length > 0 ? ['## Not linked yet', '', ...gaps, ''] : []),
+		'## Cast',
+		'',
+		cast.moment === undefined
+			? '_State is shown at this scene, once it sits on the clock._'
+			: `State after this scene, at [[${cast.moment}]].`,
+		'',
+		...castLines,
+		'',
+		...(situation.themes.length > 0
+			? ['## Themes', '', situation.themes.map(t => `- [[${t}]]`).join('\n'), '']
+			: []),
+		'## Replay',
+		'',
+		placed
+			? `Replays in sequence${situation.order === undefined ? '' : ` at order ${String(situation.order)}`}.`
+			: 'Not in the replay sequence — an unplaced situation contributes no state.',
+		'',
+		situation.events.length === 0
+			? '_No ledger events._'
+			: situation.events
+					.map(event => `- \`${event.type}\` — [[${event.actor}]]`)
+					.join('\n'),
+		'',
+		// Unplaced scenes are still in the inbox, and their prose is no less the
+		// author's for not having an arc yet.
+		readAuthorBody(project.vault.root, VAULT.situations, situation.id) === undefined
+			? authorSection(project.vault.root, VAULT.inbox, situation.id, 'situations/inbox/')
+			: authorSection(project.vault.root, VAULT.situations, situation.id, 'situations/'),
+	].join('\n');
+
+	return {
+		path: `${VAULT.wiki}/situations/${situation.id}.md`,
+		kind: 'situation',
+		id: situation.id,
+		title: situation.title ?? situation.id,
+		summary: facts.replaceAll(/\[\[|\]\]/g, ''),
+		sortKey: situation.order,
+		body,
+	};
+}
+
 function buildThemePage(theme: Theme, project: Project): WikiPage {
 	const pillar = project.coverage.pillars.find(p => p.id === theme.id);
 
@@ -1260,6 +1417,10 @@ export function buildWiki(project: Project): Wiki {
 		.toSorted((a, b) => a.id.localeCompare(b.id))
 		.map(arc => buildArcPage(arc, project, ctx));
 
+	const situations = project.vault.situations
+		.toSorted((a, b) => a.id.localeCompare(b.id))
+		.map(situation => buildSituationPage(situation, project, ctx));
+
 	const themes = project.vault.themes
 		.toSorted((a, b) => a.id.localeCompare(b.id))
 		.map(theme => buildThemePage(theme, project));
@@ -1274,6 +1435,7 @@ export function buildWiki(project: Project): Wiki {
 		...skills,
 		...items,
 		...arcs,
+		...situations,
 		...themes,
 	];
 
