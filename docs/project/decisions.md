@@ -195,3 +195,54 @@ two others _within_ an arc.
 
 The whole flow is documented in `docs/guide/populating-a-situation.md` and
 verified end to end in `test/situation-workflow.test.ts`.
+
+## D10 — The in-world clock is a bigint
+
+**Committed:** every instant is `bigint` seconds from the origin, ±1 trillion
+years; calendars are a presentation layer chosen per vault.
+
+`at` was a JavaScript number, exact only to ±9,007,199,254,740,991 — about ±285
+million years in seconds. A vault dating the formation of a world before a
+present-day origin passes that immediately, and past it the arithmetic does not
+fail: it silently rounds, and two moments a minute apart compare equal.
+
+The rounding is invisible in round numbers, which is what makes it dangerous.
+`-26174880000000000` survives a round trip through a double intact;
+`-26174880000000123` comes back as `...124`. A format that is lossless for the
+values used in testing and lossy for the ones used in writing is found years
+later, in someone's book. A real vault was already past the bound.
+
+Decisions inside that:
+
+- **The widening is exactly as broad as the clock.** Frontmatter is parsed with
+  `intAsBigInt` so `at` never passes through a double, then every other integer
+  is narrowed back to a number. Levels, xp, stats and orders are small by nature
+  and read by arithmetic all over the codebase; promoting them wholesale would
+  be a large change for no gain, and mixing the two silently is how `1n + 1`
+  becomes a TypeError in production.
+- **A damaged number is refused, not adopted.** A `number` outside the safe
+  range has already been rounded by the parser. Taking it would bake the damage
+  in, so it becomes a load issue instead.
+- **Calendars are presentation, never storage.** A vault holds seconds and
+  nothing else; `timeline/time.md` decides how they are _read_. Changing the
+  calendar never rewrites a moment.
+- **A custom calendar is a formula, not a schema.** Ten months of thirty-five
+  days with four moons on different cycles is a function, and a declarative
+  format covering it would be a worse programming language than the one already
+  in the vault. It runs in the existing consent-gated isolate, receives a
+  `BigInt`, and returns a string.
+- **Formatting happens during `computeProject`.** The isolate is async and the
+  runner is disposed before the project is returned, so every displayed instant
+  is rendered once while it is alive and read from a map afterwards. The
+  alternative would be running author code on the main thread, which is the one
+  thing the sandbox exists to prevent.
+- **Gregorian says when it cannot answer.** `Date` spans ±273,790 years and the
+  clock spans ±1 trillion. Beyond its horizon the calendar returns "beyond this
+  calendar"; clamping would report a date wrong by geological ages, and throwing
+  would take the timeline down over a display concern (P4).
+
+`clock_beyond_exact_range` is gone — the condition it warned about can no longer
+occur. `clock_collision` remains for two moments genuinely written at the same
+second.
+
+Documented in `docs/reference/time.md`.

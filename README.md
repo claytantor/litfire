@@ -76,6 +76,9 @@ Then, in the TUI:
 | `/arc new [title]`             | Create an arc                                    |
 | `/arc <id> after <moment>`     | Anchor an arc on the clock                       |
 | `/arc <id> order <n>`          | Set its replay order                             |
+| `/time`                        | The in-world clock and the calendar it reads by  |
+| `/time gregorian <epoch>`      | Bind the clock to Earth/Sol time                 |
+| `/time custom`                 | Read it through a calendar formula you wrote     |
 | `/situation place <id> <arc>`  | Move a situation out of the inbox                |
 | `/help`, `/quit`               |                                                  |
 
@@ -114,11 +117,12 @@ The README is the short version. Everything below lives on the
 | [Genre profiles](https://claytantor.github.io/litfire/concepts/genre-profiles)       | One engine, many idioms                            |
 | [The LitRPG genre](https://claytantor.github.io/litfire/concepts/litrpg)             | What this tool assumes about the genre             |
 
-| Reference                                                                             |                                     |
-| ------------------------------------------------------------------------------------- | ----------------------------------- |
-| [Model providers](https://claytantor.github.io/litfire/reference/providers)           | Choosing a provider, key, and model |
-| [The formula sandbox](https://claytantor.github.io/litfire/reference/formula-sandbox) | Why formulas run in an isolate      |
-| [Scripts](https://claytantor.github.io/litfire/reference/scripts)                     | What each script in `scripts/` does |
+| Reference                                                                             |                                          |
+| ------------------------------------------------------------------------------------- | ---------------------------------------- |
+| [The in-world clock](https://claytantor.github.io/litfire/reference/time)             | Deep time, bigint seconds, and calendars |
+| [Model providers](https://claytantor.github.io/litfire/reference/providers)           | Choosing a provider, key, and model      |
+| [The formula sandbox](https://claytantor.github.io/litfire/reference/formula-sandbox) | Why formulas run in an isolate           |
+| [Scripts](https://claytantor.github.io/litfire/reference/scripts)                     | What each script in `scripts/` does      |
 
 | Project                                                                       |                                                  |
 | ----------------------------------------------------------------------------- | ------------------------------------------------ |

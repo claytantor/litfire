@@ -27,6 +27,7 @@ export const VAULT = {
 	 * of moments, so a vault written before they were pages needs no migration.
 	 */
 	moments: 'timeline/moments',
+	time: 'timeline/time.md',
 	/** The pre-moments single-file list. Read, never written. */
 	legacyMoments: 'timeline/world-events.md',
 	arcs: 'timeline/arcs',

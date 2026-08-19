@@ -66,6 +66,7 @@ export default defineConfig({
 			{
 				text: 'Reference',
 				items: [
+					{text: 'The in-world clock', link: '/reference/time'},
 					{text: 'Model providers', link: '/reference/providers'},
 					{text: 'The formula sandbox', link: '/reference/formula-sandbox'},
 					{text: 'Scripts', link: '/reference/scripts'},

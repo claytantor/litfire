@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {toInstant} from '../time/instant.js';
 
 /** Ids are the wikilink target and the filename stem, so keep them slug-safe. */
 export const idSchema = z
@@ -154,6 +155,19 @@ export const ledgerEventSchema = z.discriminatedUnion('type', [
  * row in a list, and a moment is a thing an author interviews about, shows, and
  * extracts into on its own. Arcs anchor to them by id.
  */
+/**
+ * A point on the in-world clock: whole seconds from the vault's origin.
+ *
+ * Accepts a plain YAML integer as well as a bigint so timelines written before
+ * the clock was widened keep loading, and refuses a number that is already
+ * outside the exactly-representable range — see `toInstant`.
+ */
+export const instantSchema = z
+	.custom<bigint>(value => toInstant(value) !== undefined, {
+		message: `not a whole number of seconds within ±1 trillion years of the origin`,
+	})
+	.transform(value => toInstant(value)!);
+
 export const momentSchema = z.object({
 	id: idSchema,
 	name: z.string().optional(),
@@ -163,7 +177,7 @@ export const momentSchema = z.object({
 	 * `buildSequence` skips it and `runChecks` raises it, because a replay that
 	 * guessed a position would be worse than one that says it does not know.
 	 */
-	at: z.number().optional(),
+	at: instantSchema.optional(),
 	events: z.array(ledgerEventSchema).default([]),
 	stub: stubFlag,
 });

@@ -4,6 +4,8 @@ import {FormulaRunner, hashFormulas} from '../system/sandbox.js';
 import {computeCoverage, type Coverage} from '../themes/coverage.js';
 import {readConfig} from '../vault/config.js';
 import {loadVault, type Vault} from '../vault/load.js';
+import {formatAll, type FormattedInstants} from '../time/custom.js';
+import type {Instant} from '../time/instant.js';
 
 export type Project = {
 	readonly vault: Vault;
@@ -13,6 +15,15 @@ export type Project = {
 	readonly formulaHash: string;
 	/** True when formulas were present but consent withheld (§6.4). */
 	readonly formulasSkipped: boolean;
+	/**
+	 * Every dated instant, already rendered by the vault's custom calendar.
+	 *
+	 * Formatting a custom calendar means running author code in the isolate,
+	 * which is async and cannot outlive `computeProject` — the runner is disposed
+	 * before this returns. So the work happens here, once, while it is alive, and
+	 * the synchronous views and wiki read the answers out of this map.
+	 */
+	readonly calendarText: FormattedInstants | undefined;
 };
 
 export type ComputeOptions = {
@@ -30,6 +41,13 @@ export type ComputeOptions = {
  * §6.3 makes this deliberately non-incremental — at novel scale the whole thing
  * is milliseconds, and a pure function is far easier to trust than a cache.
  */
+/** Every instant a page might need to show, deduplicated by `formatAll`. */
+function momentInstants(vault: Vault): Instant[] {
+	return vault.moments
+		.map(moment => moment.at)
+		.filter((at): at is Instant => at !== undefined);
+}
+
 export async function computeProject(
 	root: string,
 	options: ComputeOptions = {},
@@ -77,6 +95,11 @@ export async function computeProject(
 			replayResult.sequence,
 		);
 
+		const calendarText =
+			vault.time?.calendar === 'custom' && runner !== undefined
+				? (await formatAll(runner, momentInstants(vault))).formatted
+				: undefined;
+
 		return {
 			vault,
 			replay: replayResult,
@@ -84,6 +107,7 @@ export async function computeProject(
 			coverage,
 			formulaHash,
 			formulasSkipped: vault.formulas.length > 0 && !consented,
+			calendarText,
 		};
 	} finally {
 		runner?.dispose();

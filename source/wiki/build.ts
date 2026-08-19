@@ -20,6 +20,9 @@ import {
 } from '../genre/types.js';
 import type {Step} from '../ledger/replay.js';
 import {castOf, momentByStep} from '../ledger/state.js';
+import {compareInstants, grouped} from '../time/instant.js';
+import {calendarFor} from '../time/binding.js';
+import type {Calendar} from '../time/calendar.js';
 import {parseDocument} from '../vault/frontmatter.js';
 import {resolve, VAULT} from '../vault/paths.js';
 import type {Wiki, WikiKind, WikiPage} from './types.js';
@@ -66,6 +69,12 @@ type StepContext = {
 	readonly sequence: readonly Step[];
 	readonly sequenceIndex: ReadonlyMap<string, number>;
 	readonly eventsByStep: ReadonlyMap<string, readonly LedgerEvent[]>;
+	/**
+	 * How this vault reads its clock. Every page that shows a position goes
+	 * through it, so binding a calendar changes the whole wiki at once rather
+	 * than page by page.
+	 */
+	readonly calendar: Calendar;
 };
 
 /**
@@ -75,6 +84,9 @@ type StepContext = {
  */
 function buildStepContext(project: Project): StepContext {
 	const sequence = project.replay.sequence;
+	const {calendar} = calendarFor(project.vault.time, {
+		formatted: project.calendarText,
+	});
 	const sequenceIndex = new Map(sequence.map((step, index) => [step.id, index]));
 	const eventsByStep = new Map<string, readonly LedgerEvent[]>([
 		...project.vault.moments.map(event => [event.id, event.events] as const),
@@ -82,7 +94,7 @@ function buildStepContext(project: Project): StepContext {
 			situation => [situation.id, situation.events] as const,
 		),
 	]);
-	return {sequence, sequenceIndex, eventsByStep};
+	return {sequence, sequenceIndex, eventsByStep, calendar};
 }
 
 /** Situations that never made it into the sequence (unplaced) sort last,
@@ -801,7 +813,10 @@ function buildMomentPage(moment: Moment, project: Project, ctx: StepContext): Wi
 		'',
 		moment.at === undefined
 			? '_Undated — recorded but not placed, so nothing it carries reaches the ledger._'
-			: `On the in-world clock at **${moment.at}**.`,
+			: // Both, always. The number is the truth and the date is a reading of
+				// it; an epoch that is out by a century looks fine on its own and
+				// wrong the moment it sits beside the seconds it came from.
+				`${ctx.calendar.format(moment.at)} — **${grouped(moment.at)}** from origin.`,
 		'',
 		'## What it changes',
 		'',
@@ -833,7 +848,7 @@ function buildMomentPage(moment: Moment, project: Project, ctx: StepContext): Wi
 		summary:
 			moment.at === undefined
 				? `undated, ${plural(moment.events.length, 'event')}`
-				: `at ${moment.at}, ${plural(moment.events.length, 'event')}${placed ? '' : ', unplaced'}`,
+				: `at ${grouped(moment.at)}, ${plural(moment.events.length, 'event')}${placed ? '' : ', unplaced'}`,
 		body,
 	};
 }
@@ -1121,7 +1136,7 @@ function buildArcPage(arc: Arc, project: Project, ctx: StepContext): WikiPage {
 		id: arc.id,
 		// Arcs carry their own order, and it is sparse: `arc-10` sorts before
 		// `arc-2` alphabetically, which is the same lie one step smaller.
-		...(arc.order === undefined ? {} : {sortKey: arc.order}),
+		...(arc.order === undefined ? {} : {sortKey: BigInt(arc.order)}),
 		title: arc.name ?? arc.id,
 		summary,
 		body,
@@ -1246,7 +1261,7 @@ function buildSituationPage(
 		id: situation.id,
 		title: situation.title ?? situation.id,
 		summary: facts.replaceAll(/\[\[|\]\]/g, ''),
-		sortKey: situation.order,
+		...(situation.order === undefined ? {} : {sortKey: BigInt(situation.order)}),
 		body,
 	};
 }
@@ -1339,7 +1354,7 @@ function buildIndexPage(pages: readonly WikiPage[]): WikiPage {
 				if (b.sortKey === undefined) {
 					return -1;
 				}
-				return a.sortKey - b.sortKey;
+				return compareInstants(a.sortKey, b.sortKey);
 			}
 			return a.title.localeCompare(b.title);
 		});

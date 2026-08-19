@@ -414,51 +414,32 @@ function factionGoals(input: CheckInput): Finding[] {
 }
 
 /**
- * Positions the in-world clock cannot actually tell apart.
+ * Two moments the author placed at the same instant.
  *
- * `at` is a JavaScript number, so it is exact only while |at| stays inside
- * `Number.MAX_SAFE_INTEGER`. A clock counting seconds reaches that in about 285
- * million years — well within reach of a story that opens in deep time, where
- * 800 million years ago is roughly 2.5e16 seconds and the spacing between
- * representable values is four seconds.
+ * This used to also warn that positions past `Number.MAX_SAFE_INTEGER` could
+ * not be told apart: `at` was a double, exact only to about ±285 million years
+ * in seconds, and a story opening in deep time crossed that easily. The clock
+ * is a bigint now and exact across its whole ±1 trillion year range, so that
+ * finding cannot occur and is gone. What remains is the real case — two
+ * turning points genuinely written at the same second.
  *
- * Nothing here is wrong yet: sorting still works, the value survives YAML and
- * JSON intact, and turning points that reshape a world are not four seconds
- * apart. What must not happen is the *silent* version — two events written a
- * second apart, landing on the same instant, ordered by id, with nothing said.
- * So the granularity is stated, and a genuine collision is reported.
+ * Ties are broken by id, which is deterministic but arbitrary. When the author
+ * meant an order, saying so beats picking one alphabetically and moving on.
  */
-function clockPrecision(input: CheckInput): Finding[] {
+function clockCollisions(input: CheckInput): Finding[] {
 	const findings: Finding[] = [];
-	const dated = input.moments.filter(event => event.at !== undefined);
+	const byPosition = new Map<string, string[]>();
 
-	for (const event of dated) {
-		const at = event.at ?? 0;
-		if (Number.isSafeInteger(at)) {
+	for (const event of input.moments) {
+		if (event.at === undefined) {
 			continue;
 		}
-
-		// Measured rather than assumed: the gap doubles with the exponent, so the
-		// number the author needs is the one for *their* magnitude.
-		let granularity = 1;
-		while (at - granularity === at) {
-			granularity *= 2;
-		}
-
-		findings.push({
-			kind: 'clock_beyond_exact_range',
-			detail: `moment '${event.id}' sits at ${at}, past the exact-integer range — positions within ${String(granularity)} of it cannot be told apart`,
-			where: event.id,
-		});
+		// Keyed by the decimal string: a Map keys bigints by identity well enough,
+		// but the string is what the message needs anyway.
+		const key = event.at.toString();
+		byPosition.set(key, [...(byPosition.get(key) ?? []), event.id]);
 	}
 
-	// Ties are broken by id, which is deterministic but arbitrary. When the author
-	// meant an order, saying so beats picking one alphabetically and moving on.
-	const byPosition = new Map<number, string[]>();
-	for (const event of dated) {
-		const at = event.at ?? 0;
-		byPosition.set(at, [...(byPosition.get(at) ?? []), event.id]);
-	}
 	for (const [at, ids] of byPosition) {
 		if (ids.length > 1) {
 			findings.push({
@@ -541,7 +522,7 @@ export function runChecks(input: CheckInput): OpenQuestion[] {
 		...statRanges(input),
 		...brokenReferences(input),
 		...unplaced(input),
-		...clockPrecision(input),
+		...clockCollisions(input),
 		...systemNames(input),
 		...factionGoals(input),
 		...artifactUse(input),

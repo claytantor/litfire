@@ -47,7 +47,7 @@ export type WikiPage = {
 	 * Absent sorts last, then by title — an undated moment has no place in a
 	 * sequence, and saying so beats inventing one.
 	 */
-	readonly sortKey?: number;
+	readonly sortKey?: bigint;
 	/** Full page markdown, headings and all. No frontmatter — the writer adds it. */
 	readonly body: string;
 };

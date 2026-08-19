@@ -2,6 +2,7 @@ import {readdir, readFile, rename, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import type {Project} from '../core/project.js';
 import {arcSchema, chapterSchema, situationSchema} from '../domain/schema.js';
+import {calendarFor, CALENDAR_FORMULA_ID, gregorian, timeSchema} from '../time/index.js';
 import {partitionChapters} from '../chapters/index.js';
 import {renderManuscript} from '../chapters/manuscript.js';
 import {
@@ -78,6 +79,7 @@ import {
 	renderQuestions,
 	renderArc,
 	renderArcs,
+	renderTime,
 	renderCast,
 	renderSheet,
 	renderSystem,
@@ -788,6 +790,130 @@ const questions: Command = {
 		}
 		const lines = renderQuestions(context.project);
 		return {lines, paged: lines.length > 14, title: 'questions'};
+	},
+};
+
+/**
+ * `/time` — read the in-world clock, and bind it to a calendar.
+ *
+ * The clock itself is not configurable: every instant is whole seconds from
+ * the origin, and the origin is second zero. What a binding decides is how
+ * those seconds are *read* — as themselves, as Earth/Sol dates, or through a
+ * calendar the author wrote as a formula.
+ */
+const time: Command = {
+	name: 'time',
+	usage: '/time [seconds | gregorian <epoch> [zone] | custom | origin <name>]',
+	summary: 'the in-world clock, and the calendar it is read through',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const [sub, ...rest] = args;
+		const current = context.project.vault.time;
+
+		const write = async (patch: Record<string, unknown>) => {
+			const file = resolve(context.root, VAULT.time);
+			const raw = await readFile(file, 'utf8').catch(() => undefined);
+			const document = raw === undefined ? {data: {}, body: ''} : parseDocument(raw);
+			const data = {...document.data, ...patch};
+			try {
+				timeSchema.parse(data);
+			} catch (caught) {
+				return caught instanceof Error ? caught.message.split('\n')[0]! : String(caught);
+			}
+			await writeFile(
+				file,
+				stringifyDocument({
+					data,
+					body:
+						document.body.trim() === ''
+							? '\nWhat the origin is, and why the clock starts there.\n'
+							: document.body,
+				}),
+				'utf8',
+			);
+			return undefined;
+		};
+
+		if (sub === 'seconds' || sub === 'custom' || sub === 'gregorian') {
+			const patch: Record<string, unknown> = {calendar: sub};
+
+			if (sub === 'gregorian') {
+				const [epoch, zone] = rest;
+				if (!epoch) {
+					return {
+						lines: [
+							error('usage: /time gregorian <epoch> [zone]'),
+							muted('epoch is the real instant the origin sits at, ISO 8601'),
+							muted('e.g. /time gregorian 2031-08-15T19:33:00-07:00 America/Los_Angeles'),
+						],
+					};
+				}
+				// Checked here rather than on the next load: a bad epoch that only
+				// surfaces as raw seconds later reads as the command having done
+				// nothing at all.
+				try {
+					gregorian({epoch, timeZone: zone});
+				} catch (caught) {
+					return {
+						lines: [error(caught instanceof Error ? caught.message : String(caught))],
+					};
+				}
+				patch['epoch'] = epoch;
+				if (zone !== undefined) {
+					patch['timezone'] = zone;
+				}
+			}
+
+			const failed = await write(patch);
+			if (failed !== undefined) {
+				return {lines: [error(failed)]};
+			}
+
+			return {
+				lines: [
+					ok(`clock read as ${sub}`),
+					...(sub === 'custom'
+						? [
+								muted(
+									`define a \`${CALENDAR_FORMULA_ID}\` formula taking seconds (BigInt)`,
+								),
+								muted('and returning a string — /consent lets it run'),
+							]
+						: []),
+				],
+				dirty: true,
+			};
+		}
+
+		if (sub === 'origin') {
+			const name = rest.join(' ');
+			if (name === '') {
+				return {lines: [error('usage: /time origin <what second zero is>')]};
+			}
+			const failed = await write({origin: name});
+			return failed === undefined
+				? {lines: [ok(`origin is ${name}`)], dirty: true}
+				: {lines: [error(failed)]};
+		}
+
+		if (sub !== undefined) {
+			return {
+				lines: [
+					error(
+						'usage: /time [seconds | gregorian <epoch> [zone] | custom | origin <name>]',
+					),
+				],
+			};
+		}
+
+		const {calendar, note} = calendarFor(current, {
+			formatted: context.project.calendarText,
+		});
+		const lines = renderTime(context.project, calendar, note);
+		return {lines, paged: lines.length > 14, title: 'time'};
 	},
 };
 
@@ -1881,6 +2007,7 @@ export const commands: readonly Command[] = [
 	lint,
 	questions,
 	arc,
+	time,
 	situation,
 	provider,
 	project,

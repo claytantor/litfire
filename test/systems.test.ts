@@ -339,16 +339,33 @@ describe('the in-world clock at deep time', () => {
 		);
 	};
 
-	it('states the real granularity when a position leaves the exact range', async () => {
-		// 800 million years ago, counted in seconds: -800000000 * 31536000.
+	/**
+	 * This used to warn that positions here could not be told apart: `at` was a
+	 * double, exact only to about ±285 million years in seconds, and the spacing
+	 * between representable values at this magnitude was four seconds. The clock
+	 * is a bigint now, so deep time is ordinary and there is nothing to report.
+	 */
+	it('places a moment 800 million years back with nothing to report', async () => {
 		await moment('substrate-patch', 'at: -25228800000000000\n');
 
 		const project = await computeProject(root);
-		const finding = project.questions.find(q => q.kind === 'clock_beyond_exact_range');
 
-		expect(finding?.detail).toContain('substrate-patch');
-		// Computed for this magnitude, not a hardcoded warning.
-		expect(finding?.detail).toContain('within 4 of it cannot be told apart');
+		expect(project.vault.issues).toEqual([]);
+		expect(project.questions.map(q => q.kind)).not.toContain('clock_beyond_exact_range');
+		expect(project.vault.moments[0]?.at).toBe(-25_228_800_000_000_000n);
+	});
+
+	it('keeps two deep-time moments one second apart distinct', async () => {
+		// A double rounds both of these to the same value; a bigint does not.
+		await moment('patch', 'at: -25228800000000000\n');
+		await moment('aftermath', 'at: -25228799999999999\n');
+
+		const project = await computeProject(root);
+
+		expect(project.questions.map(q => q.kind)).not.toContain('clock_collision');
+		// And the later one replays second, which is the point of keeping them apart.
+		const order = project.replay.sequence.map(step => step.id);
+		expect(order.indexOf('patch')).toBeLessThan(order.indexOf('aftermath'));
 	});
 
 	it('says nothing about positions the clock can represent exactly', async () => {
@@ -359,10 +376,9 @@ describe('the in-world clock at deep time', () => {
 		expect(project.questions.map(q => q.kind)).not.toContain('clock_beyond_exact_range');
 	});
 
-	it('reports two events that land on the same instant', async () => {
-		// One second apart at this magnitude is no distance at all.
+	it('reports two events the author genuinely placed at the same instant', async () => {
 		await moment('patch', 'at: -25228800000000000\n');
-		await moment('aftermath', 'at: -25228799999999999\n');
+		await moment('aftermath', 'at: -25228800000000000\n');
 
 		const project = await computeProject(root);
 		const collision = project.questions.find(q => q.kind === 'clock_collision');
@@ -620,7 +636,10 @@ describe('the wiki renders a timeline as a timeline', () => {
 
 		const wiki = buildWiki(await computeProject(root));
 		const page = wiki.pages.find(p => p.id === 'the-substrate-patch');
-		expect(page?.summary).toContain('at -26174880000000000');
-		expect(page?.body).toContain('On the in-world clock at **-26174880000000000**');
+		// Grouped, because a raw twenty-digit run is unreadable.
+		expect(page?.summary).toContain('at -26,174,880,000,000,000');
+		// With no calendar bound the reading is the seconds themselves, and the
+		// exact position is always stated alongside it.
+		expect(page?.body).toContain('**-26,174,880,000,000,000** from origin');
 	});
 });

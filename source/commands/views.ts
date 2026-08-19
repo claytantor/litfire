@@ -3,6 +3,14 @@ import type {Project} from '../core/project.js';
 import type {OrphanedInterview} from '../interview/index.js';
 import type {LedgerState} from '../ledger/replay.js';
 import {
+	compareInstants,
+	describeDuration,
+	grouped,
+	MAX_INSTANT,
+	type Instant,
+} from '../time/instant.js';
+import type {Calendar} from '../time/calendar.js';
+import {
 	allStates,
 	castOf,
 	momentByStep,
@@ -147,7 +155,9 @@ export function renderPrimitives(
 			rows: vault.moments
 				.toSorted(
 					(a, b) =>
-						(a.at ?? Number.MAX_SAFE_INTEGER) - (b.at ?? Number.MAX_SAFE_INTEGER) ||
+						// Undated sorts last: a moment recorded but not placed has no
+						// position, and inventing one would state the sequence wrongly.
+						compareInstants(a.at ?? MAX_INSTANT, b.at ?? MAX_INSTANT) ||
 						a.id.localeCompare(b.id),
 				)
 				.map(
@@ -155,7 +165,7 @@ export function renderPrimitives(
 						[
 							moment.id,
 							moment.name ?? '',
-							moment.at === undefined ? 'undated' : `at ${String(moment.at)}`,
+							moment.at === undefined ? 'undated' : `at ${grouped(moment.at)}`,
 						] as const,
 				),
 		},
@@ -978,6 +988,73 @@ export function renderArc(project: Project, arcId: string): Line[] {
 			lines.push(text(`  ${characterId}  ${level}`));
 		}
 		lines.push(muted('/pacing compares this against replay'));
+	}
+
+	return lines;
+}
+
+/**
+ * `/time` — how this vault reads its clock, and what that makes of the moments.
+ *
+ * The origin is second zero by definition; a binding only decides what second
+ * zero is *called*. Showing both the raw seconds and the calendar's reading
+ * side by side is what makes a wrong epoch obvious — a date that is out by a
+ * century looks fine on its own and wrong the moment it sits next to the
+ * number it came from.
+ */
+export function renderTime(project: Project, calendar: Calendar, note?: string): Line[] {
+	const {time, moments} = project.vault;
+	const dated = moments
+		.filter((moment): moment is typeof moment & {at: Instant} => moment.at !== undefined)
+		.toSorted((a, b) => compareInstants(a.at, b.at));
+
+	const lines: Line[] = [
+		heading('time'),
+		text(`calendar   ${calendar.name}`),
+		text(`origin     ${time?.origin ?? '(unnamed) — second zero'}`),
+	];
+
+	if (time?.calendar === 'gregorian') {
+		lines.push(
+			text(`epoch      ${time.epoch ?? '(none)'}`),
+			text(`timezone   ${time.timezone}`),
+		);
+	}
+
+	if (note !== undefined) {
+		lines.push(blank(), warn(note));
+	}
+
+	lines.push(
+		blank(),
+		muted(`${plural(dated.length, 'dated moment')} of ${String(moments.length)}`),
+	);
+
+	if (dated.length === 0) {
+		lines.push(muted('nothing on the clock yet — /timeline interview'));
+		return lines;
+	}
+
+	lines.push(blank());
+	const rows = dated.map(moment => [
+		`  ${moment.id}`,
+		grouped(moment.at),
+		calendar.format(moment.at),
+		describeDuration(moment.at),
+	]);
+	for (const row of columns([
+		['  moment', 'seconds', 'reads as', 'from origin'],
+		...rows,
+	])) {
+		lines.push(text(row));
+	}
+
+	const undated = moments.length - dated.length;
+	if (undated > 0) {
+		lines.push(
+			blank(),
+			muted(`${plural(undated, 'moment')} undated — recorded, but not on the clock`),
+		);
 	}
 
 	return lines;

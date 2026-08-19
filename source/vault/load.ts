@@ -25,6 +25,7 @@ import {extractFormulas} from '../system/formulas.js';
 import type {Formula} from '../system/sandbox.js';
 import {parseDocument} from './frontmatter.js';
 import {resolve, VAULT} from './paths.js';
+import {timeSchema, type TimeBinding} from '../time/binding.js';
 
 export type LoadIssue = {
 	readonly file: string;
@@ -41,6 +42,8 @@ export type Vault = {
 	readonly systems: readonly SystemDef[];
 	readonly formulas: readonly Formula[];
 	readonly moments: readonly Moment[];
+	/** How this vault reads its clock. Absent means raw seconds from origin. */
+	readonly time: TimeBinding | undefined;
 	readonly arcs: readonly Arc[];
 	readonly situations: readonly Situation[];
 	readonly characters: readonly Character[];
@@ -179,6 +182,8 @@ export async function loadVault(root: string): Promise<Vault> {
 		issues,
 	);
 
+	const time = await loadOne(resolve(root, VAULT.time), timeSchema, issues);
+
 	const {systems: named, formulas: scopedFormulas} = await loadSystems(root, issues);
 
 	// The shared file stays unscoped, so a formula in it is reachable from every
@@ -255,6 +260,7 @@ export async function loadVault(root: string): Promise<Vault> {
 		systems,
 		formulas,
 		moments,
+		time,
 		arcs,
 		// Inbox situations carry no arc, so they replay as unplaced (§5).
 		situations: [...placed, ...inbox.map(s => ({...s, arc: undefined}))],

@@ -166,6 +166,36 @@ export class FormulaRunner {
 		return result;
 	}
 
+	/**
+	 * Calls a formula and returns a string — the shape a calendar needs.
+	 *
+	 * Separate from `call` rather than loosening its return type, because every
+	 * existing caller is arithmetic and a formula that quietly returned a string
+	 * where a level was expected should still be an error.
+	 *
+	 * BigInt crosses the isolate boundary intact: it is structured-cloneable, so
+	 * a calendar receives the instant at full precision rather than a rounded
+	 * double, which is the entire reason the clock is a bigint.
+	 */
+	async callText(id: string, ...args: readonly unknown[]): Promise<string> {
+		const reference = this.#refs.get(id);
+		if (!reference) {
+			throw new Error(`formula '${id}' is not defined`);
+		}
+
+		const copied = args.map(argument =>
+			new ivm.ExternalCopy(argument).copyInto({release: true}),
+		);
+		const result: unknown = await reference.apply(undefined, copied, {
+			timeout: CPU_TIMEOUT_MS,
+		});
+
+		if (typeof result !== 'string') {
+			throw new Error(`formula '${id}' returned ${String(result)}, expected a string`);
+		}
+		return result;
+	}
+
 	dispose(): void {
 		if (this.#disposed) {
 			return;

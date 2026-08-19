@@ -7,6 +7,7 @@ import type {
 	Moment,
 } from '../domain/schema.js';
 import type {FormulaRunner} from '../system/sandbox.js';
+import {compareInstants, MAX_INSTANT, type Instant} from '../time/instant.js';
 
 export type CharacterState = {
 	id: string;
@@ -71,14 +72,16 @@ export function buildSequence(
 	situations: readonly Situation[],
 ): Step[] {
 	const dated = moments.filter(
-		(event): event is Moment & {at: number} => event.at !== undefined,
+		(event): event is Moment & {at: Instant} => event.at !== undefined,
 	);
-	const byClock = dated.toSorted((a, b) => a.at - b.at || a.id.localeCompare(b.id));
+	const byClock = dated.toSorted(
+		(a, b) => compareInstants(a.at, b.at) || a.id.localeCompare(b.id),
+	);
 	const anchorAt = new Map(byClock.map(event => [event.id, event.at]));
 	const emitted = new Set<string>();
 	const sequence: Step[] = [];
 
-	const emitMomentsUpTo = (limit: number) => {
+	const emitMomentsUpTo = (limit: Instant) => {
 		for (const event of byClock) {
 			if (!emitted.has(event.id) && event.at <= limit) {
 				emitted.add(event.id);
@@ -114,7 +117,8 @@ export function buildSequence(
 		}
 	}
 
-	emitMomentsUpTo(Number.POSITIVE_INFINITY);
+	// Everything not already emitted, however deep in time it sits.
+	emitMomentsUpTo(MAX_INSTANT);
 	return sequence;
 }
 
