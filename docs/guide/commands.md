@@ -37,6 +37,7 @@
 | `/time`                        | The in-world clock and the calendar it reads by  |
 | `/time gregorian <epoch>`      | Bind the clock to Earth/Sol time                 |
 | `/time custom`                 | Read it through a calendar formula you wrote     |
+| `/time at <date>`              | Convert a date to seconds, or back               |
 | `/situation place <id> <arc>`  | Move a situation out of the inbox                |
 | `/help`, `/quit`               |                                                  |
 

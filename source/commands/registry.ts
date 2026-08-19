@@ -2,7 +2,14 @@ import {readdir, readFile, rename, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import type {Project} from '../core/project.js';
 import {arcSchema, chapterSchema, situationSchema} from '../domain/schema.js';
-import {calendarFor, CALENDAR_FORMULA_ID, gregorian, timeSchema} from '../time/index.js';
+import {
+	calendarFor,
+	CALENDAR_FORMULA_ID,
+	describeDuration,
+	gregorian,
+	timeSchema,
+	toInstant,
+} from '../time/index.js';
 import {partitionChapters} from '../chapters/index.js';
 import {renderManuscript} from '../chapters/manuscript.js';
 import {
@@ -803,7 +810,7 @@ const questions: Command = {
  */
 const time: Command = {
 	name: 'time',
-	usage: '/time [seconds | gregorian <epoch> [zone] | custom | origin <name>]',
+	usage: '/time [at <date> | seconds | gregorian <epoch> [zone] | custom]',
 	summary: 'the in-world clock, and the calendar it is read through',
 	async run(args, context) {
 		if (!context.project) {
@@ -899,11 +906,75 @@ const time: Command = {
 				: {lines: [error(failed)]};
 		}
 
+		/**
+		 * Converts between a date and the seconds a moment stores.
+		 *
+		 * Bidirectional on purpose, and it decides which way by looking at the
+		 * input rather than asking: a bare integer is already an instant and wants
+		 * reading, anything else is a date and wants converting. Both directions
+		 * are the same question — "what is this, in the other notation" — and
+		 * making the author remember two verbs for it would be needless.
+		 */
+		if (sub === 'at') {
+			// Joined, because a date has spaces in it.
+			const written = rest.join(' ').trim();
+			if (written === '') {
+				return {
+					lines: [
+						error('usage: /time at <date | seconds>'),
+						muted('converts either way — a date to seconds, or seconds to a date'),
+					],
+				};
+			}
+
+			const {calendar, note} = calendarFor(current, {
+				formatted: context.project.calendarText,
+			});
+
+			const asInstant = toInstant(written.replaceAll(',', ''));
+			const instant = asInstant ?? calendar.parse?.(written);
+
+			if (instant === undefined) {
+				// A calendar formula formats and cannot read back. That is a real
+				// limitation of the shape, not a failure of this input.
+				if (calendar.parse === undefined) {
+					return {
+						lines: [
+							error(`${calendar.name} formats dates but cannot read them back`),
+							muted('a calendar formula is one-way — give the seconds directly'),
+						],
+					};
+				}
+				return {
+					lines: [
+						error(`'${written}' is not a date ${calendar.name} can read`),
+						muted(
+							current?.calendar === 'gregorian'
+								? 'try 2036-08-15 02:30:00'
+								: 'give whole seconds, or bind a calendar with /time gregorian',
+						),
+						...(note === undefined ? [] : [muted(note)]),
+					],
+				};
+			}
+
+			return {
+				lines: [
+					// Bare and unpunctuated first, because the next thing the author
+					// does with it is paste it into a moment's frontmatter.
+					ok(`at: ${instant.toString()}`),
+					text(`reads as     ${calendar.format(instant)}`),
+					text(`from origin  ${describeDuration(instant)}`),
+					...(note === undefined ? [] : [muted(note)]),
+				],
+			};
+		}
+
 		if (sub !== undefined) {
 			return {
 				lines: [
 					error(
-						'usage: /time [seconds | gregorian <epoch> [zone] | custom | origin <name>]',
+						'usage: /time [at <date> | seconds | gregorian <epoch> [zone] | custom | origin <name>]',
 					),
 				],
 			};

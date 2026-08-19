@@ -150,6 +150,32 @@ epoch      2031-08-15T19:33:00-07:00
 
 Wiki moment pages carry both for the same reason.
 
+## Converting a date
+
+```
+/time at 2036-08-15 02:30:00
+```
+
+```
+at: 157791420
+reads as     2036-08-15 02:30:00
+from origin  ~5 years
+```
+
+The bare integer comes first and unpunctuated, because the next thing you do
+with it is paste it into a moment's frontmatter.
+
+It converts **either way**, and decides which by looking at the input rather
+than asking: a bare integer is already an instant and gets read back as a date,
+anything else is a date and gets converted. Grouped digits are accepted too,
+since that is how `/time` prints them.
+
+::: warning A calendar formula is one-way
+A custom calendar formats and cannot read dates back — there is no way to invert
+an arbitrary function. `/time at` still converts seconds while one is bound, and
+says plainly why it cannot go the other way.
+:::
+
 ## Durations
 
 Spans longer than a day are reported with a leading `~` and computed against a

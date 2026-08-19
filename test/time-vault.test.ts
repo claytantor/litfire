@@ -143,6 +143,64 @@ describe('/time', () => {
 	});
 });
 
+describe('/time at', () => {
+	it('converts a date to the seconds a moment stores', async () => {
+		await run('/time gregorian 2031-08-15T19:33:00-07:00 America/Los_Angeles');
+
+		const shown = said(await run('/time at 2031-08-16 19:33:00'));
+		// Bare and unpunctuated, because it is about to be pasted into frontmatter.
+		expect(shown).toContain('at: 86400');
+		expect(shown).toContain('2031-08-16 19:33:00');
+	});
+
+	it('converts back the other way when given seconds', async () => {
+		await run('/time gregorian 2031-08-15T19:33:00-07:00 America/Los_Angeles');
+
+		const shown = said(await run('/time at 86400'));
+		expect(shown).toContain('at: 86400');
+		expect(shown).toContain('2031-08-16 19:33:00');
+	});
+
+	it('accepts grouped digits, since that is how /time prints them', async () => {
+		expect(said(await run('/time at -26,174,880,000,000,123'))).toContain(
+			'at: -26174880000000123',
+		);
+	});
+
+	it('round-trips the date that would not load as a moment', async () => {
+		// The real case: a vault holding `at: "2036-08-15 02:30:00"` fails to
+		// load, and this is what turns it into something that does.
+		await run('/time gregorian 2031-08-15T19:33:00-07:00 America/Los_Angeles');
+
+		const converted = said(await run('/time at 2036-08-15 02:30:00'));
+		const seconds = /at: (-?\d+)/.exec(converted)?.[1];
+		expect(seconds).toBeDefined();
+
+		await moment('inannas-first-memory', seconds!);
+		expect(context.project!.vault.issues).toEqual([]);
+		expect(said(await run('/time'))).toContain('2036-08-15 02:30:00');
+	});
+
+	it('says what it wanted when the date is unreadable', async () => {
+		await run('/time gregorian 2031-08-15T19:33:00-07:00');
+		const shown = said(await run('/time at last Tuesday'));
+
+		expect(shown).toContain('is not a date');
+		expect(shown).toContain('try 2036-08-15');
+	});
+
+	it('asks for something to convert when given nothing', async () => {
+		expect(said(await run('/time at'))).toContain('usage:');
+	});
+
+	it('reads seconds as themselves when no calendar is bound', async () => {
+		const shown = said(await run('/time at 86400'));
+		expect(shown).toContain('at: 86400');
+		expect(shown).toContain('86,400s');
+		expect(shown).toContain('1d');
+	});
+});
+
 describe('a calendar the author wrote', () => {
 	/** Ten months of thirty-two days — nothing Gregorian can express. */
 	const CALENDAR = `
@@ -197,6 +255,22 @@ describe('a calendar the author wrote', () => {
 		expect(calendar.format(-26_174_880_000_000_123n)).toBe(
 			`Year ${expected}, day ${(-26_174_880_000_000_123n % (86_400n * 320n)) / 86_400n + 1n}`,
 		);
+	});
+
+	it('says a calendar formula cannot read dates back', async () => {
+		await moment('the-breach', '0');
+		await withCustomCalendar();
+
+		const shown = said(await run('/time at Year 3, day 6'));
+		expect(shown).toContain('cannot read them back');
+		expect(shown).toContain('one-way');
+	});
+
+	it('still converts seconds while a custom calendar is bound', async () => {
+		await moment('the-breach', '0');
+		await withCustomCalendar();
+
+		expect(said(await run('/time at 0'))).toContain('at: 0');
 	});
 
 	it('falls back to seconds, and says why, when formulas are not consented', async () => {
