@@ -86,7 +86,7 @@ describe('Pager', () => {
 			columns,
 			24,
 		);
-		await flush();
+		await term.paint();
 
 		const frame = term.frame();
 		expectFits(frame, columns, 24);
@@ -100,7 +100,7 @@ describe('Pager', () => {
 			40,
 			10,
 		);
-		await flush();
+		await term.paint();
 
 		const frame = term.frame();
 		expectFits(frame, 40, 10);
@@ -120,7 +120,7 @@ describe('Pager', () => {
 			200,
 			40,
 		);
-		await flush();
+		await term.paint();
 		const wide = term.frame();
 		expect(widest(wide)).toBeGreaterThan(100);
 
@@ -130,7 +130,7 @@ describe('Pager', () => {
 		term.instance.rerender(
 			<Pager title="pacing" lines={longLines} rows={20} columns={44} onClose={vi.fn()} />,
 		);
-		await flush();
+		await term.paint();
 
 		const narrow = term.frame();
 		expectFits(narrow, 44, 20);
@@ -165,7 +165,7 @@ describe('DiffReview', () => {
 			columns,
 			24,
 		);
-		await flush();
+		await term.paint();
 
 		const frame = term.frame();
 		expectFits(frame, columns, 24);
@@ -187,7 +187,7 @@ describe('DiffReview', () => {
 			50,
 			16,
 		);
-		await flush();
+		await term.paint();
 
 		const frame = term.frame();
 		expectFits(frame, 50, 16);
@@ -216,7 +216,7 @@ describe('DiffReview', () => {
 			50,
 			10,
 		);
-		await flush();
+		await term.paint();
 
 		const frame = term.frame();
 		expect(widest(frame)).toBeLessThanOrEqual(50);
@@ -242,7 +242,7 @@ describe('DiffReview', () => {
 			44,
 			22,
 		);
-		await flush();
+		await term.paint();
 
 		term.stdin.write('e');
 		await flush(150);
@@ -276,7 +276,7 @@ describe('EditorScreen', () => {
 			columns,
 			24,
 		);
-		await flush();
+		await term.paint();
 
 		const frame = term.frame();
 		expectFits(frame, columns, 24);
@@ -300,7 +300,7 @@ describe('EditorScreen', () => {
 			46,
 			14,
 		);
-		await flush();
+		await term.paint();
 
 		const frame = term.frame();
 		expectFits(frame, 46, 14);
@@ -384,7 +384,7 @@ describe('SelectList', () => {
 			columns,
 			24,
 		);
-		await flush();
+		await term.paint();
 
 		const frame = term.frame();
 		expect(widest(frame)).toBeLessThanOrEqual(columns);
@@ -400,7 +400,7 @@ describe('ProviderWizard', () => {
 			columns,
 			12,
 		);
-		await flush();
+		await term.paint();
 
 		const frame = term.frame();
 		expectFits(frame, columns, 12);

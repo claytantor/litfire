@@ -118,6 +118,8 @@ export type Terminal = {
 	readonly instance: Instance;
 	/** The most recent frame a render drew, ANSI stripped. */
 	frame(): string;
+	/** Wait until something has been drawn, then let one more frame land. */
+	paint(): Promise<void>;
 	/** What the window is showing, after compositing. */
 	screen(): string;
 	/** Everything the terminal holds, scrollback included. */
@@ -189,6 +191,20 @@ export function mount(
 		stdin,
 		instance,
 		frame: () => strip(stdout.lastFrame),
+		/**
+		 * Waits until something has actually been drawn, then lets one more frame
+		 * land.
+		 *
+		 * Replaces `await flush()` after a mount. A fixed delay encodes how fast
+		 * the machine running the suite happens to be, and on a shared CI runner
+		 * the assertion lands on an empty screen — which reads as "the hints are
+		 * missing" rather than as "nothing has painted yet". When content is
+		 * already present this costs one tick, exactly as the old flush did.
+		 */
+		async paint() {
+			await waitFor(() => strip(stdout.lastFrame).trim() !== '');
+			await flush();
+		},
 		screen: () => stdout.vt.screen().join('\n'),
 		buffer: () => stdout.vt.buffer().join('\n'),
 		async resize(nextColumns: number, nextRows: number) {
