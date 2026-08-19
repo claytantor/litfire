@@ -5,7 +5,7 @@ hero:
   name: litfire
   text: Write the scene. The tool keeps the numbers straight.
   tagline: >
-    A LitRPG authoring tool. The author writes freeform situations; the tool
+    A LitRPG LLM supported authoring tool. The author writes freeform situations; the tool
     tracks game state deterministically and records contradictions as open
     questions that never block writing.
   actions:

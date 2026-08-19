@@ -65,9 +65,9 @@ Then, in the TUI:
 | `/provider`                   | Choose an LLM provider, key, and model           |
 | `/provider status`            | Show configured providers and masked keys        |
 | `/provider clear <id>`        | Remove a stored key                              |
-| `/situation [<id>]`           | A scene’s cast: who is in it, and what they hold |
+| `/situation <id>`             | A scene’s cast: who is in it, and what they hold |
+| `/situation <id> edit`        | Write a scene in the native buffer               |
 | `/situation new [title]`      | Scaffold a scene and open it in the buffer       |
-| `/situation edit <id>`        | Write a scene in the native buffer               |
 | `/situation place <id> <arc>` | Move a situation out of the inbox                |
 | `/help`, `/quit`              |                                                  |
 

@@ -789,9 +789,16 @@ const questions: Command = {
 	},
 };
 
+/**
+ * Words that are verbs rather than an id, so the two can be told apart wherever
+ * they appear. `new` is absent deliberately — it is handled before this is
+ * consulted, because its remaining arguments are a free-text title.
+ */
+const SITUATION_VERBS = new Set(['show', 'edit', 'place']);
+
 const situation: Command = {
 	name: 'situation',
-	usage: '/situation [<id>] · new|edit|place',
+	usage: '/situation <id> [show|edit|place <arc>] · /situation new [title]',
 	summary: 'show a scene\u2019s cast, write one, scaffold, or place it',
 	async run(args, context) {
 		if (!context.project) {
@@ -800,6 +807,9 @@ const situation: Command = {
 
 		const [sub, ...rest] = args;
 
+		// `new` is the one verb that must come first: everything after it is a
+		// free-text title, and a scene called "The Place" would otherwise lose a
+		// word to the argument parser.
 		if (sub === 'new') {
 			const existing = context.project.vault.situations.length;
 			const id = `sit-${String(existing + 1).padStart(3, '0')}`;
@@ -832,10 +842,21 @@ const situation: Command = {
 			};
 		}
 
-		if (sub === 'edit') {
-			const [id] = rest;
+		/**
+		 * Everything else reads its arguments the way `/system` and `/character`
+		 * do: the verb is whichever word is a verb, and the id is whichever is
+		 * not. `/situation sit-001 edit` and `/situation edit sit-001` are the
+		 * same command, because an author who has just read an id off
+		 * `/primitives` types it first, and being told that is the wrong order
+		 * teaches nothing.
+		 */
+		const verb = args.find(argument => SITUATION_VERBS.has(argument));
+		const positional = args.filter(argument => !SITUATION_VERBS.has(argument));
+
+		if (verb === 'edit') {
+			const [id] = positional;
 			if (!id) {
-				return {lines: [error('usage: /situation edit <id>')]};
+				return {lines: [error('usage: /situation <id> edit')]};
 			}
 
 			const file = await findSituationFile(context.root, id);
@@ -846,10 +867,10 @@ const situation: Command = {
 			return {lines: [], openEditor: file};
 		}
 
-		if (sub === 'place') {
-			const [id, arcId] = rest;
+		if (verb === 'place') {
+			const [id, arcId] = positional;
 			if (!id || !arcId) {
-				return {lines: [error('usage: /situation place <id> <arc>')]};
+				return {lines: [error('usage: /situation <id> place <arc>')]};
 			}
 			if (!context.project.vault.arcs.some(arc => arc.id === arcId)) {
 				return {lines: [error(`no arc '${arcId}'`)]};
@@ -900,17 +921,25 @@ const situation: Command = {
 
 		// A bare id is the reading view: who is in this scene, at what moment, and
 		// what each of them has there. It is the form the author reaches for while
-		// writing, so it needs no subcommand.
-		if (sub !== undefined && rest.length === 0) {
-			const lines = renderCast(context.project, sub);
-			return {lines, paged: lines.length > 14, title: `situation ${sub}`};
+		// writing, so it needs no verb — but `show` is accepted, because that is
+		// what the other id-namespaced commands call it.
+		//
+		// Exactly one positional, because `/situation what now` names no scene and
+		// looking up the first word of a mistyped line reports the wrong problem.
+		const [id] = positional;
+		if (
+			(verb === undefined || verb === 'show') &&
+			id !== undefined &&
+			positional.length === 1
+		) {
+			const lines = renderCast(context.project, id);
+			return {lines, paged: lines.length > 14, title: `situation ${id}`};
 		}
 
 		return {
 			lines: [
-				error(
-					'usage: /situation <id> | /situation new [title] | /situation place <id> <arc>',
-				),
+				error('usage: /situation <id> [show|edit|place <arc>]'),
+				muted('/situation new [title] scaffolds one and opens the buffer'),
 			],
 		};
 	},

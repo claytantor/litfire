@@ -75,6 +75,68 @@ describe('writing a situation', () => {
 	it('asks for an id when none is given', async () => {
 		expect(said(await dispatch('/situation edit'))).toContain('usage:');
 	});
+
+	/**
+	 * The reported bug. `/primitives` prints the id, so the author has it in
+	 * hand and types it first; being told that is the wrong order teaches
+	 * nothing. `/system` and `/character` already read arguments this way.
+	 */
+	it('takes the id before or after the verb', async () => {
+		const created = await dispatch('/situation new A Scene');
+		const id = String(
+			parseDocument(await readFile(created.openEditor!, 'utf8')).data['id'],
+		);
+
+		const verbFirst = await dispatch(`/situation edit ${id}`);
+		const idFirst = await dispatch(`/situation ${id} edit`);
+
+		expect(idFirst.openEditor).toBe(verbFirst.openEditor);
+		expect(idFirst.openEditor).toBe(created.openEditor);
+	});
+
+	it('names every form it accepts when it cannot parse the line', async () => {
+		// The usage line is the only place an author learns `edit` exists after
+		// mistyping, so it has to list it.
+		const said_ = said(await dispatch('/situation what now'));
+
+		expect(said_).toContain('edit');
+		expect(said_).toContain('show');
+		expect(said_).toContain('place');
+		expect(said_).toContain('new');
+	});
+
+	it('shows the cast for a bare id, and for an explicit show', async () => {
+		const created = await dispatch('/situation new A Scene');
+		const id = String(
+			parseDocument(await readFile(created.openEditor!, 'utf8')).data['id'],
+		);
+
+		expect(said(await dispatch(`/situation ${id}`))).toContain(id);
+		expect(said(await dispatch(`/situation ${id} show`))).toContain(id);
+	});
+
+	it('places with the id on either side of the verb', async () => {
+		const created = await dispatch('/situation new A Scene');
+		const id = String(
+			parseDocument(await readFile(created.openEditor!, 'utf8')).data['id'],
+		);
+
+		// Whatever the outcome, it must be identical for both forms and must never
+		// be a complaint about the argument order.
+		const verbFirst = await dispatch(`/situation place ${id} arc-01`);
+		const idFirst = await dispatch(`/situation ${id} place arc-01`);
+
+		expect(said(idFirst)).toBe(said(verbFirst));
+		expect(said(idFirst)).not.toContain('usage:');
+	});
+
+	it('keeps a free-text title intact even when it contains a verb', async () => {
+		// `new` is handled before the verb scan for exactly this reason.
+		const result = await dispatch('/situation new The Place');
+		const raw = await readFile(result.openEditor!, 'utf8');
+
+		expect(parseDocument(raw).data['title']).toBe('The Place');
+	});
 });
 
 /**

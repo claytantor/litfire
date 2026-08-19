@@ -1,8 +1,24 @@
 # Writing a scene
 
 `/situation new [title]` scaffolds a scene and opens it in the native buffer;
-`/situation edit <id>` reopens one. No external process is involved — the
+`/situation <id> edit` reopens one. No external process is involved — the
 terminal you are already in is where the writing happens.
+
+The verb may come before or after the id, so `/situation sit-001 edit` and
+`/situation edit sit-001` are the same command — `/system` and `/character` read
+their arguments the same way. Without a verb, an id shows the scene's cast
+instead; `show` says so explicitly.
+
+| Form                          | Does                                 |
+| ----------------------------- | ------------------------------------ |
+| `/situation <id>`             | Show the cast — the reading view     |
+| `/situation <id> show`        | The same, said explicitly            |
+| `/situation <id> edit`        | Open the scene in the buffer         |
+| `/situation <id> place <arc>` | Move it out of the inbox onto an arc |
+| `/situation new [title]`      | Scaffold one and open it             |
+
+`new` is the one form whose verb must come first, because everything after it is
+a free-text title — a scene called "The Place" would otherwise lose a word.
 
 ```
 editing situations/inbox/sit-001-the-ledger-room.md
