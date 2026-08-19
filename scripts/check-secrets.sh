@@ -34,8 +34,7 @@ note() {
 # ── 1. Paths that must never be committed, whatever they contain ─────────────
 for f in "${files[@]}"; do
   case "$f" in
-    vaults/.gitkeep | vaults/README.md) continue ;;
-    vaults/*) note "$f" "story vault contents belong outside version control" ;;
+    vaults/*) note "$f" "story vaults belong outside version control entirely" ;;
     */.litrpg/* | .litrpg/*) note "$f" "vault cache/config (.litrpg/)" ;;
     credentials.json | */credentials.json) note "$f" "provider credentials file" ;;
     .env | .env.*) [[ "$f" == ".env.example" ]] || note "$f" "environment file may hold API keys" ;;

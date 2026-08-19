@@ -13,8 +13,13 @@ pnpm check       # typecheck → lint → format → test
 pnpm dev         # run the TUI against a vault in the current directory
 ```
 
-`pnpm vault:new <name>` scaffolds a throwaway vault under `vaults/`, which is
-gitignored. Never point the tool at a vault you care about while developing.
+`pnpm vault:new <name>` scaffolds a throwaway vault under `vaults/`. That whole
+directory is gitignored with no exceptions — a vault is somebody's writing and
+never belongs in this repository — and the script refuses to create one unless
+git confirms it is ignored, so a broken `.gitignore` fails loudly rather than at
+commit time. Put real prose in there if it helps; none of it can be committed.
+
+Never point the tool at a vault you care about while developing.
 
 ## What `pnpm check` covers
 

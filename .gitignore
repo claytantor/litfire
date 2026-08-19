@@ -7,10 +7,13 @@ dist/
 SCRATCH.md
 
 # ─── Story vaults ────────────────────────────────────────────────────────────
-# Test vaults live here; `pnpm vault:new <name>` creates one.
-/vaults/*
-!/vaults/.gitkeep
-!/vaults/README.md
+# Test vaults live here; `pnpm vault:new <name>` creates one, and `mkdir -p`
+# makes the directory, so nothing needs to be tracked to hold the place open.
+#
+# No exceptions. A whitelist here is a standing invitation to add "just one
+# more" file, and a vault is the author's own writing — it does not belong in
+# this repository under any name.
+/vaults/
 
 # `.litrpg/` is a vault's unambiguous signature. Ignoring it anywhere means a
 # vault created outside /vaults/ still can't have its cache or config committed.
