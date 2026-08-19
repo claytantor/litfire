@@ -286,3 +286,30 @@ Detection came with it, since neither case was checked at all:
 
 Neither is resolved automatically. Which of two pages is the real one is the
 author's call every time (P4).
+
+## D12 — Places are a primitive
+
+**Committed:** `placeSchema` of `{id, name}` and nothing else; wiki place ids
+come from pages _and_ situations.
+
+Places were the one kind with no schema — free prose in a directory — and that
+was mostly right. What a room is like is writing, not data, and no field was
+going to capture it.
+
+What it cost was addressability. A place had no name of its own, the wiki
+derived place ids from `situation.place` alone, and `/primitives` read the
+directory and could report nothing but the stem. So a place an author had
+written and not yet used was invisible everywhere: no wiki page, no name, no
+command to see it. A vault with two written places showed none.
+
+The schema is deliberately the thinnest in the vault: an id and an optional
+name. The body stays prose.
+
+Wiki ids are now the union of both sources. Deriving them from situations alone
+hid a place that had been written; deriving them from the directory alone would
+drop a place a scene names but nobody has written up yet, which is the more
+common half of the same mistake. Both are legitimate states and `/place` names
+them apart — "no scenes" against "no page yet".
+
+`renderPrimitives` loses its `places` parameter, since there is no longer a kind
+the caller has to read off disk on the view's behalf.

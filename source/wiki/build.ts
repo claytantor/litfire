@@ -391,18 +391,22 @@ function buildCharacterPage(
 }
 
 // ---------------------------------------------------------------------------
-// Places — free-form, no schema. Ids come from `situation.place`, never from a
-// directory listing, so a place nobody has written a scene in yet gets no page
-// rather than an empty stub.
+// Places. Ids come from two directions and both count: the pages an author has
+// written, and the ids situations name. Deriving them from situations alone
+// meant a place someone had written a page about was invisible until a scene
+// happened there, which reads as the wiki having lost it. Deriving them from
+// the directory alone would drop a place a scene names but nobody has written
+// up yet, which is the more common half of the same mistake.
 // ---------------------------------------------------------------------------
 
 function placeIds(project: Project): string[] {
 	return [
-		...new Set(
-			project.vault.situations
+		...new Set([
+			...project.vault.places.map(place => place.id),
+			...project.vault.situations
 				.map(situation => situation.place)
 				.filter((p): p is string => p !== undefined),
-		),
+		]),
 	].toSorted();
 }
 
@@ -415,6 +419,7 @@ function buildPlacePage(placeId: string, project: Project, ctx: StepContext): Wi
 	const last = placed.at(-1);
 	const characters = [...new Set(situations.flatMap(s => s.characters))].toSorted();
 	const authorBody = readAuthorBody(project.vault.root, VAULT.places, placeId);
+	const place = project.vault.places.find(candidate => candidate.id === placeId);
 
 	const summary =
 		first && last
@@ -422,7 +427,7 @@ function buildPlacePage(placeId: string, project: Project, ctx: StepContext): Wi
 			: `${plural(situations.length, 'situation')}, none placed in sequence yet`;
 
 	const body = [
-		`# ${placeId}`,
+		`# ${place?.name ?? placeId}`,
 		'',
 		BANNER,
 		'',
@@ -454,7 +459,9 @@ function buildPlacePage(placeId: string, project: Project, ctx: StepContext): Wi
 		path: `${VAULT.wiki}/places/${placeId}.md`,
 		kind: 'place',
 		id: placeId,
-		title: placeId,
+		// Named if the author wrote a page for it; a place a scene invented has
+		// only its id, and showing the slug is honest about that.
+		title: place?.name ?? placeId,
 		summary,
 		body,
 	};

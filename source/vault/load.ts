@@ -6,6 +6,7 @@ import {
 	chapterSchema,
 	characterSchema,
 	factionSchema,
+	placeSchema,
 	situationSchema,
 	systemSchema,
 	themeSchema,
@@ -16,6 +17,7 @@ import {
 	type Chapter,
 	type Character,
 	type Faction,
+	type Place,
 	type Situation,
 	type SystemDef,
 	type Theme,
@@ -48,6 +50,8 @@ export type Vault = {
 	readonly situations: readonly Situation[];
 	readonly characters: readonly Character[];
 	readonly factions: readonly Faction[];
+	/** Somewhere a scene happens. Body is prose; only id and name are data. */
+	readonly places: readonly Place[];
 	readonly artifacts: readonly Artifact[];
 	readonly themes: readonly Theme[];
 	readonly chapters: readonly Chapter[];
@@ -243,11 +247,12 @@ export async function loadVault(root: string): Promise<Vault> {
 	}
 	moments.sort((a, b) => a.id.localeCompare(b.id));
 
-	const [arcs, characters, factions, artifacts, themes, placed, inbox, chapters] =
+	const [arcs, characters, factions, places, artifacts, themes, placed, inbox, chapters] =
 		await Promise.all([
 			loadDirectory(resolve(root, VAULT.arcs), arcSchema, issues),
 			loadDirectory(resolve(root, VAULT.characters), characterSchema, issues),
 			loadDirectory(resolve(root, VAULT.factions), factionSchema, issues),
+			loadDirectory(resolve(root, VAULT.places), placeSchema, issues),
 			loadDirectory(resolve(root, VAULT.artifacts), artifactSchema, issues),
 			loadDirectory(resolve(root, VAULT.themes), themeSchema, issues),
 			loadDirectory(resolve(root, VAULT.situations), situationSchema, issues),
@@ -266,6 +271,7 @@ export async function loadVault(root: string): Promise<Vault> {
 		situations: [...placed, ...inbox.map(s => ({...s, arc: undefined}))],
 		characters,
 		factions,
+		places,
 		artifacts,
 		themes,
 		chapters,

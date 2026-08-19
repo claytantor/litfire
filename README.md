@@ -84,6 +84,9 @@ Then, in the TUI:
 | `/moment <id> at <when>`       | Set or change a moment’s time                    |
 | `/moment <id> edit`            | Write its description in the buffer              |
 | `/moment new <name>`           | Create a moment and open the buffer              |
+| `/place [<id>]`                | Places, or one with the scenes there             |
+| `/place new <name>`            | Write a place and open the buffer                |
+| `/place <id> edit`             | Edit its description                             |
 | `/situation place <id> <arc>`  | Move a situation out of the inbox                |
 | `/help`, `/quit`               |                                                  |
 

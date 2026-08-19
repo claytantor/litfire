@@ -5,6 +5,7 @@ import {
 	arcSchema,
 	chapterSchema,
 	momentSchema,
+	placeSchema,
 	situationSchema,
 } from '../domain/schema.js';
 import {
@@ -94,6 +95,8 @@ import {
 	renderArcs,
 	renderMoment,
 	renderMoments,
+	renderPlace,
+	renderPlaces,
 	renderTime,
 	renderUnreadableTime,
 	renderCast,
@@ -708,17 +711,7 @@ const primitives: Command = {
 			return needsProject();
 		}
 
-		// The one kind with no schema: free prose in a directory, never loaded
-		// into `Project`, so it is read here rather than derived.
-		const entries = await readdir(resolve(context.root, VAULT.places), {
-			withFileTypes: true,
-		}).catch(() => []);
-		const places = entries
-			.filter(entry => entry.isFile() && entry.name.endsWith('.md'))
-			.map(entry => path.basename(entry.name, '.md'))
-			.toSorted();
-
-		const lines = renderPrimitives(context.project, places, args[0]);
+		const lines = renderPrimitives(context.project, args[0]);
 		return {lines, paged: lines.length > 20, title: 'primitives'};
 	},
 };
@@ -973,6 +966,141 @@ const time: Command = {
 		});
 		const lines = renderTime(context.project, calendar, note);
 		return {lines, paged: lines.length > 14, title: 'time'};
+	},
+};
+
+const PLACE_VERBS = new Set(['show', 'edit', 'name']);
+
+/**
+ * `/place` — somewhere a scene happens.
+ *
+ * Places were the one kind with no schema and no command: free prose in a
+ * directory, with the wiki learning one existed only by finding a situation
+ * that named it. That made a place an author had written but not yet used
+ * invisible, which reads as the tool having lost it.
+ */
+const place: Command = {
+	name: 'place',
+	usage: '/place <id> [show|edit|name <text>] · /place new [name]',
+	summary: 'somewhere a scene happens: write one, name it, see what happened',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const [sub, ...rest] = args;
+
+		if (sub === 'new') {
+			const name = rest.join(' ').trim();
+			if (name === '') {
+				return {lines: [error('usage: /place new <name>')]};
+			}
+
+			const id =
+				name
+					.toLowerCase()
+					.replaceAll(/[^a-z0-9]+/g, '-')
+					.replace(/^-|-$/g, '') || 'place';
+
+			const file = resolve(context.root, VAULT.places, `${id}.md`);
+			const already = await readFile(file, 'utf8').then(
+				() => true,
+				() => false,
+			);
+			if (already) {
+				return {
+					lines: [error(`place '${id}' already has a page`), muted(`/place ${id} edit`)],
+				};
+			}
+
+			await mkdir(resolve(context.root, VAULT.places), {recursive: true});
+			await writeFile(
+				file,
+				stringifyDocument({
+					data: placeSchema.parse({id, name}),
+					body: '\nWhat it is like to be here, and what it makes possible.\n',
+				}),
+				{encoding: 'utf8', flag: 'wx'},
+			);
+
+			return {
+				lines: [
+					ok(`created ${path.relative(context.root, file)}`),
+					muted(`/situation <id> place ${id} puts a scene here`),
+				],
+				openEditor: file,
+				dirty: true,
+			};
+		}
+
+		const verb = args.find(argument => PLACE_VERBS.has(argument));
+		const positional = args.filter(argument => !PLACE_VERBS.has(argument));
+		const [id] = positional;
+
+		if (verb === 'edit' || verb === 'name') {
+			if (!id) {
+				return {
+					lines: [error(`usage: /place <id> ${verb}${verb === 'name' ? ' <text>' : ''}`)],
+				};
+			}
+
+			const file = resolve(context.root, VAULT.places, `${id}.md`);
+			const raw = await readFile(file, 'utf8').catch(() => undefined);
+			if (raw === undefined) {
+				return {
+					lines: [
+						error(`no page for place '${id}'`),
+						muted(`/place new ${id} writes one`),
+					],
+				};
+			}
+
+			if (verb === 'edit') {
+				return {lines: [], openEditor: file};
+			}
+
+			const name = positional.slice(1).join(' ').trim();
+			if (name === '') {
+				return {lines: [error('usage: /place <id> name <text>')]};
+			}
+
+			const document = parseDocument(raw);
+			const data = {...document.data, name};
+			try {
+				placeSchema.parse(data);
+			} catch (caught) {
+				return {
+					lines: [
+						error(
+							caught instanceof Error ? caught.message.split('\n')[0]! : String(caught),
+						),
+					],
+				};
+			}
+			await writeFile(file, stringifyDocument({data, body: document.body}), 'utf8');
+			return {lines: [ok(`${id} is now “${name}”`)], dirty: true};
+		}
+
+		if (
+			(verb === undefined || verb === 'show') &&
+			id !== undefined &&
+			positional.length === 1
+		) {
+			const lines = renderPlace(context.project, id);
+			return {lines, paged: lines.length > 14, title: `place ${id}`};
+		}
+
+		if (args.length === 0) {
+			const lines = renderPlaces(context.project);
+			return {lines, paged: lines.length > 14, title: 'places'};
+		}
+
+		return {
+			lines: [
+				error('usage: /place <id> [show|edit|name <text>]'),
+				muted('/place new <name> writes one'),
+			],
+		};
 	},
 };
 
@@ -2252,6 +2380,7 @@ export const commands: readonly Command[] = [
 	questions,
 	arc,
 	moment,
+	place,
 	time,
 	situation,
 	provider,

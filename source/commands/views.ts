@@ -101,16 +101,19 @@ export function renderSheet(
  * target, and what every cross-reference in frontmatter names. Wanting to see
  * them all at once is wanting to know what you are allowed to point at.
  *
- * `places` arrives separately because it is the one kind with no schema — free
- * prose in a directory, never loaded into `Project` — so the caller reads the
- * directory and passes what it found.
+ * Places used to arrive separately, read off the directory by the caller,
+ * because they were the one kind with no schema. They have one now, so they
+ * come from the vault like everything else — and from situations too, since a
+ * scene can name somewhere nobody has written up yet.
  */
-export function renderPrimitives(
-	project: Project,
-	places: readonly string[],
-	focus?: string,
-): Line[] {
+export function renderPrimitives(project: Project, focus?: string): Line[] {
 	const {vault} = project;
+	const places = [
+		...new Set([
+			...vault.places.map(place => place.id),
+			...vault.situations.map(s => s.place).filter((p): p is string => p !== undefined),
+		]),
+	].toSorted();
 	const under = (systemId: string) =>
 		Object.values(project.replay.state.characters).filter(
 			character => character.system === systemId,
@@ -247,8 +250,17 @@ export function renderPrimitives(
 		},
 		{
 			kind: 'place',
-			// No schema, so nothing but the stem is known without reading the file.
-			rows: places.map(id => [id, '', 'free-form'] as const),
+			// Both directions, as `/place` lists them: a page with no scene and a
+			// scene with no page are each half-finished, differently.
+			rows: places.map(id => {
+				const written = vault.places.find(candidate => candidate.id === id);
+				const scenes = vault.situations.filter(s => s.place === id).length;
+				return [
+					id,
+					written?.name ?? '',
+					written === undefined ? 'no page yet' : plural(scenes, 'scene'),
+				] as const;
+			}),
 		},
 	];
 
@@ -1247,4 +1259,92 @@ export function renderUnreadableTime(
 		muted('try 2036-08-15 02:30:00, or give whole seconds'),
 		...trailer,
 	];
+}
+
+/**
+ * `/place` — everywhere scenes happen, written or merely named.
+ *
+ * Both directions count. A place with a page but no scene is somewhere the
+ * author has built and not yet used; a place a scene names with no page is
+ * somewhere they have used and not yet built. Listing only one of those would
+ * hide half the world, and they are different kinds of unfinished.
+ */
+export function renderPlaces(project: Project): Line[] {
+	const {places, situations} = project.vault;
+	const named = new Set(
+		situations.map(s => s.place).filter((p): p is string => p !== undefined),
+	);
+	const written = new Set(places.map(place => place.id));
+	const all = [...new Set([...written, ...named])].toSorted();
+
+	if (all.length === 0) {
+		return [
+			heading('places'),
+			muted('none yet — /place new <name> writes one'),
+			muted('or /situation <id> place <place> names one from a scene'),
+		];
+	}
+
+	const scenes = (id: string) => situations.filter(s => s.place === id).length;
+
+	const lines: Line[] = [
+		heading('places'),
+		muted(`${plural(all.length, 'place')} · ${String(written.size)} with a page`),
+		blank(),
+	];
+
+	for (const row of columns(
+		all.map(id => [
+			`  ${id}`,
+			places.find(place => place.id === id)?.name ?? '',
+			scenes(id) === 0 ? 'no scenes' : plural(scenes(id), 'scene'),
+			written.has(id) ? '' : 'no page yet',
+		]),
+	)) {
+		lines.push(text(row));
+	}
+
+	return lines;
+}
+
+/** One place: what it is called, and what has happened there. */
+export function renderPlace(project: Project, placeId: string): Line[] {
+	const place = project.vault.places.find(candidate => candidate.id === placeId);
+	const scenes = project.vault.situations.filter(s => s.place === placeId);
+
+	// Neither a page nor a mention: nothing in the vault knows this name.
+	if (place === undefined && scenes.length === 0) {
+		return [
+			error(`no place '${placeId}'`),
+			muted('/place lists them · /place new <name> writes one'),
+		];
+	}
+
+	const lines: Line[] = [heading(`${placeId}${place?.name ? ` — ${place.name}` : ''}`)];
+
+	if (place === undefined) {
+		lines.push(
+			warn('no page yet — named by scenes, but nothing describes it'),
+			muted(`/place new ${placeId} writes one`),
+		);
+	}
+
+	lines.push(blank(), muted('scenes here'));
+	if (scenes.length === 0) {
+		lines.push(
+			muted('  (none)'),
+			muted(`  /situation <id> place ${placeId} sets one here`),
+		);
+	} else {
+		for (const scene of scenes) {
+			lines.push(text(`  ${scene.id}${scene.title ? ` — ${scene.title}` : ''}`));
+		}
+	}
+
+	const cast = [...new Set(scenes.flatMap(scene => scene.characters))].toSorted();
+	if (cast.length > 0) {
+		lines.push(blank(), muted('who has been here'), text(`  ${cast.join(', ')}`));
+	}
+
+	return lines;
 }

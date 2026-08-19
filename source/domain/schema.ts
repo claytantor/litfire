@@ -200,6 +200,24 @@ export const arcSchema = z.object({
 	stub: stubFlag,
 });
 
+/**
+ * A place: somewhere a scene happens.
+ *
+ * Deliberately the thinnest schema in the vault. Places were free prose in a
+ * directory for a long time and that was mostly right — what a room is like is
+ * writing, not data, and no field was going to capture it. What it cost was
+ * addressability: a place had no name of its own, so the wiki could only learn
+ * one existed by finding a situation that named it, and a place file nobody had
+ * used yet was invisible.
+ *
+ * So it gains an id and a name and nothing else. The body stays prose.
+ */
+export const placeSchema = z.object({
+	id: idSchema,
+	name: z.string().optional(),
+	stub: stubFlag,
+});
+
 // ---------------------------------------------------------------------------
 // Situations (§6.1)
 // ---------------------------------------------------------------------------
@@ -359,6 +377,7 @@ export type Curves = z.infer<typeof curvesSchema>;
 export type SystemDef = z.infer<typeof systemSchema>;
 export type LedgerEvent = z.infer<typeof ledgerEventSchema>;
 export type Moment = z.infer<typeof momentSchema>;
+export type Place = z.infer<typeof placeSchema>;
 export type Milestone = z.infer<typeof milestoneSchema>;
 export type Arc = z.infer<typeof arcSchema>;
 export type Situation = z.infer<typeof situationSchema>;

@@ -3,6 +3,7 @@ import type {
 	Artifact,
 	Character,
 	Faction,
+	Place,
 	Situation,
 	SystemDef,
 	Theme,
@@ -29,6 +30,7 @@ export type CheckInput = {
 	readonly situations: readonly Situation[];
 	readonly characters: readonly Character[];
 	readonly factions: readonly Faction[];
+	readonly places: readonly Place[];
 	readonly artifacts: readonly Artifact[];
 	readonly themes: readonly Theme[];
 	readonly replay: ReplayResult;
@@ -440,6 +442,7 @@ function duplicates(input: CheckInput): Finding[] {
 		{kind: 'situation', pages: input.situations},
 		{kind: 'character', pages: input.characters},
 		{kind: 'faction', pages: input.factions},
+		{kind: 'place', pages: input.places},
 		{kind: 'artifact', pages: input.artifacts},
 		{kind: 'theme', pages: input.themes},
 	] as const;

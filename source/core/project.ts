@@ -83,6 +83,7 @@ export async function computeProject(
 			situations: vault.situations,
 			characters: vault.characters,
 			factions: vault.factions,
+			places: vault.places,
 			artifacts: vault.artifacts,
 			themes: vault.themes,
 			replay: replayResult,

@@ -80,6 +80,21 @@ Scaffolds `situations/inbox/` and opens the [native buffer](./writing-a-scene.md
 so you can write. Scenes start in the inbox: an unplaced situation is a valid
 permanent state, not a staging error.
 
+### 3b. Somewhere for it to happen
+
+```
+/place new The Ledger Room
+```
+
+Writes `places/the-ledger-room.md` and opens the buffer. Places are almost all
+prose — what a room is like is writing, not data — so the schema is only an id
+and a name.
+
+`/place` lists everywhere, and tells the two kinds of unfinished apart: a page
+with no scene is somewhere you have built and not yet used; a scene naming
+somewhere with no page is the reverse. Both get a wiki page, and both are
+legitimate.
+
 ### 4. Link it
 
 ```
