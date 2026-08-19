@@ -13,10 +13,15 @@ import {customCalendar, type FormattedInstants} from './custom.js';
  */
 export const timeSchema = z.object({
 	/**
-	 * `seconds` (the default), `gregorian` for Earth/Sol, or `custom` for a
-	 * calendar formula in this vault.
+	 * `gregorian` for Earth/Sol, `custom` for a calendar formula in this vault,
+	 * or `seconds` to read instants as themselves.
+	 *
+	 * Deliberately without a default. Absent means the author has never chosen,
+	 * which reads the same as `seconds` but is not the same thing — one wants a
+	 * nudge toward binding a calendar and the other has already declined it. A
+	 * default would erase that difference on the way in.
 	 */
-	calendar: z.enum(['seconds', 'gregorian', 'custom']).default('seconds'),
+	calendar: z.enum(['seconds', 'gregorian', 'custom']).optional(),
 	/**
 	 * What the origin is, in the author's words. Never parsed — it is the label
 	 * on second zero, and the one place the clock says what it is anchored to.
@@ -42,7 +47,7 @@ export function calendarFor(
 	binding: TimeBinding | undefined,
 	options: {readonly formatted?: FormattedInstants | undefined} = {},
 ): {calendar: Calendar; note: string | undefined} {
-	if (binding === undefined || binding.calendar === 'seconds') {
+	if (binding?.calendar === undefined || binding.calendar === 'seconds') {
 		return {calendar: rawSeconds, note: undefined};
 	}
 

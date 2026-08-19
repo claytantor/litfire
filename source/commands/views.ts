@@ -1025,6 +1025,18 @@ export function renderTime(project: Project, calendar: Calendar, note?: string):
 		lines.push(blank(), warn(note));
 	}
 
+	// Said here rather than left to be discovered when a date is refused. An
+	// author who has named their origin has already started thinking in dates,
+	// and this is the screen where they find out the vault has not.
+	if (time?.calendar === undefined) {
+		lines.push(
+			blank(),
+			muted('no calendar bound — times are whole seconds'),
+			muted('/time gregorian <epoch> [zone] reads them as Earth/Sol dates'),
+			muted('/time custom reads them through a calendar formula you wrote'),
+		);
+	}
+
 	lines.push(
 		blank(),
 		muted(`${plural(dated.length, 'dated moment')} of ${String(moments.length)}`),
@@ -1177,4 +1189,62 @@ export function renderMoment(
 	}
 
 	return lines;
+}
+
+/**
+ * Why a written time could not be read, and what to do about it.
+ *
+ * Shared by `/time at` and `/moment <id> at` so the two cannot diverge, and
+ * split by *cause* rather than reporting one message for all three. The
+ * distinction matters: "no calendar is bound" is a fact about the vault and
+ * tells the author exactly what to do next, while "that is not a date I can
+ * read" is a fact about the input and sends them to check their typing. Saying
+ * the second when the first is true is how someone concludes the date format is
+ * wrong and goes looking for the right one, which does not exist yet.
+ */
+export function renderUnreadableTime(
+	written: string,
+	calendar: Calendar,
+	note?: string,
+): Line[] {
+	const trailer = note === undefined ? [] : [muted(note)];
+
+	// Digits, so it was meant as an instant and is simply too far out. Checked
+	// first: every branch below would otherwise call a number "a date".
+	if (/^[+-]?[\d,]+$/.test(written.trim())) {
+		return [
+			error(`${written} is outside the supported range`),
+			muted(
+				`the clock reaches ±${grouped(MAX_INSTANT)} seconds — a trillion years either way`,
+			),
+			...trailer,
+		];
+	}
+
+	// Nothing bound. The input is very likely fine; the vault has no calendar.
+	if (calendar.id === 'seconds') {
+		return [
+			error('no calendar is bound, so a time has to be whole seconds'),
+			muted(`'${written}' looks like a date — bind a calendar to write dates:`),
+			text('  /time gregorian <epoch> [zone]'),
+			muted('  where <epoch> is the real instant your origin sits at, ISO 8601'),
+			muted('  e.g. /time gregorian 2031-08-15T19:33:00-07:00 America/Los_Angeles'),
+			...trailer,
+		];
+	}
+
+	// A formula formats and cannot be inverted. A limit of the shape, not the input.
+	if (calendar.parse === undefined) {
+		return [
+			error(`${calendar.name} formats dates but cannot read them back`),
+			muted('a calendar formula is one-way — give whole seconds instead'),
+			...trailer,
+		];
+	}
+
+	return [
+		error(`${calendar.name} cannot read '${written}'`),
+		muted('try 2036-08-15 02:30:00, or give whole seconds'),
+		...trailer,
+	];
 }

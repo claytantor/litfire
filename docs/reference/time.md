@@ -59,6 +59,12 @@ A calendar turns an instant into something readable, and sometimes back again.
 It is a presentation choice, held in `timeline/time.md`, and changing it never
 rewrites a moment.
 
+::: warning Naming an origin does not bind a calendar
+`/time origin <name>` labels second zero; it does not decide how seconds are
+read. Until you run one of the three below, a time has to be whole seconds, and
+`/time` says so.
+:::
+
 ### Seconds — the default
 
 ```

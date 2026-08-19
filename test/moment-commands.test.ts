@@ -124,17 +124,35 @@ describe('setting the time', () => {
 		expect(moments().find(m => m.id === 'the-breach')?.at).toBe(-26_174_880_000_000_123n);
 	});
 
-	it('reports a time it cannot read, and changes nothing', async () => {
-		const result = await run('/moment the-breach at last Tuesday');
+	/**
+	 * The reported confusion: with nothing bound, a date was refused with a
+	 * message about seconds, which reads as the date format being wrong. The
+	 * problem is the vault, and that is what it has to say.
+	 */
+	it('says no calendar is bound, rather than blaming the date', async () => {
+		const result = await run('/moment the-breach at 2036-08-15 02:30:00');
 
-		expect(said(result)).toContain('is not a time');
+		expect(said(result)).toContain('no calendar is bound');
+		expect(said(result)).toContain('/time gregorian');
+		// And the command to fix it is complete enough to run.
+		expect(said(result)).toContain('2031-08-15T19:33:00-07:00');
 		expect(moments().find(m => m.id === 'the-breach')?.at).toBeUndefined();
 	});
 
-	it('refuses an instant past the supported range', async () => {
+	it('says a date is unreadable only once a calendar can actually read dates', async () => {
+		await run('/time gregorian 2031-08-15T19:33:00-07:00');
+		const result = await run('/moment the-breach at last Tuesday');
+
+		expect(said(result)).toContain('cannot read');
+		expect(said(result)).not.toContain('no calendar is bound');
+		expect(moments().find(m => m.id === 'the-breach')?.at).toBeUndefined();
+	});
+
+	it('calls an out-of-range integer what it is, not a date', async () => {
 		const result = await run('/moment the-breach at -31557600000000000001');
 
-		expect(said(result)).toContain('is not a time');
+		expect(said(result)).toContain('outside the supported range');
+		expect(said(result)).not.toContain('looks like a date');
 		expect(moments().find(m => m.id === 'the-breach')?.at).toBeUndefined();
 	});
 

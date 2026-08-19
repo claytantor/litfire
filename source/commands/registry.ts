@@ -95,6 +95,7 @@ import {
 	renderMoment,
 	renderMoments,
 	renderTime,
+	renderUnreadableTime,
 	renderCast,
 	renderSheet,
 	renderSystem,
@@ -942,27 +943,7 @@ const time: Command = {
 			const instant = readWhen(written, calendar);
 
 			if (instant === undefined) {
-				// A calendar formula formats and cannot read back. That is a real
-				// limitation of the shape, not a failure of this input.
-				if (calendar.parse === undefined) {
-					return {
-						lines: [
-							error(`${calendar.name} formats dates but cannot read them back`),
-							muted('a calendar formula is one-way — give the seconds directly'),
-						],
-					};
-				}
-				return {
-					lines: [
-						error(`'${written}' is not a date ${calendar.name} can read`),
-						muted(
-							current?.calendar === 'gregorian'
-								? 'try 2036-08-15 02:30:00'
-								: 'give whole seconds, or bind a calendar with /time gregorian',
-						),
-						...(note === undefined ? [] : [muted(note)]),
-					],
-				};
+				return {lines: renderUnreadableTime(written, calendar, note)};
 			}
 
 			return {
@@ -1110,17 +1091,7 @@ const moment: Command = {
 
 			const instant = readWhen(written, calendar);
 			if (instant === undefined) {
-				return {
-					lines: [
-						error(`'${written}' is not a time ${calendar.name} can read`),
-						muted(
-							calendar.parse === undefined
-								? 'a calendar formula is one-way — give whole seconds'
-								: 'give whole seconds, or a date the bound calendar reads',
-						),
-						...(note === undefined ? [] : [muted(note)]),
-					],
-				};
+				return {lines: renderUnreadableTime(written, calendar, note)};
 			}
 
 			// Writing the bigint, not a string: this is the clock, and it round-trips

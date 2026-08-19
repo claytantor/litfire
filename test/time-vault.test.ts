@@ -185,8 +185,23 @@ describe('/time at', () => {
 		await run('/time gregorian 2031-08-15T19:33:00-07:00');
 		const shown = said(await run('/time at last Tuesday'));
 
-		expect(shown).toContain('is not a date');
+		expect(shown).toContain('cannot read');
 		expect(shown).toContain('try 2036-08-15');
+	});
+
+	it('names the missing calendar when nothing is bound', async () => {
+		const shown = said(await run('/time at 2036-08-15 02:30:00'));
+
+		expect(shown).toContain('no calendar is bound');
+		expect(shown).toContain('/time gregorian <epoch> [zone]');
+	});
+
+	it('nudges from /time itself, not only when a date is refused', async () => {
+		await run('/time origin Inanna’s Birthday');
+		const shown = said(await run('/time'));
+
+		expect(shown).toContain('no calendar bound');
+		expect(shown).toContain('/time gregorian');
 	});
 
 	it('asks for something to convert when given nothing', async () => {
