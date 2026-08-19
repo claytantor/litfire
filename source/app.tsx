@@ -805,10 +805,19 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 					for (const written of outcome.written) {
 						lines.push(ok(`wrote ${written}`));
 					}
+					// Named as what it was. A deletion reported as "wrote" is the
+					// kind of log line someone trusts and should not.
+					for (const removed of outcome.removed) {
+						lines.push(ok(`removed ${removed}`));
+					}
 					for (const failure of outcome.failed) {
 						lines.push(error(`${failure.path}: ${failure.reason}`));
 					}
-					if (outcome.written.length === 0 && outcome.failed.length === 0) {
+					if (
+						outcome.written.length === 0 &&
+						outcome.removed.length === 0 &&
+						outcome.failed.length === 0
+					) {
 						lines.push(muted('nothing applied'));
 					}
 					append(lines);

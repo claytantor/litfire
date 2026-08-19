@@ -108,13 +108,26 @@ there, so carry forward everything the change does not revise.
 
 Do not propose anything under raw/, ledger/, wiki/, or .litrpg/.
 
-Where a change would need a file *deleted* rather than written, say so in notes:
-you cannot delete, and an author told plainly is better served than one left with
-a page that should no longer exist.`;
+Where a file should no longer exist, propose it with "remove": true and no
+contents. Corpus is generated, and generation makes duplicates — extraction run
+twice over one interview slugs the same event two ways and leaves two pages for
+one thing. Cleaning that up is your job, not a note for the author to action by
+hand.
+
+Removal is for corpus the tool generated and got wrong: a page duplicating
+another, a stub superseded by a real page, a file whose id no longer resolves.
+It is never for a page an author wrote deliberately, and never for raw/ — that is
+their own record. When you are unsure which of two pages is the real one, keep
+both and say so in notes. A removal you cannot justify in one sentence is one you
+should not propose.
+
+Every removal reaches the author as a diff they accept or reject, so propose the
+one you believe is right rather than hedging.`;
 
 export const PLAN_SHAPE = [
 	'Respond with a single JSON object and nothing else — no prose before or',
 	'after, no markdown fence. Shape:',
-	'{"writes":[{"path":"...","contents":"...","rationale":"why this file changes"}],',
+	'{"writes":[{"path":"...","contents":"...","rationale":"why this file changes"},',
+	'           {"path":"...","remove":true,"rationale":"why this file should go"}],',
 	' "notes":["anything you could not do, or that needs the author to decide"]}',
 ].join('\n');

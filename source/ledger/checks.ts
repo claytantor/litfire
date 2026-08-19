@@ -414,6 +414,78 @@ function factionGoals(input: CheckInput): Finding[] {
 }
 
 /**
+ * Two pages claiming to be the same thing.
+ *
+ * Ids are the vault's primary key: they are the filename stem, the wikilink
+ * target, and what every cross-reference in frontmatter resolves against. Two
+ * pages declaring the same one is not a style problem — replay, the wiki and
+ * every lookup silently pick whichever loaded first, and the other page becomes
+ * invisible while still sitting on disk.
+ *
+ * Names are checked too, and separately, because that is the failure that
+ * actually happens. Extraction runs twice over the same interview, slugs the
+ * same event two different ways, and produces `inannas-first-memory` and
+ * `the-first-memory` — distinct ids, identical `name`, one moment. No id check
+ * would ever catch it, and the author sees their timeline quietly double.
+ *
+ * Both are reported, never resolved: which page is the real one, and what to do
+ * with the other, is the author's call every time (P4).
+ */
+function duplicates(input: CheckInput): Finding[] {
+	const findings: Finding[] = [];
+
+	const kinds = [
+		{kind: 'moment', pages: input.moments},
+		{kind: 'arc', pages: input.arcs},
+		{kind: 'situation', pages: input.situations},
+		{kind: 'character', pages: input.characters},
+		{kind: 'faction', pages: input.factions},
+		{kind: 'artifact', pages: input.artifacts},
+		{kind: 'theme', pages: input.themes},
+	] as const;
+
+	for (const {kind, pages} of kinds) {
+		const byId = new Map<string, number>();
+		for (const page of pages) {
+			byId.set(page.id, (byId.get(page.id) ?? 0) + 1);
+		}
+		for (const [id, count] of byId) {
+			if (count > 1) {
+				findings.push({
+					kind: 'duplicate_id',
+					detail: `${String(count)} ${kind} pages declare id '${id}'; everything that resolves it sees only one of them`,
+					where: id,
+				});
+			}
+		}
+
+		// Grouped case-insensitively and on trimmed text: two extraction passes
+		// rarely disagree about a name in a way a reader would notice.
+		const byName = new Map<string, string[]>();
+		for (const page of pages) {
+			const name = 'name' in page ? page.name : 'title' in page ? page.title : undefined;
+			if (typeof name !== 'string' || name.trim() === '') {
+				continue;
+			}
+			const key = name.trim().toLowerCase();
+			byName.set(key, [...(byName.get(key) ?? []), page.id]);
+		}
+		for (const [, ids] of byName) {
+			if (ids.length > 1) {
+				const sorted = ids.toSorted();
+				findings.push({
+					kind: 'duplicate_name',
+					detail: `${kind}s ${sorted.join(', ')} share one name — likely the same thing written twice`,
+					where: sorted[0] ?? kind,
+				});
+			}
+		}
+	}
+
+	return findings;
+}
+
+/**
  * Two moments the author placed at the same instant.
  *
  * This used to also warn that positions past `Number.MAX_SAFE_INTEGER` could
@@ -523,6 +595,7 @@ export function runChecks(input: CheckInput): OpenQuestion[] {
 		...brokenReferences(input),
 		...unplaced(input),
 		...clockCollisions(input),
+		...duplicates(input),
 		...systemNames(input),
 		...factionGoals(input),
 		...artifactUse(input),

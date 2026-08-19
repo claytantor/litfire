@@ -15,6 +15,7 @@ import {
 	renderDiff,
 	type ApplyOutcome,
 	type ReviewBatch,
+	type ReviewItem,
 } from '../review/index.js';
 import {useSpinnerFrame} from '../hooks/use-spinner.js';
 import {theme} from '../theme.js';
@@ -47,6 +48,17 @@ type Props = {
  * rules on stay in one frame. $EDITOR remains reachable from inside it (^e) for
  * the edits a one-screen buffer is the wrong shape for.
  */
+/** What this item does to the file, for the row that measures and the row that draws. */
+function label(item: ReviewItem | undefined): string {
+	if (item === undefined) {
+		return '';
+	}
+	if (item.proposal.remove === true) {
+		return ' (removes file)';
+	}
+	return item.existing === undefined ? ' (new file)' : '';
+}
+
 export function DiffReview({
 	batch,
 	title,
@@ -154,7 +166,9 @@ export function DiffReview({
 				]
 			: [
 					{
-						text: `a accept · r reject · e edit · A accept-all · ←→ item · ↑↓ scroll · ${
+						text: `a accept · r reject · ${
+							item?.proposal.remove === true ? '' : 'e edit · '
+						}A accept-all · ←→ item · ↑↓ scroll · ${
 							batch.settled ? 'enter apply · ' : ''
 						}ctrl+s save · q cancel`,
 						dim: true,
@@ -173,7 +187,7 @@ export function DiffReview({
 		width,
 	);
 	const pathRow = splitRow(
-		`${item?.proposal.path ?? ''}${item?.existing === undefined ? ' (new file)' : ''}${
+		`${item?.proposal.path ?? ''}${label(item)}${
 			item?.edited === true ? ' (edited)' : ''
 		}`,
 		badge.text,
@@ -287,7 +301,10 @@ export function DiffReview({
 				bump();
 				return;
 			}
-			if (input === 'e' && item) {
+			// Not offered for a removal: there is nothing to edit, and the buffer
+			// would accept changes that `applyAccepted` then ignores — it deletes
+			// on the proposal's say-so, not on the contents. Reject it instead.
+			if (input === 'e' && item && item.proposal.remove !== true) {
 				setEditing(true);
 				return;
 			}
@@ -357,7 +374,14 @@ export function DiffReview({
 			>
 				<Text>
 					<Text color={theme.color.user}>{item.proposal.path}</Text>
-					{item.existing === undefined && <Text dimColor> (new file)</Text>}
+					{item.proposal.remove === true ? (
+						// Coloured like an error rather than dimmed: this is the one
+						// decision in the gate that cannot be undone by rejecting the
+						// next item, and it should not look like an ordinary write.
+						<Text color={theme.color.error}> (removes file)</Text>
+					) : (
+						item.existing === undefined && <Text dimColor> (new file)</Text>
+					)}
 					{item.edited && <Text color="#e0af68"> (edited)</Text>}
 				</Text>
 				<Text color={badge.color}>{badge.text}</Text>

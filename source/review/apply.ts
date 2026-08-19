@@ -1,4 +1,4 @@
-import {mkdir, readFile, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {VAULT} from '../vault/paths.js';
 import type {ApplyOutcome, ReviewItem} from './types.js';
@@ -93,6 +93,7 @@ export async function applyAccepted(
 	items: readonly ReviewItem[],
 ): Promise<ApplyOutcome> {
 	const written: string[] = [];
+	const removed: string[] = [];
 	const skipped: string[] = [];
 	const failed: {path: string; reason: string}[] = [];
 
@@ -103,7 +104,20 @@ export async function applyAccepted(
 		}
 
 		try {
+			// The same path check either way: a removal is as capable of naming
+			// `raw/` or somewhere outside the vault as a write is, and rather more
+			// costly if it succeeds.
 			const target = resolveInsideVault(root, item.proposal.path);
+
+			if (item.proposal.remove === true) {
+				// `force: false` on purpose. A removal that finds nothing there has
+				// not done what it said, and reporting that beats reporting success
+				// for a file some other pass already dealt with.
+				await rm(target);
+				removed.push(item.proposal.path);
+				continue;
+			}
+
 			await mkdir(path.dirname(target), {recursive: true});
 			await writeFile(target, item.contents, 'utf8');
 			written.push(item.proposal.path);
@@ -115,5 +129,5 @@ export async function applyAccepted(
 		}
 	}
 
-	return {written, skipped, failed};
+	return {written, removed, skipped, failed};
 }

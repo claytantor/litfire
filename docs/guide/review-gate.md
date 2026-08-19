@@ -37,3 +37,34 @@ a accept · r reject · e edit · A accept-all · ←→ item · ↑↓ scroll
   resolved canonically and must land inside the vault and end in `.md`.
   `.litrpg/` (tool cache), `ledger/` (derived), and `raw/` (author input) are
   refused. A bad path fails that one item; the rest of the batch still applies.
+
+## Removals
+
+A proposal can remove a file as well as write one. It arrives in the gate like
+any other item, labelled `(removes file)`, with the whole file shown coming out
+rather than an empty panel:
+
+```
+timeline/moments/the-first-memory.md (removes file)
+• pending
++0 −24
+```
+
+`e` is not offered — there is nothing to edit, and accepting is the only thing
+that acts. The same path rules apply as for a write, so `raw/`, `ledger/`,
+`wiki/` and anything outside the vault are refused; a removal naming one of
+those is worse than a write naming it, not better.
+
+**Why this exists.** Corpus is generated, and generation makes duplicates:
+extraction run twice over one interview slugs the same event two ways and leaves
+two pages for one moment. Until removals existed, the agent that noticed could
+only describe the problem — the tool could create the mess and not clear it up.
+
+`/lint` reports the two cases worth acting on:
+
+- **`duplicate_id`** — two pages declaring the same id. Everything that resolves
+  it sees only one; the other is invisible while still on disk.
+- **`duplicate_name`** — different ids, one name. This is the one that actually
+  happens, and no id check would ever catch it.
+
+Neither is resolved for you. Which page is the real one is an author's call.

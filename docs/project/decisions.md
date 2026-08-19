@@ -246,3 +246,43 @@ occur. `clock_collision` remains for two moments genuinely written at the same
 second.
 
 Documented in `docs/reference/time.md`.
+
+## D11 — Proposals may remove a file
+
+**Committed:** `Proposal.remove`, through the review gate, under the same path
+rules as a write.
+
+Corpus is generated, and generation makes duplicates. Extraction run twice over
+one interview slugged the same event two ways and left `inannas-first-memory`
+and `the-first-memory` — distinct ids, one name, one moment. The architect could
+see it and could not fix it: a `Proposal` was `{path, contents}` with no way to
+say "this should not exist", and its prompt said so outright — _"you cannot
+delete"_. The tool could create the mess and not clear it up.
+
+A removal is a proposal like any other. It reaches the author as a diff showing
+the whole file coming out, is accepted or rejected one at a time (P3), and
+passes the same `resolveInsideVault` check as a write — `raw/`, `ledger/`,
+`wiki/` and anything outside the vault are refused, which matters more for a
+removal than for a write.
+
+Three details:
+
+- **The diff shows an emptying, not an empty panel.** Whatever contents came
+  with the proposal are discarded at batch creation, because what is being
+  decided is the deletion.
+- **`e` is not offered on a removal.** The buffer would accept edits that
+  `applyAccepted` then ignores, since it deletes on the proposal's say-so rather
+  than on the contents.
+- **A removal that finds nothing there fails rather than reporting success.**
+  `rm` without `force`: a deletion that did not happen has not done what it said.
+
+Detection came with it, since neither case was checked at all:
+
+- `duplicate_id` — two pages declaring one id. Everything that resolves it sees
+  only one, and the other is invisible while still on disk.
+- `duplicate_name` — different ids, one name. This is the case that actually
+  occurs, and no id check would ever catch it. Matched case-insensitively on
+  trimmed text; unnamed pages are not treated as sharing a name.
+
+Neither is resolved automatically. Which of two pages is the real one is the
+author's call every time (P4).

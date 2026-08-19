@@ -30,7 +30,10 @@ export class ReviewBatch {
 			items.push({
 				proposal,
 				existing: await readExisting(root, proposal.path),
-				contents: proposal.contents,
+				// A removal ends with nothing there, so the diff shows every line
+				// going away rather than an empty panel the author has to take on
+				// trust. Whatever contents came with the proposal are ignored.
+				contents: proposal.remove === true ? '' : proposal.contents,
 				decision: 'pending',
 				edited: false,
 			});

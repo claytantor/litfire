@@ -16,7 +16,18 @@ export type PlanOutcome = {
 
 const planWriteSchema = z.object({
 	path: z.string().min(1),
-	contents: z.string().min(1),
+	/** Empty is only valid alongside `remove`, which is checked below. */
+	contents: z.string().default(''),
+	/**
+	 * Remove the file rather than write it.
+	 *
+	 * The architect's job is the shape of the corpus, and shape includes what
+	 * should not be there: extraction run twice over one interview leaves two
+	 * pages for one moment, and until this existed the agent that noticed could
+	 * only describe the problem. A removal still lands as a diff through the
+	 * gate, one explicit decision at a time.
+	 */
+	remove: z.boolean().default(false),
 	rationale: z.string().optional(),
 });
 
@@ -115,10 +126,19 @@ export async function runPlan(
 			});
 			continue;
 		}
+		// A write with nothing in it is a malformed proposal, not an empty file:
+		// the one legitimate way to end up with no contents is to remove the file,
+		// and saying so explicitly is what the gate renders as a deletion.
+		if (!write.remove && write.contents.trim() === '') {
+			refusals.push({path: write.path, reason: 'empty contents, and not marked remove'});
+			continue;
+		}
+
 		proposals.push({
 			path: write.path,
 			contents: write.contents,
 			confidence: 'low',
+			...(write.remove ? {remove: true} : {}),
 			...(write.rationale === undefined ? {} : {rationale: write.rationale}),
 		});
 	}
