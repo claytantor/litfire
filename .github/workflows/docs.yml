@@ -1,0 +1,66 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Unlike ci.yml, this does not cancel in progress: GitHub Pages allows one
+# deployment at a time, and killing a half-finished one leaves the live site in
+# an undefined state. A superseded docs build is cheap; a broken site is not.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Runs on every pull request as well as on main. This is the link checker:
+  # VitePress fails the build on a dead relative link, which is the whole
+  # reason a renamed section stops being a silent problem.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # VitePress reads git history for each page's "last updated"; a
+          # shallow clone has no dates to read.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Same install as ci.yml, and for the same reason: pnpm gates build
+      # scripts, and the approvals in pnpm-workspace.yaml have to survive a
+      # frozen install.
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm docs:build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/.vitepress/dist
+
+  # Split from the build so a broken link never reaches the site, and so a
+  # pull request can be checked without being able to deploy anything.
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    # Scoped to this job alone. The build job runs third-party dependency code
+    # and never needs to write; only this one does.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

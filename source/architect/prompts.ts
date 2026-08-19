@@ -6,8 +6,8 @@
  * Keeping them apart is what stops a question about the corpus turning into an
  * unrequested rewrite of it.
  *
- * The architect is the counterpart to `/editor`, not a bigger version of it.
- * The editor may only correct typos and is guarded down to that; the architect
+ * The architect is the counterpart to `/reviewer`, not a bigger version of it.
+ * The reviewer may only correct typos and is guarded down to that; the architect
  * may move a world around — split one system into two, promote a paragraph into
  * a page, rename an id across every file that references it. What keeps that
  * safe is not a narrower guard but the review gate: every write is a diff the

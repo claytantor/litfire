@@ -23,7 +23,7 @@ async function writeIfChanged(file: string, contents: string): Promise<boolean> 
 }
 
 /** Hand-rolled rather than `readdir(..., {recursive: true})`: matches the style
- * already used for `listMarkdown` in `vault/load.ts` and `editor/corpus.ts`. */
+ * already used for `listMarkdown` in `vault/load.ts` and `reviewer/corpus.ts`. */
 async function listMarkdownRecursive(directory: string): Promise<string[]> {
 	const entries = await readdir(directory, {withFileTypes: true}).catch(() => []);
 	const files: string[] = [];

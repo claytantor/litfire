@@ -41,16 +41,24 @@ export type CommandResult = {
 		readonly all?: boolean;
 	};
 	/**
-	 * Opens the literary editor over the whole corpus. Unlike an interview, the
-	 * author drives — and the only writes it can propose are corrections.
+	 * Opens the reviewer over the whole rendered corpus. Unlike an interview,
+	 * the author drives — and the only writes it can propose are corrections.
 	 */
-	readonly editor?: boolean;
+	readonly reviewer?: boolean;
 	/**
 	 * Opens the architect over the raw material *and* the corpus. Where the
-	 * editor may only correct, the architect may restructure — so every write it
-	 * proposes goes through the same review gate, one diff at a time.
+	 * reviewer may only correct, the architect may restructure — so every write
+	 * it proposes goes through the same review gate, one diff at a time.
 	 */
 	readonly architect?: boolean;
+	/**
+	 * Opens a vault file in the native prose buffer, by absolute path.
+	 *
+	 * Only the body is editable; the frontmatter is written back byte-identical.
+	 * A situation's frontmatter is the part other commands and the extractor
+	 * maintain, and the buffer is for the half that is the author's alone (P6).
+	 */
+	readonly openEditor?: string;
 	/** Switches the active project to this absolute path. */
 	readonly switchProject?: string;
 	readonly exit?: boolean;

@@ -217,6 +217,7 @@ function statRanges(input: CheckInput): Finding[] {
 function brokenReferences(input: CheckInput): Finding[] {
 	const findings: Finding[] = [];
 	const arcIds = new Set(input.arcs.map(arc => arc.id));
+	const momentIds = new Set(input.moments.map(moment => moment.id));
 	const characterIds = new Set(input.characters.map(character => character.id));
 	const subthemeIds = new Set(
 		input.themes.flatMap(theme => theme.subthemes.map(sub => sub.id)),
@@ -227,6 +228,16 @@ function brokenReferences(input: CheckInput): Finding[] {
 			findings.push({
 				kind: 'broken_reference',
 				detail: `situation '${situation.id}' names arc '${situation.arc}', which does not exist`,
+				where: situation.id,
+			});
+		}
+
+		// Only an explicit anchor is checkable. A situation with no moment has
+		// inherited one from the sequence, which cannot dangle by construction.
+		if (situation.moment !== undefined && !momentIds.has(situation.moment)) {
+			findings.push({
+				kind: 'broken_reference',
+				detail: `situation '${situation.id}' anchors to moment '${situation.moment}', which does not exist`,
 				where: situation.id,
 			});
 		}

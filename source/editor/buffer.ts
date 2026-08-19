@@ -120,10 +120,56 @@ export function deleteForward(buffer: Buffer): Buffer {
 	);
 }
 
-export function move(
-	buffer: Buffer,
-	to: 'left' | 'right' | 'up' | 'down' | 'home' | 'end' | 'top' | 'bottom',
-): Buffer {
+/**
+ * Where one word ends and the next begins.
+ *
+ * Whitespace-delimited rather than punctuation-aware: this is a prose buffer,
+ * and in prose `don't` and `sit-014` are one word each. A code editor's notion
+ * of a word would stop the cursor inside both.
+ */
+const isWordChar = (character: string): boolean => character.trim() !== '';
+
+function wordLeft(line: string, column: number): number {
+	let index = column;
+	while (index > 0 && !isWordChar(line[index - 1] ?? '')) {
+		index--;
+	}
+	while (index > 0 && isWordChar(line[index - 1] ?? '')) {
+		index--;
+	}
+	return index;
+}
+
+function wordRight(line: string, column: number): number {
+	let index = column;
+	while (index < line.length && isWordChar(line[index] ?? '')) {
+		index++;
+	}
+	while (index < line.length && !isWordChar(line[index] ?? '')) {
+		index++;
+	}
+	return index;
+}
+
+export type Motion =
+	| 'left'
+	| 'right'
+	| 'up'
+	| 'down'
+	| 'home'
+	| 'end'
+	| 'top'
+	| 'bottom'
+	| 'word-left'
+	| 'word-right'
+	| 'page-up'
+	| 'page-down';
+
+/**
+ * `distance` is only read by the page motions, which need to know how tall the
+ * viewport is — the buffer does not, and should not, own that.
+ */
+export function move(buffer: Buffer, to: Motion, distance = 1): Buffer {
 	const {lines, cursor} = buffer;
 	const last = Math.max(0, lines.length - 1);
 
@@ -176,6 +222,44 @@ export function move(
 
 		case 'bottom': {
 			return place(lines, {line: last, column: lineAt(lines, last).length});
+		}
+
+		// At the start of a line, step to the end of the previous one: otherwise
+		// walking back through a paragraph stalls at every line break.
+		case 'word-left': {
+			if (cursor.column === 0) {
+				return cursor.line === 0
+					? place(lines, cursor)
+					: place(lines, {
+							line: cursor.line - 1,
+							column: lineAt(lines, cursor.line - 1).length,
+						});
+			}
+			return place(lines, {
+				line: cursor.line,
+				column: wordLeft(lineAt(lines, cursor.line), cursor.column),
+			});
+		}
+
+		case 'word-right': {
+			const current = lineAt(lines, cursor.line);
+			if (cursor.column >= current.length) {
+				return cursor.line >= last
+					? place(lines, cursor)
+					: place(lines, {line: cursor.line + 1, column: 0});
+			}
+			return place(lines, {
+				line: cursor.line,
+				column: wordRight(current, cursor.column),
+			});
+		}
+
+		case 'page-up': {
+			return place(lines, {line: cursor.line - distance, column: cursor.column});
+		}
+
+		case 'page-down': {
+			return place(lines, {line: cursor.line + distance, column: cursor.column});
 		}
 	}
 }

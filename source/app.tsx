@@ -1,3 +1,5 @@
+import {readFile, writeFile} from 'node:fs/promises';
+import path from 'node:path';
 import {Box, Static, Text, useApp, useInput, useWindowSize} from 'ink';
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {findCommand} from './commands/registry.js';
@@ -14,12 +16,13 @@ import {Footer} from './components/footer.js';
 import {LineView} from './components/line-view.js';
 import {Pager} from './components/pager.js';
 import {DiffReview} from './components/diff-review.js';
-import {EditorMode} from './components/editor-mode.js';
+import {TextBuffer} from './components/text-buffer.js';
+import {ReviewerMode} from './components/reviewer-mode.js';
 import {ArchitectMode} from './components/architect-mode.js';
 import {InterviewScreen, type InterviewOutcome} from './components/interview-screen.js';
 import {ProviderWizard} from './components/provider-wizard.js';
 import type {Project} from './core/project.js';
-import {EditorSession, type FixOutcome} from './editor/index.js';
+import {ReviewerSession, type FixOutcome} from './reviewer/index.js';
 import {ArchitectSession, type PlanOutcome} from './architect/index.js';
 import {loadSetting, overlayFor} from './genre/index.js';
 import {stopWikiServe} from './wiki/host.js';
@@ -45,6 +48,7 @@ import {
 	type Startup,
 } from './vault/projects.js';
 import {readConfig, saveProvider} from './vault/config.js';
+import {parseDocument, stringifyDocument} from './vault/frontmatter.js';
 import {appendHistory, extendHistory, readHistory} from './vault/history.js';
 import {useProject} from './hooks/use-project.js';
 import {theme} from './theme.js';
@@ -103,9 +107,24 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 	const [review, setReview] = useState<{batch: ReviewBatch; title: string} | undefined>(
 		undefined,
 	);
-	const [editing, setEditing] = useState<
+	/**
+	 * The native prose buffer, open on one vault file.
+	 *
+	 * `data` is the frontmatter as read; it is written back unchanged so the
+	 * buffer can only ever alter the author's own prose. `body` seeds the buffer
+	 * and is not updated as they type — TextBuffer owns the text once it opens.
+	 */
+	const [authoring, setAuthoring] = useState<
 		| {
-				session: EditorSession;
+				readonly file: string;
+				readonly data: Record<string, unknown>;
+				readonly body: string;
+		  }
+		| undefined
+	>(undefined);
+	const [reviewing, setReviewing] = useState<
+		| {
+				session: ReviewerSession;
 				provider: Provider;
 				register: string;
 				/** Captured at open, so a mid-recompute `undefined` cannot unmount the screen. */
@@ -174,7 +193,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 				wizard === undefined &&
 				interview === undefined &&
 				review === undefined &&
-				editing === undefined,
+				reviewing === undefined,
 		},
 	);
 
@@ -237,8 +256,48 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 		[append, ensure, root],
 	);
 
-	/** Opens the literary editor over the whole corpus. */
-	const startEditor = useCallback(async () => {
+	/**
+	 * Opens a vault file in the native prose buffer.
+	 *
+	 * Read here rather than in the command so the buffer always opens on what is
+	 * on disk right now — a scene the author edited in Obsidian a moment ago is
+	 * the version they mean, not whatever the last recompute cached.
+	 */
+	const openAuthoring = useCallback(
+		async (file: string) => {
+			try {
+				const {data, body} = parseDocument(await readFile(file, 'utf8'));
+				setAuthoring({file, data, body});
+			} catch (caught) {
+				append([error(caught instanceof Error ? caught.message : String(caught))]);
+			}
+		},
+		[append],
+	);
+
+	/**
+	 * Writes the buffer back, frontmatter untouched.
+	 *
+	 * The frontmatter is re-serialised from what was parsed at open, not carried
+	 * through as text — which means a save normalises its formatting but can
+	 * never change its meaning. The body is written exactly as typed (P6).
+	 */
+	const saveAuthoring = useCallback(
+		async (file: string, data: Record<string, unknown>, body: string) => {
+			try {
+				await writeFile(file, stringifyDocument({data, body}), 'utf8');
+				setAuthoring(undefined);
+				append([ok(`wrote ${path.relative(root, file)}`)]);
+				recompute();
+			} catch (caught) {
+				append([error(caught instanceof Error ? caught.message : String(caught))]);
+			}
+		},
+		[append, recompute, root],
+	);
+
+	/** Opens the reviewer over the whole rendered corpus. */
+	const startReviewer = useCallback(async () => {
 		const resolved = await ensure();
 		if (!resolved) {
 			append([error('no vault loaded here — run /init first')]);
@@ -260,14 +319,14 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 		const register = profile.register ?? '';
 
 		append([
-			muted('editor — ask anything about the corpus'),
+			muted('reviewer — ask anything about the corpus'),
 			muted('`fix <id|arc|everything>` proofreads; corrections are spelling and'),
 			muted('grammar only, and every one still goes through review'),
 			muted('esc to leave'),
 		]);
 
-		setEditing({
-			session: new EditorSession({
+		setReviewing({
+			session: new ReviewerSession({
 				root,
 				project: resolved,
 				provider: loaded.provider,
@@ -601,12 +660,12 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 						const next = result.switchProject;
 						// Anything scoped to the old vault has to go: an active
 						// character, a half-finished review, an open interview, an
-						// editor grounded on a corpus that is no longer loaded.
+						// reviewer grounded on a corpus that is no longer loaded.
 						setActiveCharacter(undefined);
 						setPager(undefined);
 						setReview(undefined);
 						setInterview(undefined);
-						setEditing(undefined);
+						setReviewing(undefined);
 						// The wiki server serves one vault; it must not keep serving the
 						// old one after a switch.
 						await stopWikiServe();
@@ -627,8 +686,8 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 						);
 					} else if (result.architect) {
 						await openArchitect();
-					} else if (result.editor) {
-						await startEditor();
+					} else if (result.reviewer) {
+						await startReviewer();
 					} else if (result.wizard) {
 						setWizard(result.wizard);
 					} else if (result.paged && result.lines.length > 0) {
@@ -638,6 +697,9 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 					}
 					if (result.dirty) {
 						recompute();
+					}
+					if (result.openEditor !== undefined) {
+						await openAuthoring(result.openEditor);
 					}
 				} catch (caught) {
 					append([error(caught instanceof Error ? caught.message : String(caught))]);
@@ -656,8 +718,9 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			recompute,
 			root,
 			runExtract,
-			startEditor,
+			startReviewer,
 			openArchitect,
+			openAuthoring,
 			startInterview,
 		],
 	);
@@ -759,25 +822,50 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 		);
 	}
 
+	// Above the conversations for the same reason the review gate is: a scene the
+	// author is part-way through writing is the most expensive thing on screen to
+	// lose, so nothing may render over the top of it.
+	if (authoring) {
+		return (
+			<Box flexDirection="column" paddingX={1}>
+				<TextBuffer
+					contents={authoring.body}
+					path={path.relative(root, authoring.file)}
+					columns={columns}
+					// The whole terminal, less the padding this Box adds.
+					height={rows - 1}
+					confirmDiscard
+					onSave={body => {
+						void saveAuthoring(authoring.file, authoring.data, body);
+					}}
+					onCancel={() => {
+						setAuthoring(undefined);
+						append([muted('closed without saving')]);
+					}}
+				/>
+			</Box>
+		);
+	}
+
 	// Deliberately after the review gate: a correction pass opens the gate over
 	// the top, and clearing it drops the author back into the same conversation
 	// rather than a fresh one that has forgotten what they were doing.
-	if (editing) {
+	if (reviewing) {
 		return (
-			<EditorMode
+			<ReviewerMode
 				root={root}
-				project={project ?? editing.project}
-				provider={editing.provider}
-				session={editing.session}
-				register={editing.register}
+				project={project ?? reviewing.project}
+				provider={reviewing.provider}
+				session={reviewing.session}
+				register={reviewing.register}
 				rows={rows}
 				columns={columns}
 				onFixed={outcome => {
 					void handleFixed(outcome);
 				}}
 				onExit={() => {
-					setEditing(undefined);
-					append([muted('editor closed')]);
+					setReviewing(undefined);
+					append([muted('reviewer closed')]);
 				}}
 			/>
 		);

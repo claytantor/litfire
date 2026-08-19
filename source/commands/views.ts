@@ -3,6 +3,12 @@ import type {Project} from '../core/project.js';
 import type {OrphanedInterview} from '../interview/index.js';
 import type {LedgerState} from '../ledger/replay.js';
 import {
+	allStates,
+	castOf,
+	momentByStep,
+	type CharacterStateView,
+} from '../ledger/state.js';
+import {
 	blank,
 	columns,
 	error,
@@ -105,6 +111,8 @@ export function renderPrimitives(
 	const groups: readonly {
 		readonly kind: string;
 		readonly rows: readonly (readonly [string, string, string])[];
+		/** Shown only when named by `focus` — see the `state` group. */
+		readonly onDemand?: boolean;
 	}[] = [
 		{
 			kind: 'system',
@@ -170,6 +178,22 @@ export function renderPrimitives(
 			),
 		},
 		{
+			kind: 'state',
+			// Derived, and the only combinatorial kind here: one row per character
+			// per moment. Listed on request rather than by default, because at
+			// novel scale it is larger than every other kind put together and would
+			// bury them.
+			onDemand: true,
+			rows: allStates(project.replay, vault.situations).map(
+				state =>
+					[
+						state.id,
+						`L${String(state.level)}`,
+						`${state.system ?? '(no system)'} · ${plural(state.artifacts.length, 'artifact')}`,
+					] as const,
+			),
+		},
+		{
 			kind: 'faction',
 			rows: vault.factions.map(
 				faction =>
@@ -220,7 +244,7 @@ export function renderPrimitives(
 
 	const shown =
 		focus === undefined
-			? groups
+			? groups.filter(group => group.onDemand !== true)
 			: groups.filter(group => group.kind === focus || `${group.kind}s` === focus);
 
 	if (shown.length === 0) {
@@ -252,6 +276,110 @@ export function renderPrimitives(
 
 	if (total === 0) {
 		lines.push(blank(), muted('nothing with an id yet — /system or /character to start'));
+	}
+
+	for (const group of groups) {
+		if (group.onDemand === true && focus === undefined && group.rows.length > 0) {
+			lines.push(
+				blank(),
+				muted(
+					`${plural(group.rows.length, `${group.kind} id`)} not listed — /primitives ${group.kind}`,
+				),
+			);
+		}
+	}
+
+	return lines;
+}
+
+/**
+ * One situation as the character states standing in it (§6.1).
+ *
+ * The cast shares a moment and agrees on nothing else, so the stats and
+ * artifacts are laid out per character rather than merged: what makes a scene
+ * writable is seeing that one of them has the artifact and the other does not.
+ */
+export function renderCast(project: Project, situationId: string): Line[] {
+	const situation = project.vault.situations.find(
+		candidate => candidate.id === situationId,
+	);
+	if (situation === undefined) {
+		return [error(`no situation '${situationId}'`)];
+	}
+
+	const clock = momentByStep(project.replay.sequence, project.vault.situations);
+	const cast = castOf(project.replay, clock, situation);
+	const moment = project.vault.moments.find(candidate => candidate.id === cast.moment);
+
+	const lines: Line[] = [
+		heading(`${situation.id}${situation.title ? ` — ${situation.title}` : ''}`),
+	];
+
+	if (cast.moment === undefined) {
+		lines.push(
+			warn('unplaced — no moment on the clock precedes this scene'),
+			muted(
+				situation.arc === undefined
+					? '/situation place it on an arc, or set moment: in its frontmatter'
+					: 'set moment: in its frontmatter, or date a moment before it',
+			),
+		);
+	} else {
+		const when = moment?.at === undefined ? 'undated' : `at ${String(moment.at)}`;
+		lines.push(
+			muted(
+				`moment ${cast.moment}${moment?.name ? ` — ${moment.name}` : ''} · ${when} · ${
+					cast.anchored ? 'anchored' : 'inherited'
+				}`,
+			),
+		);
+	}
+
+	if (situation.place !== undefined) {
+		lines.push(muted(`place ${situation.place}`));
+	}
+
+	if (cast.states.length === 0) {
+		lines.push(blank(), muted('nobody in this scene has a state yet'));
+	}
+
+	for (const state of cast.states) {
+		lines.push(blank(), text(state.id), ...stateRows(state));
+	}
+
+	if (cast.missing.length > 0) {
+		lines.push(
+			blank(),
+			warn(`no state at this point: ${cast.missing.join(', ')}`),
+			muted('they are in the cast but the ledger has not reached them'),
+		);
+	}
+
+	return lines;
+}
+
+/** The body of one character state — indented, shared by every state view. */
+function stateRows(state: CharacterStateView): Line[] {
+	const stats = Object.entries(state.stats).toSorted(([a], [b]) => a.localeCompare(b));
+	const lines: Line[] = [
+		muted(
+			`  ${state.system ?? '(no system)'} · level ${String(state.level)} · xp ${String(state.xp)}`,
+		),
+	];
+
+	if (stats.length > 0) {
+		for (const row of columns(stats.map(([id, value]) => [`  ${id}`, String(value)]))) {
+			lines.push(text(row));
+		}
+	}
+
+	lines.push(
+		text(
+			`  artifacts: ${state.artifacts.length > 0 ? state.artifacts.join(', ') : '(none)'}`,
+		),
+	);
+	if (state.skills.length > 0) {
+		lines.push(text(`  skills: ${state.skills.join(', ')}`));
 	}
 
 	return lines;

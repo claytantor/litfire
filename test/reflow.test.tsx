@@ -5,12 +5,12 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {App} from '../source/app.js';
 import type {Line} from '../source/commands/types.js';
 import {DiffReview} from '../source/components/diff-review.js';
-import {EditorScreen} from '../source/components/editor-screen.js';
+import {ConversationScreen} from '../source/components/conversation-screen.js';
 import {InterviewScreen} from '../source/components/interview-screen.js';
 import {Pager} from '../source/components/pager.js';
 import {ProviderWizard} from '../source/components/provider-wizard.js';
 import {SelectList} from '../source/components/select-list.js';
-import type {EditorTurn} from '../source/editor/types.js';
+import type {ConversationTurn} from '../source/conversation/types.js';
 import {InterviewSession} from '../source/interview/index.js';
 import type {ChatMessage, Provider} from '../source/llm/index.js';
 import {ReviewBatch} from '../source/review/index.js';
@@ -250,20 +250,25 @@ describe('DiffReview', () => {
 		const frame = term.frame();
 		expectFits(frame, 44, 22);
 		expect(frame).toContain('^s save');
-		expect(frame).toContain('esc cancel');
+		// The verb tracks whether there is anything to lose; an untouched buffer
+		// closes rather than discards.
+		expect(frame).toContain('esc close');
 		term.unmount();
 	});
 });
 
-describe('EditorScreen', () => {
-	const turns: readonly EditorTurn[] = Array.from({length: 20}, (_unused, index) => ({
-		role: index % 2 === 0 ? 'author' : 'editor',
-		text: `${String(index).padStart(2, '0')} ${paragraph}`,
-	}));
+describe('ConversationScreen', () => {
+	const turns: readonly ConversationTurn[] = Array.from(
+		{length: 20},
+		(_unused, index) => ({
+			role: index % 2 === 0 ? 'author' : 'agent',
+			text: `${String(index).padStart(2, '0')} ${paragraph}`,
+		}),
+	);
 
 	it.each(WIDTHS)('fits a %i-column terminal and keeps the composer', async columns => {
 		const term = mount(
-			<EditorScreen
+			<ConversationScreen
 				turns={turns}
 				streaming={undefined}
 				status={undefined}
@@ -272,6 +277,7 @@ describe('EditorScreen', () => {
 				columns={columns}
 				onSubmit={vi.fn()}
 				onCancel={vi.fn()}
+				speaker="reviewer"
 			/>,
 			columns,
 			24,
@@ -280,14 +286,14 @@ describe('EditorScreen', () => {
 
 		const frame = term.frame();
 		expectFits(frame, columns, 24);
-		expect(frame).toContain('ask the editor…');
+		expect(frame).toContain('ask the reviewer…');
 		expect(frame).toContain('↑↓ scroll');
 		term.unmount();
 	});
 
 	it('fits while a reply is streaming into a 14-row terminal', async () => {
 		const term = mount(
-			<EditorScreen
+			<ConversationScreen
 				turns={turns}
 				streaming={`${paragraph} ${paragraph}`}
 				status="thinking…"
@@ -296,6 +302,7 @@ describe('EditorScreen', () => {
 				columns={46}
 				onSubmit={vi.fn()}
 				onCancel={vi.fn()}
+				speaker="reviewer"
 			/>,
 			46,
 			14,
@@ -304,7 +311,7 @@ describe('EditorScreen', () => {
 
 		const frame = term.frame();
 		expectFits(frame, 46, 14);
-		expect(frame).toContain('the editor is replying…');
+		expect(frame).toContain('the reviewer is replying…');
 		term.unmount();
 	});
 });

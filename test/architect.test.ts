@@ -111,7 +111,7 @@ describe('the conversation', () => {
 
 		expect(reply).toBe('Two systems, by the sound of it.');
 		const system = provider.seen[0]?.[0]?.content ?? '';
-		// Both halves: /editor sees only the corpus, extraction sees only the
+		// Both halves: /reviewer sees only the corpus, extraction sees only the
 		// transcript, and the questions worth asking here need both.
 		expect(system).toContain('# The corpus');
 		expect(system).toContain('# The raw material');

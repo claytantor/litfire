@@ -57,7 +57,7 @@ export function buildPlanMessages(
 /**
  * Runs the structural pass.
  *
- * Unlike `/editor`'s correction pass there is no content guard: the architect is
+ * Unlike `/reviewer`'s correction pass there is no content guard: the architect is
  * *supposed* to move things around, so a guard that rejected structural change
  * would reject the feature. What stands in its place is `resolveInsideVault` —
  * the same path check every proposal in this tool passes — and the review gate,

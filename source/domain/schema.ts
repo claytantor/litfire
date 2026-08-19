@@ -196,6 +196,20 @@ export const situationSchema = z.object({
 	/** Absent means unplaced — a valid permanent state (§5). */
 	arc: idSchema.optional(),
 	order: z.number().int().optional(),
+	/**
+	 * Where on the in-world clock this scene sits.
+	 *
+	 * Absent is the common case and not a defect: a situation inherits the last
+	 * moment before it in the replay sequence, so an author who has ordered their
+	 * arcs has already said when every scene happens. Writing it here pins the
+	 * scene to a moment explicitly — worth doing for a flashback, or wherever
+	 * narrative order and clock order disagree.
+	 *
+	 * It never reorders anything. Sequence comes from arc order and intra-arc
+	 * order (§5); this names the clock position, which is what every character
+	 * state in the scene is addressed by.
+	 */
+	moment: idSchema.optional(),
 	characters: z.array(idSchema).default([]),
 	place: idSchema.optional(),
 	themes: z.array(idSchema).default([]),

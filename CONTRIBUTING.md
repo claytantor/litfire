@@ -95,4 +95,5 @@ the reason you think it does.
 
 Open an issue with the smallest reproduction you can manage. A vault is markdown
 on disk, so a short file plus the command usually is one. Security issues go
-through [private reporting](SECURITY.md) instead.
+through [private reporting](https://github.com/claytantor/litfire/blob/main/SECURITY.md)
+instead.

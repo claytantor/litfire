@@ -1,11 +1,11 @@
 import {useCallback, useRef, useState} from 'react';
 import {ArchitectSession, runPlan, type PlanOutcome} from '../architect/index.js';
-import {buildEditorContext} from '../editor/corpus.js';
-import type {EditorTurn} from '../editor/types.js';
+import {buildReviewerContext} from '../reviewer/corpus.js';
+import type {ConversationTurn} from '../conversation/types.js';
 import type {Project} from '../core/project.js';
 import type {Provider} from '../llm/index.js';
 import {buildRawContext, renderRawContext} from '../architect/raw.js';
-import {EditorScreen} from './editor-screen.js';
+import {ConversationScreen} from './conversation-screen.js';
 
 type Props = {
 	readonly root: string;
@@ -25,7 +25,7 @@ const PLAN = /^plan\s+(.+)$/is;
 /**
  * Binds the architect to the shared conversation screen.
  *
- * The split mirrors `/editor`: talking is free and changes nothing, and a write
+ * The split mirrors `/reviewer`: talking is free and changes nothing, and a write
  * only ever happens behind an explicit verb. Here that verb is `plan`, and what
  * it produces goes to the same review gate as every other proposal in the tool —
  * the architect may restructure a world, but not without the author reading each
@@ -33,7 +33,7 @@ const PLAN = /^plan\s+(.+)$/is;
  */
 export function ArchitectMode({rows, columns, ...options}: Props) {
 	const {root, project, provider, session, register, onPlanned, onExit} = options;
-	const [turns, setTurns] = useState<readonly EditorTurn[]>(session.turns);
+	const [turns, setTurns] = useState<readonly ConversationTurn[]>(session.turns);
 	const [streaming, setStreaming] = useState<string | undefined>(undefined);
 	const [status, setStatus] = useState<string | undefined>(undefined);
 	const [busy, setBusy] = useState(false);
@@ -59,7 +59,7 @@ export function ArchitectMode({rows, columns, ...options}: Props) {
 						// instruction like "do that" refers to the same material the
 						// author was just discussing.
 						const [corpus, raw] = await Promise.all([
-							buildEditorContext(root, project, planned[1]),
+							buildReviewerContext(root, project, planned[1]),
 							buildRawContext(root, planned[1]),
 						]);
 						const context = [
@@ -123,7 +123,7 @@ export function ArchitectMode({rows, columns, ...options}: Props) {
 	}, [busy, onExit]);
 
 	return (
-		<EditorScreen
+		<ConversationScreen
 			turns={turns}
 			streaming={streaming}
 			status={status}

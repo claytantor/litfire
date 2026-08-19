@@ -1,4 +1,3 @@
-import {spawn} from 'node:child_process';
 import {readdir, readFile, rename, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import type {Project} from '../core/project.js';
@@ -77,6 +76,7 @@ import {
 	renderPrimitives,
 	renderCharacter,
 	renderQuestions,
+	renderCast,
 	renderSheet,
 	renderSystem,
 	renderThemes,
@@ -664,17 +664,17 @@ const wiki: Command = {
 	},
 };
 
-const editor: Command = {
-	name: 'editor',
-	usage: '/editor',
-	summary: 'chat with a literary editor about the whole corpus',
+const reviewer: Command = {
+	name: 'reviewer',
+	usage: '/reviewer',
+	summary: 'chat with a literary editor about the rendered corpus',
 	async run(_args, context) {
 		if (!context.project) {
 			return needsProject();
 		}
 		// Provider resolution happens where the screen opens, the same way the
 		// interviews do it — the command's job is to say which mode to enter.
-		return {lines: [], editor: true};
+		return {lines: [], reviewer: true};
 	},
 };
 
@@ -789,25 +789,10 @@ const questions: Command = {
 	},
 };
 
-async function openExternally(root: string, file: string): Promise<string> {
-	const configRaw = await readFile(resolve(root, VAULT.config), 'utf8').catch(() => '{}');
-	const configured = (JSON.parse(configRaw) as {editor?: string}).editor ?? '$EDITOR';
-
-	// D4: $EDITOR by default; it is portable and works over SSH.
-	const command = configured === '$EDITOR' ? process.env['EDITOR'] : configured;
-	if (!command) {
-		return 'set $EDITOR to open situations automatically';
-	}
-
-	const child = spawn(command, [file], {detached: true, stdio: 'ignore'});
-	child.unref();
-	return `opened in ${command}`;
-}
-
 const situation: Command = {
 	name: 'situation',
-	usage: '/situation new|place <id> <arc>',
-	summary: 'scaffold a situation, or move one out of the inbox',
+	usage: '/situation [<id>] · new|edit|place',
+	summary: 'show a scene\u2019s cast, write one, scaffold, or place it',
 	async run(args, context) {
 		if (!context.project) {
 			return needsProject();
@@ -834,15 +819,31 @@ const situation: Command = {
 				{encoding: 'utf8', flag: 'wx'},
 			);
 
-			const opened = await openExternally(context.root, file);
+			// Straight into the buffer: scaffolding a scene and then being handed
+			// back to a prompt is a stall at exactly the moment the author has
+			// something to write.
 			return {
 				lines: [
 					ok(`created ${path.relative(context.root, file)}`),
-					muted(opened),
 					muted(`place it with /situation place ${id} <arc>`),
 				],
+				openEditor: file,
 				dirty: true,
 			};
+		}
+
+		if (sub === 'edit') {
+			const [id] = rest;
+			if (!id) {
+				return {lines: [error('usage: /situation edit <id>')]};
+			}
+
+			const file = await findSituationFile(context.root, id);
+			if (file === undefined) {
+				return {lines: [error(`no file for situation '${id}'`)]};
+			}
+
+			return {lines: [], openEditor: file};
 		}
 
 		if (sub === 'place') {
@@ -897,8 +898,20 @@ const situation: Command = {
 			};
 		}
 
+		// A bare id is the reading view: who is in this scene, at what moment, and
+		// what each of them has there. It is the form the author reaches for while
+		// writing, so it needs no subcommand.
+		if (sub !== undefined && rest.length === 0) {
+			const lines = renderCast(context.project, sub);
+			return {lines, paged: lines.length > 14, title: `situation ${sub}`};
+		}
+
 		return {
-			lines: [error('usage: /situation new [title] | /situation place <id> <arc>')],
+			lines: [
+				error(
+					'usage: /situation <id> | /situation new [title] | /situation place <id> <arc>',
+				),
+			],
 		};
 	},
 };
@@ -1553,7 +1566,7 @@ export const commands: readonly Command[] = [
 	chapter,
 	exportManuscript,
 	wiki,
-	editor,
+	reviewer,
 	architect,
 	primitives,
 	timeline,
