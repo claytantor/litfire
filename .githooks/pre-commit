@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Installed via `pnpm hooks:install` (sets core.hooksPath to .githooks).
+here="$(dirname "$0")"
+"$here/../scripts/check-secrets.sh" --staged || exit 1
+"$here/../scripts/check-attribution.sh" --staged || exit 1

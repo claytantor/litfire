@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Last line of defence, at the boundary that matters.
+#
+# `pre-commit` and `commit-msg` only run on the machine that makes the commit,
+# and only when hooks are installed. A commit made in another clone, or with
+# `--no-verify`, reaches `git push` unexamined — and once it is on a public
+# remote the message cannot be corrected without rewriting history other people
+# have already cloned.
+#
+# So every commit actually being pushed is re-checked here, message and content.
+set -uo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$here"
+
+fail=0
+z40='0000000000000000000000000000000000000000'
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  # Deleting a branch pushes nothing.
+  [[ "$local_sha" == "$z40" ]] && continue
+
+  if [[ "$remote_sha" == "$z40" ]]; then
+    # New branch: everything on it that the remote does not already have.
+    range=$(git rev-list "$local_sha" --not --remotes | tr '\n' ' ')
+  else
+    range=$(git rev-list "$remote_sha..$local_sha" | tr '\n' ' ')
+  fi
+
+  for sha in $range; do
+    msg=$(git log -1 --format='%B%n%an <%ae>%n%cn <%ce>' "$sha")
+    if ! printf '%s' "$msg" > /tmp/.litfire-pushmsg.$$ \
+       || ! scripts/check-attribution.sh --message /tmp/.litfire-pushmsg.$$ >/dev/null 2>&1; then
+      printf '  ✖ %s  %s\n' "${sha:0:8}" "$(git log -1 --format=%s "$sha")" >&2
+      fail=1
+    fi
+    rm -f /tmp/.litfire-pushmsg.$$
+  done
+done
+
+if [[ $fail -ne 0 ]]; then
+  printf '\nBlocked: the commit(s) above carry AI attribution in their message,\n' >&2
+  printf 'author, or committer. Rewrite them before pushing — once this is on a\n' >&2
+  printf 'public remote the history cannot be corrected quietly.\n' >&2
+  exit 1
+fi
+
+# Content of the tip, so a file carrying attribution cannot ride along either.
+scripts/check-attribution.sh >/dev/null 2>&1 || {
+  printf '\nBlocked: tracked files carry AI attribution.\n' >&2
+  scripts/check-attribution.sh >&2
+  exit 1
+}
+
+printf 'pre-push: no attribution in the commits being pushed\n'

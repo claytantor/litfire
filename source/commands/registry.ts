@@ -1,0 +1,1574 @@
+import {spawn} from 'node:child_process';
+import {readdir, readFile, rename, writeFile} from 'node:fs/promises';
+import path from 'node:path';
+import type {Project} from '../core/project.js';
+import {chapterSchema, situationSchema} from '../domain/schema.js';
+import {partitionChapters} from '../chapters/index.js';
+import {renderManuscript} from '../chapters/manuscript.js';
+import {
+	findProvider,
+	forgetKey,
+	maskKey,
+	PROVIDERS,
+	resolveKey,
+	verifyStoredKey,
+	type ProviderId,
+	type ResolvedKey,
+} from '../llm/index.js';
+import {
+	AGENCY_NOTE,
+	LEXICON_KEYS,
+	ORIGIN_NOTE,
+	VISIBILITY_NOTE,
+	isLexiconKey,
+	lexiconPairs,
+	listProfiles,
+	loadSetting,
+	term,
+	writeLexiconTerm,
+} from '../genre/index.js';
+import {
+	KIND_SUMMARY,
+	findForResume,
+	type InterviewKind,
+	findOrphanedInterviews,
+	findResumable,
+	transcriptsForKind,
+} from '../interview/index.js';
+import {renderStatusBlock, writeStatusBlock} from '../system/status.js';
+import {buildWiki, writeWiki} from '../wiki/index.js';
+import {
+	SERVE_SCRIPT,
+	currentServe,
+	startWikiServe,
+	stopWikiServe,
+	writeServeScript,
+} from '../wiki/host.js';
+import {readConfig, recordConsent} from '../vault/config.js';
+import {parseDocument, stringifyDocument} from '../vault/frontmatter.js';
+import {resolve, VAULT} from '../vault/paths.js';
+import {
+	displayPath,
+	inspectProject,
+	projectName,
+	readLastProject,
+	readLiveRecent,
+	resolveProjectPath,
+} from '../vault/projects.js';
+import {scaffoldVault} from '../vault/scaffold.js';
+import {
+	blank,
+	columns,
+	error,
+	heading,
+	muted,
+	ok,
+	text,
+	warn,
+	type Command,
+	type CommandResult,
+	type Line,
+} from './types.js';
+import {
+	renderChapter,
+	renderChapters,
+	renderLint,
+	renderPacing,
+	renderPrimitives,
+	renderCharacter,
+	renderQuestions,
+	renderSheet,
+	renderSystem,
+	renderThemes,
+	renderTimeline,
+} from './views.js';
+
+const needsProject = (): CommandResult => ({
+	lines: [error('no vault loaded here — run /init first')],
+});
+
+/** D3: sparse integers so frontmatter stays readable in Obsidian. */
+const ORDER_STEP = 10;
+
+function nextOrder(existing: readonly number[]): number {
+	const max = existing.length === 0 ? 0 : Math.max(...existing);
+	return max + ORDER_STEP;
+}
+
+/** Everything `/export` must refuse to write over: these hold the only copy. */
+const SOURCE_DIRECTORIES: readonly string[] = [
+	VAULT.meta,
+	VAULT.raw,
+	VAULT.system,
+	VAULT.timeline,
+	VAULT.characters,
+	VAULT.themes,
+	VAULT.places,
+	VAULT.factions,
+	VAULT.situations,
+	VAULT.chapters,
+	VAULT.ledger,
+];
+
+const help: Command = {
+	name: 'help',
+	usage: '/help',
+	summary: 'list commands',
+	async run(_args, _context) {
+		const rows = commands.map(command => [`  ${command.usage}`, command.summary]);
+		return {
+			lines: [heading('commands'), ...columns(rows).map(row => text(row))],
+		};
+	},
+};
+
+const init: Command = {
+	name: 'init',
+	usage: '/init',
+	summary: 'scaffold a vault here',
+	async run(args, context) {
+		const known = listProfiles().map(profile => profile.id);
+
+		// Args are order-insensitive: whichever one names a profile is the idiom,
+		// anything else is the target path. `/init` with neither asks.
+		const chosen = args.find(arg => known.includes(arg));
+		const rawPath = args.find(arg => !known.includes(arg));
+		const target =
+			rawPath === undefined ? context.root : resolveProjectPath(context.root, rawPath);
+		const suffix = rawPath === undefined ? '' : ` ${rawPath}`;
+
+		// §10: /init asks what kind of world this is. `base` stays first-class so
+		// declining to choose is a supported path, not a fallthrough.
+		if (chosen === undefined) {
+			return {
+				lines: [
+					heading('what kind of world is this?'),
+					...listProfiles().map(profile =>
+						text(`  /init ${(profile.id + suffix).padEnd(24)} ${profile.name}`),
+					),
+					blank(),
+					muted(`target: ${displayPath(target)}`),
+					muted('the idiom supplies vocabulary and interview questions only —'),
+					muted('it never changes how state is computed, and switching later'),
+					muted('re-renders the corpus without migrating a file'),
+				],
+			};
+		}
+
+		const state = await inspectProject(target);
+		if (state === 'not-a-directory') {
+			return {lines: [error(`${displayPath(target)} is a file, not a directory`)]};
+		}
+
+		const result = await scaffoldVault(target, chosen);
+		const lines = [
+			heading('/init'),
+			ok(`created ${result.created.length} file(s)`),
+			...result.created.slice(0, 12).map(file => muted(`  + ${file}`)),
+		];
+		if (result.created.length > 12) {
+			lines.push(muted(`  … and ${result.created.length - 12} more`));
+		}
+		if (result.skipped.length > 0) {
+			lines.push(muted(`kept ${result.skipped.length} existing file(s)`));
+		}
+		lines.push(
+			blank(),
+			muted(`idiom: ${chosen} — change it any time in system/system.md`),
+			muted('open this folder in Obsidian — the graph is already connected'),
+		);
+
+		// Scaffolding somewhere else is an implicit request to work there.
+		const switched = path.resolve(target) !== path.resolve(context.root);
+		if (switched) {
+			lines.push(ok(`switched to ${displayPath(target)}`));
+		}
+
+		return {
+			lines,
+			dirty: true,
+			...(switched ? {switchProject: target} : {}),
+		};
+	},
+};
+
+const consent: Command = {
+	name: 'consent',
+	usage: '/consent',
+	summary: 'allow this vault’s formulas to execute',
+	async run(_args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+		if (context.project.vault.formulas.length === 0) {
+			return {lines: [muted('this vault defines no formulas')]};
+		}
+
+		await recordConsent(context.root, context.project.formulaHash);
+		context.consentFormulas(context.project.formulaHash);
+		return {
+			lines: [
+				ok(`formulas enabled (${context.project.formulaHash.slice(0, 12)})`),
+				muted('they run in an isolate with no clock, no randomness, and no I/O'),
+			],
+			dirty: true,
+		};
+	},
+};
+
+const sheet: Command = {
+	name: 'sheet',
+	usage: '/sheet <character> [at]',
+	summary: 'rendered state at a point in the sequence',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const characterId = args[0] ?? context.activeCharacter;
+		if (!characterId) {
+			return {lines: [error('usage: /sheet <character> [at]')]};
+		}
+
+		context.setActiveCharacter(characterId);
+		const lines = renderSheet(context.project, characterId, args[1]);
+		return {lines, paged: lines.length > 14, title: `sheet ${characterId}`};
+	},
+};
+
+/**
+ * Finds a situation's file by reading ids out of frontmatter rather than
+ * guessing its slug, the same way `/situation place` does. Placed situations sit
+ * flat in `situations/`, unplaced ones in `situations/inbox/`.
+ */
+async function findSituationFile(root: string, id: string): Promise<string | undefined> {
+	for (const directory of [resolve(root, VAULT.situations), resolve(root, VAULT.inbox)]) {
+		const entries = await readdir(directory).catch(() => [] as string[]);
+		for (const entry of entries.filter(name => name.endsWith('.md'))) {
+			const file = path.join(directory, entry);
+			const raw = await readFile(file, 'utf8').catch(() => undefined);
+			if (raw !== undefined && parseDocument(raw).data['id'] === id) {
+				return file;
+			}
+		}
+	}
+
+	return undefined;
+}
+
+const status: Command = {
+	name: 'status',
+	usage: '/status <character> [at] · /status write <character> <situation>',
+	summary: 'render an in-world status block, or place one in a situation',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const {profile} = await loadSetting(context.root);
+		const [head, ...rest] = args;
+
+		if (head === 'write') {
+			const [characterId, situationId] = rest;
+			if (!characterId || !situationId) {
+				return {lines: [error('usage: /status write <character> <situation>')]};
+			}
+
+			// The block is rendered from the snapshot *at* that situation, not from
+			// current state: a status screen in an early scene showing end-of-book
+			// numbers is exactly the contradiction this tool exists to catch.
+			const state = context.project.replay.snapshots.get(situationId);
+			if (!state) {
+				return {
+					lines: [
+						error(`'${situationId}' has no state in the replay sequence`),
+						muted(
+							'an unplaced situation has no point in time — /situation place it first',
+						),
+					],
+				};
+			}
+
+			const character = state.characters[characterId];
+			if (!character) {
+				return {lines: [error(`no character '${characterId}' at ${situationId}`)]};
+			}
+
+			const file = await findSituationFile(context.root, situationId);
+			if (file === undefined) {
+				return {lines: [error(`no file for situation '${situationId}'`)]};
+			}
+
+			const block = renderStatusBlock(character, {profile});
+			await writeStatusBlock(file, block, {char: characterId, at: situationId});
+
+			return {
+				lines: [
+					ok(`${profile.status_template} block → ${path.relative(context.root, file)}`),
+					muted('regenerate any time — only the marked span is replaced'),
+				],
+				dirty: true,
+			};
+		}
+
+		const characterId = head ?? context.activeCharacter;
+		if (!characterId) {
+			return {lines: [error(`usage: ${status.usage}`)]};
+		}
+
+		const at = rest[0];
+		const state =
+			at === undefined
+				? context.project.replay.state
+				: context.project.replay.snapshots.get(at);
+		if (!state) {
+			return {lines: [error(`no step '${at}' in the replay sequence`)]};
+		}
+
+		const character = state.characters[characterId];
+		if (!character) {
+			return {lines: [error(`no character '${characterId}' in the ledger`)]};
+		}
+
+		context.setActiveCharacter(characterId);
+		const block = renderStatusBlock(character, {profile});
+
+		const lines = [
+			heading(`status — ${characterId}${at === undefined ? '' : `  @ ${at}`}`),
+			muted(`${profile.status_template} template, from ${profile.name}`),
+			blank(),
+			...block.split('\n').map(line => text(line)),
+			blank(),
+			muted(`/status write ${characterId} <situation> to place it`),
+		];
+		return {lines, paged: lines.length > 14, title: `status ${characterId}`};
+	},
+};
+
+const chapter: Command = {
+	name: 'chapter',
+	usage: '/chapter [<id> | new <situation> [title] | move <id> <situation>]',
+	summary: 'cut the sequence into chapters, and see the seams',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const [sub, ...rest] = args;
+
+		if (sub === 'new') {
+			const [startsAt, ...title] = rest;
+			if (!startsAt) {
+				return {lines: [error('usage: /chapter new <situation> [title]')]};
+			}
+
+			// A chapter opening on a scene that is not in the replay sequence claims
+			// nothing, so it is refused here rather than shipped as an issue the
+			// author has to go and read.
+			const inSequence = context.project.replay.sequence.some(
+				step => step.kind === 'situation' && step.id === startsAt,
+			);
+			if (!inSequence) {
+				const exists = context.project.vault.situations.some(s => s.id === startsAt);
+				return {
+					lines: [
+						error(`'${startsAt}' is not in the replay sequence`),
+						muted(
+							exists
+								? 'it is unplaced — /situation place it on an arc first'
+								: 'no situation by that id',
+						),
+					],
+				};
+			}
+
+			if (context.project.vault.chapters.some(c => c.starts_at === startsAt)) {
+				return {lines: [error(`a chapter already opens on ${startsAt}`)]};
+			}
+
+			const id = `ch-${String(context.project.vault.chapters.length + 1).padStart(3, '0')}`;
+			const order = nextOrder(context.project.vault.chapters.map(c => c.order));
+			const file = resolve(context.root, VAULT.chapters, `${id}.md`);
+
+			await writeFile(
+				file,
+				stringifyDocument({
+					data: chapterSchema.parse({
+						id,
+						order,
+						starts_at: startsAt,
+						...(title.length > 0 ? {title: title.join(' ')} : {}),
+					}),
+					body: `\nOpens on [[${startsAt}]]. Transitions between scenes live here, in\n\`litrpg:transition\` blocks — the scenes themselves are never edited.\n`,
+				}),
+				{encoding: 'utf8', flag: 'wx'},
+			);
+
+			return {
+				lines: [
+					ok(`created ${path.relative(context.root, file)} opening on ${startsAt}`),
+					muted('/chapter to see what it claims'),
+				],
+				dirty: true,
+			};
+		}
+
+		if (sub === 'move') {
+			const [id, startsAt] = rest;
+			if (!id || !startsAt) {
+				return {lines: [error('usage: /chapter move <id> <situation>')]};
+			}
+
+			const file = resolve(context.root, VAULT.chapters, `${id}.md`);
+			const raw = await readFile(file, 'utf8').catch(() => undefined);
+			if (raw === undefined) {
+				return {lines: [error(`no chapter file for '${id}'`)]};
+			}
+
+			const document = parseDocument(raw);
+			await writeFile(
+				file,
+				// P6: only the cut moves. The body is the author's connective text.
+				stringifyDocument({
+					data: {...document.data, starts_at: startsAt},
+					body: document.body,
+				}),
+				'utf8',
+			);
+
+			return {lines: [ok(`${id} now opens on ${startsAt}`)], dirty: true};
+		}
+
+		const lines =
+			sub === undefined
+				? renderChapters(context.project)
+				: renderChapter(context.project, sub);
+		return {lines, paged: lines.length > 14, title: 'chapters'};
+	},
+};
+
+const exportManuscript: Command = {
+	name: 'export',
+	usage: '/export [path]',
+	summary: 'assemble the chapters into a manuscript',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const {chapters, situations} = context.project.vault;
+		if (chapters.length === 0) {
+			return {
+				lines: [
+					error('no chapters to assemble'),
+					muted('/chapter new <situation> [title] cuts the first one'),
+				],
+			};
+		}
+
+		const partition = partitionChapters(chapters, context.project.replay.sequence);
+
+		// Bodies are read at export time rather than held in the vault cache: the
+		// manuscript is the one place the whole corpus is materialised, and reading
+		// it fresh keeps that from being paid for on every recompute.
+		const bodies = new Map<string, string>();
+		for (const directory of [VAULT.situations, VAULT.inbox]) {
+			const entries = await readdir(resolve(context.root, directory)).catch(
+				() => [] as string[],
+			);
+			for (const entry of entries.filter(name => name.endsWith('.md'))) {
+				const raw = await readFile(
+					path.join(resolve(context.root, directory), entry),
+					'utf8',
+				).catch(() => undefined);
+				if (raw === undefined) {
+					continue;
+				}
+				const {data, body} = parseDocument(raw);
+				if (typeof data['id'] === 'string') {
+					bodies.set(data['id'], body);
+				}
+			}
+		}
+
+		const chapterBodies = new Map<string, string>();
+		for (const entry of chapters) {
+			const raw = await readFile(
+				resolve(context.root, VAULT.chapters, `${entry.id}.md`),
+				'utf8',
+			).catch(() => undefined);
+			chapterBodies.set(entry.id, raw === undefined ? '' : parseDocument(raw).body);
+		}
+
+		// `resolveProjectPath` rather than `resolve`, so `/export ~/book.md` and an
+		// absolute path behave the way an author expects instead of being joined
+		// onto the vault root.
+		const target = args[0] ?? VAULT.manuscript;
+		const file = resolveProjectPath(context.root, target);
+
+		// Export produces output, so it must never land on source. Without this a
+		// mistyped `/export situations/sit-014.md` overwrites the scene with a
+		// manuscript that contains it — and the scene is the only copy.
+		const relative = path.relative(context.root, file).split(path.sep).join('/');
+		const isSource =
+			!relative.startsWith('..') &&
+			SOURCE_DIRECTORIES.some(dir => relative === dir || relative.startsWith(`${dir}/`));
+		if (isSource) {
+			return {
+				lines: [
+					error(`refusing to export onto ${relative} — that is source, not output`),
+					muted(`/export writes ${VAULT.manuscript} by default`),
+				],
+			};
+		}
+
+		await writeFile(
+			file,
+			renderManuscript({
+				partition,
+				situations,
+				bodies,
+				chapterBodies,
+				title: projectName(context.root),
+			}),
+			'utf8',
+		);
+
+		const scenes = partition.spans.reduce(
+			(total, span) => total + span.situations.length,
+			0,
+		);
+		const orphans = partition.unclaimed.filter(step => step.kind === 'situation').length;
+
+		return {
+			lines: [
+				ok(
+					`assembled ${partition.spans.length} chapter(s), ${scenes} scene(s) → ${target}`,
+				),
+				...(orphans > 0
+					? [
+							text(`${orphans} scene(s) appended under "Not yet in a chapter"`, {
+								color: '#e0af68',
+							}),
+						]
+					: []),
+				muted('regenerated wholesale — edit chapters/ and situations/, not this file'),
+			],
+		};
+	},
+};
+
+const wiki: Command = {
+	name: 'wiki',
+	usage: '/wiki [build | serve [port] [lan|<addr>] | stop]',
+	summary: 'derived cross-reference of the corpus, browsable over http',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const [sub, ...rest] = args;
+		const running = currentServe();
+
+		if (sub === 'stop') {
+			if (!running) {
+				return {lines: [muted('no wiki server running')]};
+			}
+			await stopWikiServe();
+			return {lines: [ok('wiki server stopped')]};
+		}
+
+		if (sub === 'build' || sub === undefined) {
+			if (sub === undefined && running) {
+				// Bare `/wiki` with a server up is a status question, not a rebuild.
+				return {
+					lines: [
+						ok(`serving ${running.url}`),
+						muted('/wiki build to regenerate · /wiki stop to stop'),
+					],
+				};
+			}
+
+			const built = buildWiki(context.project);
+			const result = await writeWiki(context.root, built);
+			// Surfaced here too, not only in `/lint`: a thin wiki is exactly when an
+			// author goes looking, and "your interview never landed" is the answer
+			// they need rather than a page count that looks fine.
+			const orphans = await findOrphanedInterviews(context.root);
+			// Written on build, not only on serve, so the script is there to read
+			// and to run by hand whether or not litfire ever starts it.
+			await writeServeScript(context.root);
+
+			return {
+				lines: [
+					ok(`${built.pages.length} page(s) → ${VAULT.wiki}/`),
+					...(result.removed.length > 0
+						? [muted(`removed ${result.removed.length} stale page(s)`)]
+						: []),
+					...orphans.map(orphan =>
+						text(
+							`${orphan.kind}${orphan.focus === undefined ? '' : ` ${orphan.focus}`}: ${orphan.exchanges} exchange(s) saved, but ${orphan.detail} — /${orphan.kind} extract`,
+							{color: '#e0af68'},
+						),
+					),
+					muted('derived from the corpus and the ledger — never hand-edit it'),
+					muted(`/wiki serve, or node ${VAULT.wiki}/${SERVE_SCRIPT} yourself`),
+				],
+				dirty: true,
+			};
+		}
+
+		if (sub === 'serve') {
+			if (running) {
+				return {lines: [ok(`already serving ${running.url}`)]};
+			}
+
+			// Serving an empty directory would just show the "not built yet" page,
+			// so build first rather than making the author discover the extra step.
+			const built = buildWiki(context.project);
+			await writeWiki(context.root, built);
+
+			// Order-insensitive, the way `/init` treats its own two arguments:
+			// whichever one is all digits is the port, anything else names an
+			// interface (`lan`, `all`, or a literal address).
+			const portArg = rest.find(argument => /^\d+$/.test(argument));
+			const hostArg = rest.find(argument => !/^\d+$/.test(argument));
+
+			const server = await startWikiServe(context.root, {
+				port: portArg === undefined ? undefined : Number.parseInt(portArg, 10),
+				host: hostArg,
+			});
+
+			// Said plainly and once. Binding every interface is a real change in who
+			// can read the vault, and the author should see it stated rather than
+			// have to infer it from the URL.
+			const reach =
+				server.host === '0.0.0.0'
+					? text('reachable by anything on your network — no password, no auth', {
+							color: '#e0af68',
+						})
+					: muted('bound to 127.0.0.1 — not reachable from your network');
+
+			return {
+				lines: [
+					ok(`serving ${server.url}`),
+					muted(`${built.pages.length} wiki page(s) · the corpus is browsable too`),
+					reach,
+					muted(`running ${VAULT.wiki}/${SERVE_SCRIPT} in a thread · /wiki stop`),
+				],
+				dirty: true,
+			};
+		}
+
+		return {lines: [error('usage: /wiki [build | serve [port] [lan|<addr>] | stop]')]};
+	},
+};
+
+const editor: Command = {
+	name: 'editor',
+	usage: '/editor',
+	summary: 'chat with a literary editor about the whole corpus',
+	async run(_args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+		// Provider resolution happens where the screen opens, the same way the
+		// interviews do it — the command's job is to say which mode to enter.
+		return {lines: [], editor: true};
+	},
+};
+
+/** `/primitives` — every id in the vault, grouped by kind. */
+const primitives: Command = {
+	name: 'primitives',
+	usage: '/primitives [kind]',
+	summary: 'every id in the vault, grouped by kind',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		// The one kind with no schema: free prose in a directory, never loaded
+		// into `Project`, so it is read here rather than derived.
+		const entries = await readdir(resolve(context.root, VAULT.places), {
+			withFileTypes: true,
+		}).catch(() => []);
+		const places = entries
+			.filter(entry => entry.isFile() && entry.name.endsWith('.md'))
+			.map(entry => path.basename(entry.name, '.md'))
+			.toSorted();
+
+		const lines = renderPrimitives(context.project, places, args[0]);
+		return {lines, paged: lines.length > 20, title: 'primitives'};
+	},
+};
+
+const architect: Command = {
+	name: 'architect',
+	usage: '/architect',
+	summary: 'reshape the corpus from the raw interviews, before re-extracting',
+	async run(_args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+		return {lines: [], architect: true};
+	},
+};
+
+const pacing: Command = {
+	name: 'pacing',
+	usage: '/pacing',
+	summary: 'planned vs actual level by arc',
+	async run(_args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+		const lines = renderPacing(context.project);
+		return {lines, paged: lines.length > 14, title: 'pacing'};
+	},
+};
+
+const timeline: Command = {
+	name: 'timeline',
+	usage: '/timeline [show|interview|resume|extract [all]]',
+	summary: 'structural view; same show/resume/extract as /system',
+	async run(args, context) {
+		const delegated = interviewDirective(args);
+		if (delegated) {
+			return timelineInterview.run(delegated, context);
+		}
+		if (!context.project) {
+			return needsProject();
+		}
+		const lines = renderTimeline(context.project);
+		return {lines, paged: lines.length > 14, title: 'timeline'};
+	},
+};
+
+const themes: Command = {
+	name: 'themes',
+	usage: '/themes [show|interview|resume|extract [all]]',
+	summary: 'coverage view; same show/resume/extract as /system',
+	async run(args, context) {
+		const delegated = interviewDirective(args);
+		if (delegated) {
+			return themesInterview.run(delegated, context);
+		}
+		if (!context.project) {
+			return needsProject();
+		}
+		const lines = renderThemes(context.project);
+		return {lines, paged: lines.length > 14, title: 'themes'};
+	},
+};
+
+const lint: Command = {
+	name: 'lint',
+	usage: '/lint',
+	summary: 'run the deterministic checks',
+	async run(_args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+		const orphans = await findOrphanedInterviews(context.root);
+		const lines = renderLint(context.project, orphans);
+		return {lines, paged: lines.length > 14, title: 'lint'};
+	},
+};
+
+const questions: Command = {
+	name: 'questions',
+	usage: '/questions',
+	summary: 'open question queue',
+	async run(_args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+		const lines = renderQuestions(context.project);
+		return {lines, paged: lines.length > 14, title: 'questions'};
+	},
+};
+
+async function openExternally(root: string, file: string): Promise<string> {
+	const configRaw = await readFile(resolve(root, VAULT.config), 'utf8').catch(() => '{}');
+	const configured = (JSON.parse(configRaw) as {editor?: string}).editor ?? '$EDITOR';
+
+	// D4: $EDITOR by default; it is portable and works over SSH.
+	const command = configured === '$EDITOR' ? process.env['EDITOR'] : configured;
+	if (!command) {
+		return 'set $EDITOR to open situations automatically';
+	}
+
+	const child = spawn(command, [file], {detached: true, stdio: 'ignore'});
+	child.unref();
+	return `opened in ${command}`;
+}
+
+const situation: Command = {
+	name: 'situation',
+	usage: '/situation new|place <id> <arc>',
+	summary: 'scaffold a situation, or move one out of the inbox',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const [sub, ...rest] = args;
+
+		if (sub === 'new') {
+			const existing = context.project.vault.situations.length;
+			const id = `sit-${String(existing + 1).padStart(3, '0')}`;
+			const slug =
+				rest
+					.join('-')
+					.toLowerCase()
+					.replace(/[^a-z0-9-]/g, '') || 'untitled';
+			const file = resolve(context.root, VAULT.inbox, `${id}-${slug}.md`);
+
+			await writeFile(
+				file,
+				stringifyDocument({
+					data: situationSchema.parse({id, title: rest.join(' ') || 'Untitled'}),
+					body: '\nWrite the scene here. The tool never edits this text.\n',
+				}),
+				{encoding: 'utf8', flag: 'wx'},
+			);
+
+			const opened = await openExternally(context.root, file);
+			return {
+				lines: [
+					ok(`created ${path.relative(context.root, file)}`),
+					muted(opened),
+					muted(`place it with /situation place ${id} <arc>`),
+				],
+				dirty: true,
+			};
+		}
+
+		if (sub === 'place') {
+			const [id, arcId] = rest;
+			if (!id || !arcId) {
+				return {lines: [error('usage: /situation place <id> <arc>')]};
+			}
+			if (!context.project.vault.arcs.some(arc => arc.id === arcId)) {
+				return {lines: [error(`no arc '${arcId}'`)]};
+			}
+
+			const found = context.project.vault.situations.find(s => s.id === id);
+			if (!found) {
+				return {lines: [error(`no situation '${id}'`)]};
+			}
+
+			// Locate the file by id rather than guessing its slug.
+			const inboxDirectory = resolve(context.root, VAULT.inbox);
+			const {default: fs} = await import('node:fs/promises');
+			const entries = await fs.readdir(inboxDirectory).catch(() => [] as string[]);
+			let source: string | undefined;
+			for (const entry of entries) {
+				const raw = await readFile(path.join(inboxDirectory, entry), 'utf8');
+				if (parseDocument(raw).data['id'] === id) {
+					source = path.join(inboxDirectory, entry);
+					break;
+				}
+			}
+			if (!source) {
+				return {lines: [error(`'${id}' is not in the inbox`)]};
+			}
+
+			const raw = await readFile(source, 'utf8');
+			const document = parseDocument(raw);
+			const orders = context.project.vault.situations
+				.filter(s => s.arc === arcId && s.order !== undefined)
+				.map(s => s.order as number);
+
+			const updated = stringifyDocument({
+				data: {...document.data, arc: arcId, order: nextOrder(orders)},
+				// P6: the body is passed through untouched.
+				body: document.body,
+			});
+
+			const target = resolve(context.root, VAULT.situations, path.basename(source));
+			await writeFile(source, updated, 'utf8');
+			await rename(source, target);
+
+			return {
+				lines: [ok(`placed ${id} on ${arcId} at order ${nextOrder(orders)}`)],
+				dirty: true,
+			};
+		}
+
+		return {
+			lines: [error('usage: /situation new [title] | /situation place <id> <arc>')],
+		};
+	},
+};
+
+/**
+ * Where a key came from, in one phrase.
+ *
+ * There are four sources now and the difference matters when one of them is
+ * stale: "it works on my machine" is usually a literal env var quietly beating
+ * the file someone thought they were editing.
+ */
+function describeKey(resolved: ResolvedKey): string {
+	switch (resolved.source) {
+		case 'env': {
+			return `key from ${resolved.envVar}`;
+		}
+		case 'file': {
+			return `key ${maskKey(resolved.key ?? '')} from ${resolved.path ?? resolved.fileEnvVar}`;
+		}
+		case 'stored': {
+			return `key ${maskKey(resolved.key ?? '')}`;
+		}
+		case 'missing': {
+			return 'no key';
+		}
+	}
+}
+
+const provider: Command = {
+	name: 'provider',
+	usage: '/provider [status|test|clear]',
+	summary: 'choose an LLM provider, key, and model',
+	async run(args, context) {
+		const [sub] = args;
+
+		if (sub === undefined) {
+			// Hands off to the interactive wizard (select → key → test → model).
+			return {lines: [], wizard: 'provider'};
+		}
+
+		if (sub === 'status') {
+			const config = await readConfig(context.root);
+			const lines = [heading('providers')];
+
+			for (const spec of PROVIDERS) {
+				const resolved = await resolveKey(spec.id);
+				const selected = config.provider.id === spec.id;
+				lines.push(
+					text(
+						`${selected ? '●' : ' '} ${spec.label.padEnd(32)} ${describeKey(resolved)}`,
+						selected ? {color: '#9ece6a'} : {dim: true},
+					),
+				);
+				// A misconfigured `…_FILE` is reported wherever it is noticed, not
+				// only when something later fails because of it.
+				if (resolved.problem !== undefined) {
+					lines.push(warn(`  ${resolved.problem}`));
+				}
+			}
+
+			lines.push(
+				blank(),
+				config.provider.id === undefined
+					? muted('no provider selected — run /provider')
+					: muted(
+							`active: ${config.provider.id} · ${config.provider.model ?? '(no model)'}`,
+						),
+				muted('keys are stored outside the vault and never written to .litrpg/'),
+			);
+			return {lines};
+		}
+
+		// Re-verifies a key that is already on disk. The wizard tests on entry, but
+		// nothing re-tests afterwards, so a revoked or expired key first shows up as
+		// an interview dying halfway through a question.
+		if (sub === 'test') {
+			const config = await readConfig(context.root);
+			const named = args[1];
+			const id = named ?? config.provider.id;
+
+			if (id === undefined || !PROVIDERS.some(spec => spec.id === id)) {
+				return {
+					lines: [
+						error(
+							named === undefined
+								? 'no provider selected — /provider test <id>, or /provider to choose one'
+								: `usage: /provider test <${PROVIDERS.map(s => s.id).join('|')}>`,
+						),
+					],
+				};
+			}
+
+			const spec = findProvider(id as ProviderId);
+			const {outcome, resolved} = await verifyStoredKey(id as ProviderId);
+
+			const lines = [
+				heading(`provider test — ${spec.label}`),
+				muted(`${spec.baseUrl} · ${describeKey(resolved)}`),
+			];
+			if (resolved.problem !== undefined) {
+				lines.push(warn(resolved.problem));
+			}
+
+			if (outcome.ok) {
+				lines.push(
+					ok(`key accepted — ${outcome.models.length} model(s) available`),
+					...(outcome.note === undefined ? [] : [muted(outcome.note)]),
+				);
+			} else {
+				lines.push(error(outcome.reason));
+				if (outcome.hint !== undefined) {
+					lines.push(muted(outcome.hint));
+				}
+			}
+			return {lines};
+		}
+
+		if (sub === 'clear') {
+			const id = args[1];
+			if (!id || !PROVIDERS.some(spec => spec.id === id)) {
+				return {
+					lines: [
+						error(`usage: /provider clear <${PROVIDERS.map(s => s.id).join('|')}>`),
+					],
+				};
+			}
+			await forgetKey(id as Parameters<typeof forgetKey>[0]);
+			return {
+				lines: [ok(`removed the stored key for ${findProvider(id as never).label}`)],
+			};
+		}
+
+		return {lines: [error('usage: /provider [status|test [id]|clear <id>]')]};
+	},
+};
+
+/**
+ * The four interviews share one implementation — they differ only by the brief
+ * composed into the system prompt (§9), so one factory covers all of them.
+ */
+/**
+ * The interview directives, for commands whose bare form is a view.
+ *
+ * `/timeline interview` is the original spelling and still works; the rest go
+ * straight through so timeline and themes take the same `resume|show|extract`
+ * as `/system`. Returns the args to forward, or undefined to render the view.
+ */
+function interviewDirective(args: readonly string[]): readonly string[] | undefined {
+	const [head] = args;
+	if (head === 'interview') {
+		return args.slice(1);
+	}
+	return head !== undefined && ['resume', 'continue', 'new', 'extract'].includes(head)
+		? args
+		: undefined;
+}
+
+/** What `/<kind> show` renders — the corpus side of what that interview writes. */
+/**
+ * How an interview refers to itself: "character carl", "the-lathe", "themes".
+ *
+ * The focus is dropped when it merely repeats the kind, which a single-system
+ * vault produces constantly — its one system is called `system`, and "unfinished
+ * system system interview" reads like a bug because it looks like one.
+ */
+function interviewLabel(kind: InterviewKind, focus: string | undefined): string {
+	if (focus === undefined || focus === kind) {
+		return kind;
+	}
+	return kind === 'system' ? focus : `${kind} ${focus}`;
+}
+
+function interviewView(
+	kind: 'system' | 'timeline' | 'character' | 'themes',
+	project: Project,
+	focus: string | undefined,
+): Line[] {
+	switch (kind) {
+		case 'system': {
+			return renderSystem(project, focus);
+		}
+		case 'timeline': {
+			return renderTimeline(project);
+		}
+		case 'themes': {
+			return renderThemes(project);
+		}
+		case 'character': {
+			return focus === undefined
+				? [error('usage: /character <name> show')]
+				: renderCharacter(project, focus);
+		}
+	}
+}
+
+function interviewCommand(
+	kind: 'system' | 'timeline' | 'character' | 'themes',
+	usage: string,
+): Command {
+	return {
+		name: kind,
+		usage,
+		summary: `interview — ${KIND_SUMMARY[kind]}`,
+		async run(args, context) {
+			if (!context.project) {
+				return needsProject();
+			}
+
+			// Directives, not a character name.
+			const directives = new Set(['resume', 'new', 'continue', 'extract', 'show', 'all']);
+			const positional = args.filter(argument => !directives.has(argument));
+			const wantsResume = args.includes('resume') || args.includes('continue');
+			const wantsNew = args.includes('new');
+
+			// `/character carl` and `/system the-lathe` both namespace by a
+			// positional id: transcripts, grounding, and extraction all narrow to it,
+			// so two systems are interviewed separately instead of over each other.
+			const named = kind === 'character' || kind === 'system' || kind === 'timeline';
+			let focus = named ? positional[0] : undefined;
+
+			if (kind === 'character' && focus === undefined) {
+				return {lines: [error('usage: /character <name> [show|resume|extract]')]};
+			}
+
+			if (kind === 'timeline') {
+				// A moment is the unit a timeline interview is about, so naming one
+				// targets the transcript, the grounding and the extraction at it.
+				// Bare `/timeline` still renders the whole sequence.
+				const moments = context.project.vault.moments;
+				if (
+					focus !== undefined &&
+					!moments.some(moment => moment.id === focus) &&
+					args.includes('show')
+				) {
+					return {lines: [error(`no moment '${focus}' in this vault`)]};
+				}
+			}
+
+			if (kind === 'system') {
+				const systems = context.project.vault.systems;
+				if (focus === undefined && systems.length === 1) {
+					// One system is not a choice. Naming it anyway keeps every
+					// transcript in the same namespace as a vault that has several.
+					focus = systems[0]?.id;
+				}
+				if (focus === undefined && !args.includes('show')) {
+					return {
+						lines: [
+							error(`this vault has ${String(systems.length)} systems — name one`),
+							...systems.map(system =>
+								muted(`  /system ${system.id} — ${system.name ?? '(unnamed)'}`),
+							),
+							muted('/system show lists them · /system <new-id> starts a new one'),
+						],
+					};
+				}
+				if (
+					focus !== undefined &&
+					!systems.some(system => system.id === focus) &&
+					(args.includes('show') || args.includes('extract'))
+				) {
+					return {
+						lines: [error(`no system '${focus}' in this vault`)],
+					};
+				}
+			}
+
+			// Ahead of the provider check: every `show` reads the corpus and needs
+			// no model at all. An author whose extraction failed should not have to
+			// configure a provider to find out what they still have.
+			if (args.includes('show')) {
+				const lines = interviewView(kind, context.project, focus);
+				return {lines, paged: lines.length > 14, title: kind};
+			}
+
+			const config = await readConfig(context.root);
+			if (config.provider.id === undefined || config.provider.model === undefined) {
+				return {
+					lines: [
+						error('no model provider configured'),
+						muted('run /provider to choose one — interviews need a model'),
+					],
+				};
+			}
+
+			// Re-runs extraction over a saved transcript. Deliberately its own
+			// directive rather than something a build does: it costs a request and
+			// it proposes corpus writes, and neither should be a side effect.
+			if (args.includes('extract')) {
+				// `extract all` sweeps every transcript of this kind. Worth its own
+				// word rather than a default: it is one model request per transcript,
+				// and the bare form is what an author wants nearly every time.
+				const sweep = args.includes('all');
+				const history = await transcriptsForKind(context.root, kind, focus);
+				const prior = sweep
+					? history.at(-1)
+					: (await findForResume(context.root, kind, focus))?.transcript;
+
+				if (!prior || prior.exchanges.length === 0) {
+					return {
+						lines: [
+							error(`no ${kind} transcript to extract from`),
+							muted(`/${interviewLabel(kind, focus)} runs the interview first`),
+						],
+					};
+				}
+
+				if (!sweep) {
+					const lines = [
+						muted(`re-extracting ${prior.exchanges.length} exchange(s) from ${prior.id}`),
+					];
+					// Only worth saying when there is something the bare form skips.
+					if (history.length > 1) {
+						lines.push(
+							muted(
+								`${history.length - 1} older ${kind} transcript(s) not touched — /${kind} extract all sweeps them`,
+							),
+						);
+					}
+					return {lines, extract: {kind, ...(focus === undefined ? {} : {focus})}};
+				}
+
+				const exchanges = history.reduce(
+					(total, transcript) => total + transcript.exchanges.length,
+					0,
+				);
+				return {
+					lines: [
+						muted(
+							`sweeping ${history.length} ${kind} transcript(s), ${exchanges} exchange(s) — one request each`,
+						),
+						muted(
+							`corpus writes come from ${prior.id} only; entities come from all of them`,
+						),
+					],
+					extract: {kind, all: true, ...(focus === undefined ? {} : {focus})},
+				};
+			}
+
+			const unfinished = await findResumable(context.root, kind, focus);
+
+			if (wantsResume) {
+				// Falls back to a completed transcript: an explicit `resume` means the
+				// author wants to keep talking, and refusing because the last session
+				// was wrapped up strands work they can see on disk.
+				const prior = await findForResume(context.root, kind, focus);
+				if (!prior) {
+					const state = await inspectProject(context.root);
+					const lines = [
+						error(`no ${kind} interview to resume in ${displayPath(context.root)}`),
+					];
+					// The commonest cause is standing in the wrong vault, so name it
+					// and offer the way out rather than only reporting the absence.
+					if (state !== 'vault') {
+						lines.push(
+							muted('this directory is not a vault — /init scaffolds one,'),
+							muted('or /project <path> switches to the one you meant'),
+						);
+					} else {
+						lines.push(
+							muted(`/${interviewLabel(kind, focus)} starts a new one,`),
+							muted('or /project to switch vaults'),
+						);
+					}
+					return {lines};
+				}
+				return {
+					lines: prior.reopened
+						? [
+								muted(
+									`reopening a wrapped-up interview — ${prior.transcript.exchanges.length} exchange${prior.transcript.exchanges.length === 1 ? '' : 's'} carried forward`,
+								),
+							]
+						: [],
+					interview: {kind, ...(focus === undefined ? {} : {focus}), resume: true},
+				};
+			}
+
+			// An unfinished interview is offered rather than silently discarded or
+			// silently resumed — either would be a surprise, and one of them loses
+			// work.
+			if (unfinished && !wantsNew) {
+				const when = unfinished.startedAt.slice(0, 16).replace('T', ' ');
+				const label = interviewLabel(kind, focus);
+				return {
+					lines: [
+						heading(`unfinished ${label} interview`),
+						text(
+							`  ${unfinished.exchanges.length} exchange${unfinished.exchanges.length === 1 ? '' : 's'}, started ${when}`,
+						),
+						muted(
+							`  last question: ${unfinished.exchanges.at(-1)?.question.slice(0, 90) ?? ''}`,
+						),
+						blank(),
+						text(`  /${label} resume   continue where you left off`),
+						text(`  /${label} new      start over (the old transcript is kept)`),
+					],
+				};
+			}
+
+			return {
+				lines: [],
+				interview: {kind, ...(focus === undefined ? {} : {focus})},
+			};
+		},
+	};
+}
+
+const systemInterview = interviewCommand(
+	'system',
+	'/system <id> [show|resume|extract [all]]',
+);
+const timelineInterview = interviewCommand(
+	'timeline',
+	'/timeline [<moment>] [show|resume|extract [all]]',
+);
+const characterInterview = interviewCommand(
+	'character',
+	'/character <name> [show|resume|extract [all]]',
+);
+const themesInterview = interviewCommand('themes', '/themes interview');
+
+/**
+ * `/idiom set|unset` — the authorable half of the lexicon.
+ *
+ * Reported as `before → after` rather than as the raw file change, because the
+ * value written is not necessarily the value that renders: unsetting falls back
+ * through the `extends` chain, and the author cares about the word they will
+ * see, not which layer supplied it.
+ */
+async function editLexicon(
+	root: string,
+	action: 'set' | 'unset',
+	rest: readonly string[],
+): Promise<CommandResult> {
+	const [key, ...words] = rest;
+
+	if (key === undefined) {
+		return {
+			lines: [
+				error(`usage: /idiom ${action} <key>${action === 'set' ? ' <term>' : ''}`),
+				muted(`keys: ${LEXICON_KEYS.join(', ')}`),
+			],
+		};
+	}
+	if (!isLexiconKey(key)) {
+		return {
+			lines: [
+				error(`'${key}' is not a lexicon key`),
+				muted(`keys: ${LEXICON_KEYS.join(', ')}`),
+			],
+		};
+	}
+
+	// Joined rather than taken as one token: plenty of display terms are two
+	// words ("spell school", "system point"), and quoting in the composer would
+	// be a worse ask than accepting the rest of the line.
+	const value = words.join(' ').trim();
+	if (action === 'set' && value === '') {
+		return {lines: [error(`usage: /idiom set ${key} <term>`)]};
+	}
+
+	const before = term((await loadSetting(root)).profile, key);
+	await writeLexiconTerm(root, key, action === 'set' ? value : undefined);
+	const after = await loadSetting(root);
+
+	const lines = [
+		ok(`${key}  ${before} → ${term(after.profile, key)}`),
+		muted(
+			action === 'set'
+				? `written to ${VAULT.idiom} · display only, nothing on disk changed`
+				: `cleared from ${VAULT.idiom} · now inherited from ${after.profile.chain.join(' → ') || 'base'}`,
+		),
+	];
+	for (const issue of after.issues) {
+		lines.push(error(issue));
+	}
+
+	return {lines, dirty: true};
+}
+
+const idiom: Command = {
+	name: 'idiom',
+	usage: '/idiom [set <key> <term> | unset <key>]',
+	summary: 'show or edit the setting profile and its vocabulary',
+	async run(args, context) {
+		const [sub, ...rest] = args;
+
+		if (sub === 'set' || sub === 'unset') {
+			if (!context.project) {
+				return needsProject();
+			}
+			return editLexicon(context.root, sub, rest);
+		}
+		if (sub !== undefined) {
+			return {lines: [error('usage: /idiom [set <key> <term> | unset <key>]')]};
+		}
+
+		const {setting, profile, overridden, issues} = await loadSetting(context.root);
+
+		const lines = [
+			heading(`${profile.name}  (${profile.id})`),
+			muted(`profile chain: ${profile.chain.join(' → ') || 'base'}`),
+		];
+		if (overridden) {
+			lines.push(muted('system/idiom.md is overriding the shipped profile'));
+		}
+		for (const issue of issues) {
+			lines.push(error(issue));
+		}
+
+		lines.push(blank(), muted('setting'));
+		lines.push(
+			text(
+				`  origin      ${setting.system_origin ?? '—'}${
+					setting.system_origin ? `  (${ORIGIN_NOTE[setting.system_origin]})` : ''
+				}`,
+			),
+			text(
+				`  visibility  ${setting.system_visibility ?? '—'}${
+					setting.system_visibility
+						? `  (${VISIBILITY_NOTE[setting.system_visibility]})`
+						: ''
+				}`,
+			),
+			text(
+				`  agency      ${setting.system_agency ?? '—'}${
+					setting.system_agency ? `  (${AGENCY_NOTE[setting.system_agency]})` : ''
+				}`,
+			),
+		);
+
+		// §9 risk mitigation: canonical keys stay visible so the indirection is
+		// debuggable rather than mysterious.
+		lines.push(blank(), muted('lexicon  (canonical → displayed)'));
+		for (const pair of lexiconPairs(profile)) {
+			lines.push(
+				text(
+					`  ${pair.key.padEnd(16)} ${pair.display}`,
+					pair.explicit ? {} : {dim: true},
+				),
+			);
+		}
+
+		lines.push(
+			blank(),
+			muted('display only — canonical keys are what live on disk'),
+			muted(`status template: ${profile.status_template}`),
+			muted('/idiom set <key> <term> to override · /idiom unset <key> to revert'),
+		);
+		return {lines, paged: lines.length > 14, title: 'idiom'};
+	},
+};
+
+const project: Command = {
+	name: 'project',
+	usage: '/project [path]',
+	summary: 'switch vaults, or list recent ones',
+	async run(args, context) {
+		const requested = args.join(' ').trim();
+
+		if (requested === '') {
+			const recent = await readLiveRecent();
+			const last = await readLastProject();
+			// Marked, so it is clear which one a bare `litfire` will reopen.
+			const note = (root: string, state: string) =>
+				[
+					state === 'empty' ? '(not a vault yet)' : '',
+					last !== undefined && path.resolve(last) === path.resolve(root)
+						? '(opens by default)'
+						: '',
+				]
+					.filter(Boolean)
+					.join(' ');
+
+			const here = note(context.root, 'vault');
+			const lines = [
+				heading('projects'),
+				text(`● ${displayPath(context.root)}${here === '' ? '' : `  ${here}`}`, {
+					color: '#9ece6a',
+				}),
+			];
+
+			const others = recent.filter(
+				entry => path.resolve(entry.root) !== path.resolve(context.root),
+			);
+			for (const entry of others) {
+				const suffix = note(entry.root, entry.state);
+				lines.push(
+					text(`  ${displayPath(entry.root)}${suffix === '' ? '' : `  ${suffix}`}`, {
+						dim: true,
+					}),
+				);
+			}
+			if (others.length === 0) {
+				lines.push(muted('  no other projects yet'));
+			}
+
+			lines.push(
+				blank(),
+				muted('/project <path> to switch · ~ and relative paths work'),
+				muted('litfire reopens the default · litfire . opens the current directory'),
+			);
+			return {lines, paged: lines.length > 14, title: 'projects'};
+		}
+
+		const target = resolveProjectPath(context.root, requested);
+		const state = await inspectProject(target);
+
+		if (state === 'missing') {
+			return {
+				lines: [
+					error(`${displayPath(target)} does not exist`),
+					muted(`create it with /init <idiom> ${requested}`),
+				],
+			};
+		}
+		if (state === 'not-a-directory') {
+			return {lines: [error(`${displayPath(target)} is a file, not a directory`)]};
+		}
+		if (path.resolve(target) === path.resolve(context.root)) {
+			return {lines: [muted(`already in ${displayPath(target)}`)]};
+		}
+
+		const lines = [ok(`switched to ${displayPath(target)}`)];
+		// Switching to an empty directory is how a new book starts, so it is
+		// allowed — with a pointer at the next step rather than a refusal.
+		if (state === 'empty') {
+			lines.push(muted('not a vault yet — /init <idiom> to scaffold one here'));
+		}
+
+		return {lines, switchProject: target};
+	},
+};
+
+const quit: Command = {
+	name: 'quit',
+	usage: '/quit',
+	summary: 'exit',
+	async run() {
+		return {lines: [], exit: true};
+	},
+};
+
+export const commands: readonly Command[] = [
+	help,
+	init,
+	consent,
+	sheet,
+	status,
+	pacing,
+	chapter,
+	exportManuscript,
+	wiki,
+	editor,
+	architect,
+	primitives,
+	timeline,
+	themes,
+	lint,
+	questions,
+	situation,
+	provider,
+	project,
+	idiom,
+	systemInterview,
+	characterInterview,
+	quit,
+];
+
+export function findCommand(name: string): Command | undefined {
+	return commands.find(command => command.name === name);
+}

@@ -1,7 +1,28 @@
 {
   "name": "litfire",
   "version": "0.1.0",
-  "description": "A terminal chat interface built with Ink",
+  "description": "A LitRPG authoring tool: freeform writing, deterministic game state, contradictions recorded as open questions that never block.",
+  "keywords": [
+    "litrpg",
+    "writing",
+    "authoring",
+    "tui",
+    "ink",
+    "obsidian",
+    "markdown",
+    "worldbuilding",
+    "llm",
+    "cli"
+  ],
+  "homepage": "https://github.com/claytantor/litfire#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/claytantor/litfire.git"
+  },
+  "bugs": {
+    "url": "https://github.com/claytantor/litfire/issues"
+  },
+  "author": "claytantor",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -15,7 +36,8 @@
   ],
   "scripts": {
     "dev": "tsx source/cli.tsx",
-    "build": "tsup",
+    "vault:new": "bash scripts/new-vault.sh",
+    "build": "tsup && cp source/wiki/serve-script.mjs dist/serve-script.mjs",
     "start": "node dist/cli.js",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint source test",
@@ -24,14 +46,23 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "check:secrets": "bash scripts/check-secrets.sh",
+    "check:attribution": "bash scripts/check-attribution.sh",
+    "hooks:install": "bash scripts/install-hooks.sh"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
+    "chokidar": "^5.0.0",
+    "diff": "^9.0.0",
     "ink": "^7.1.1",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
+    "isolated-vm": "^6.2.0",
+    "marked": "^18.0.9",
     "meow": "^14.1.0",
     "react": "^19.2.8",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

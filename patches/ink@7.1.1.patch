@@ -1,0 +1,138 @@
+diff --git a/build/log-update.js b/build/log-update.js
+index cdb5fc41f158304c4c4f230a765065ab1fe0a2f7..46381c287dc438aa9b88a3724c54799c0504a1b6 100644
+--- a/build/log-update.js
++++ b/build/log-update.js
+@@ -1,11 +1,36 @@
+ import ansiEscapes from 'ansi-escapes';
+ import cliCursor from 'cli-cursor';
++import stringWidth from 'string-width';
+ import { cursorPositionChanged, buildCursorSuffix, buildCursorOnlySequence, buildReturnToBottomPrefix, hideCursorEscape, } from './cursor-helpers.js';
+ // Count visible lines in a string, ignoring the trailing empty element
+ // that `split('\n')` produces when the string ends with '\n'.
+ const visibleLineCount = (lines, str) => str.endsWith('\n') ? lines.length - 1 : lines.length;
++// Rows a previously written frame currently occupies on screen.
++//
++// `eraseLines` and the return-to-bottom cursor maths both count *terminal rows*,
++// but the frame is stored as logical lines. A line wider than the terminal wraps
++// onto several rows, so erasing `lines.length` of them leaves the remainder on
++// screen — the stale borders and half-frames seen when a window is dragged
++// narrower. Worse, the wrap is re-evaluated by the terminal on every resize, so
++// the count is only correct if it is computed against the width in force *now*
++// rather than the one that applied when the frame was written.
++const rowsFor = (str, columns) => {
++    const lines = str.split('\n');
++    if (!columns || columns <= 0) {
++        return lines.length;
++    }
++    let rows = 0;
++    for (const line of lines) {
++        // An empty line still occupies one row, and a full-width line occupies
++        // exactly one — `ceil` only adds rows once the content genuinely wraps,
++        // which keeps this identical to `lines.length` for output that fits.
++        rows += Math.max(1, Math.ceil(stringWidth(line) / columns));
++    }
++    return rows;
++};
+ const createStandard = (stream, { showCursor = false } = {}) => {
+     let previousLineCount = 0;
++    const previousRowCount = () => previousLineCount === 0 ? 0 : rowsFor(previousOutput, stream.columns);
+     let previousOutput = '';
+     let hasHiddenCursor = false;
+     let cursorPosition;
+@@ -36,17 +61,20 @@ const createStandard = (stream, { showCursor = false } = {}) => {
+         if (str === previousOutput && cursorChanged) {
+             stream.write(buildCursorOnlySequence({
+                 cursorWasShown,
+-                previousLineCount,
++                previousLineCount: previousRowCount(),
+                 previousCursorPosition,
+                 visibleLineCount: visibleCount,
+                 cursorPosition: activeCursor,
+             }));
+         }
+         else {
++            // Measured before `previousOutput` is replaced: these describe the
++            // frame being erased, not the one about to be written.
++            const eraseRows = previousRowCount();
++            const returnPrefix = buildReturnToBottomPrefix(cursorWasShown, eraseRows, previousCursorPosition);
+             previousOutput = str;
+-            const returnPrefix = buildReturnToBottomPrefix(cursorWasShown, previousLineCount, previousCursorPosition);
+             stream.write(returnPrefix +
+-                ansiEscapes.eraseLines(previousLineCount) +
++                ansiEscapes.eraseLines(eraseRows) +
+                 str +
+                 cursorSuffix);
+             previousLineCount = lines.length;
+@@ -56,8 +84,8 @@ const createStandard = (stream, { showCursor = false } = {}) => {
+         return true;
+     };
+     render.clear = () => {
+-        const prefix = buildReturnToBottomPrefix(cursorWasShown, previousLineCount, previousCursorPosition);
+-        stream.write(prefix + ansiEscapes.eraseLines(previousLineCount));
++        const prefix = buildReturnToBottomPrefix(cursorWasShown, previousRowCount(), previousCursorPosition);
++        stream.write(prefix + ansiEscapes.eraseLines(previousRowCount()));
+         previousOutput = '';
+         previousLineCount = 0;
+         previousCursorPosition = undefined;
+@@ -103,6 +131,13 @@ const createStandard = (stream, { showCursor = false } = {}) => {
+     return render;
+ };
+ const createIncremental = (stream, { showCursor = false } = {}) => {
++    // Width the last frame was drawn at. The incremental path walks logical
++    // lines — `cursorUp(previousLines.length - 1)`, then `cursorNextLine` past
++    // the unchanged ones — which is only sound while one logical line occupies
++    // one terminal row. A resize breaks that for every wrapped line at once and
++    // the terminal reflows what is already on screen underneath it, so there is
++    // no incremental diff that can be trusted across a width change. Redraw.
++    let previousColumns = stream.columns;
+     let previousLines = [];
+     let previousOutput = '';
+     let hasHiddenCursor = false;
+@@ -143,11 +178,18 @@ const createIncremental = (stream, { showCursor = false } = {}) => {
+             cursorWasShown = activeCursor !== undefined;
+             return true;
+         }
+-        const returnPrefix = buildReturnToBottomPrefix(cursorWasShown, previousLines.length, previousCursorPosition);
+-        if (str === '\n' || previousOutput.length === 0) {
++        const resized = stream.columns !== previousColumns;
++        // Rows, not lines: after a reflow the old frame occupies more of the
++        // screen than it has newline characters.
++        const previousRows = previousOutput.length === 0
++            ? previousLines.length
++            : rowsFor(previousOutput, stream.columns);
++        const returnPrefix = buildReturnToBottomPrefix(cursorWasShown, previousRows, previousCursorPosition);
++        if (str === '\n' || previousOutput.length === 0 || resized) {
+             const cursorSuffix = buildCursorSuffix(visibleCount, activeCursor);
++            previousColumns = stream.columns;
+             stream.write(returnPrefix +
+-                ansiEscapes.eraseLines(previousLines.length) +
++                ansiEscapes.eraseLines(previousRows) +
+                 str +
+                 cursorSuffix);
+             cursorWasShown = activeCursor !== undefined;
+@@ -156,6 +198,7 @@ const createIncremental = (stream, { showCursor = false } = {}) => {
+             previousLines = nextLines;
+             return true;
+         }
++        previousColumns = stream.columns;
+         const hasTrailingNewline = str.endsWith('\n');
+         // We aggregate all chunks for incremental rendering into a buffer, and then write them to stdout at the end.
+         const buffer = [];
+@@ -197,8 +240,15 @@ const createIncremental = (stream, { showCursor = false } = {}) => {
+         return true;
+     };
+     render.clear = () => {
+-        const prefix = buildReturnToBottomPrefix(cursorWasShown, previousLines.length, previousCursorPosition);
+-        stream.write(prefix + ansiEscapes.eraseLines(previousLines.length));
++        // `ink.js`'s resize handler calls this on every narrowing, at which point
++        // the terminal has already reflowed the frame on screen. Erasing
++        // `previousLines.length` rows leaves every wrapped line's overflow behind,
++        // which is the stack of half-drawn borders a drag produces.
++        const rows = previousOutput.length === 0
++            ? previousLines.length
++            : rowsFor(previousOutput, stream.columns);
++        const prefix = buildReturnToBottomPrefix(cursorWasShown, rows, previousCursorPosition);
++        stream.write(prefix + ansiEscapes.eraseLines(rows));
+         previousOutput = '';
+         previousLines = [];
+         previousCursorPosition = undefined;

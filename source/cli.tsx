@@ -2,41 +2,44 @@
 import {render} from 'ink';
 import meow from 'meow';
 import {App} from './app.js';
-import {createEchoEngine} from './engine/echo.js';
+import {resolveStartup} from './vault/projects.js';
 
 const cli = meow(
 	`
 	Usage
-	  $ litfire
+	  $ litfire [vault]
+
+	  litfire <path>   open that vault
+	  litfire .        open the current directory
+	  litfire          reopen the last vault you worked in
 
 	Options
-	  --delay <ms>   Simulated inter-token delay for the echo engine (default 45)
+	  --no-watch   Do not reload when the vault changes on disk
 
 	Examples
 	  $ litfire
-	  $ litfire --delay 10
+	  $ litfire .
+	  $ litfire ~/novels/dungeon-crawler
 `,
 	{
 		importMeta: import.meta,
 		flags: {
-			delay: {
-				type: 'number',
-				default: 45,
-			},
+			watch: {type: 'boolean', default: true},
 		},
 	},
 );
 
-const engine = createEchoEngine(cli.flags.delay);
-
+const startup = await resolveStartup(cli.input[0], process.cwd());
 const version = cli.pkg.version ?? '0.0.0';
 
-const {waitUntilExit} = render(<App engine={engine} version={version} />, {
-	// A streaming transcript repaints constantly; incremental rendering rewrites
-	// only the lines that changed, which is what keeps the composer from
-	// flickering on every token.
-	incrementalRendering: true,
-	maxFps: 60,
-});
+const {waitUntilExit} = render(
+	<App root={startup.root} startup={startup} version={version} watch={cli.flags.watch} />,
+	{
+		// Tall output goes to the pager, so the dynamic region stays short and
+		// incremental rendering keeps the composer off the redraw path.
+		incrementalRendering: true,
+		maxFps: 60,
+	},
+);
 
 await waitUntilExit();

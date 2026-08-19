@@ -1,0 +1,53 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch cancels the first: nobody needs the results
+# of a commit that has already been replaced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # `isolated-vm` compiles from source and pnpm gates build scripts, so the
+      # approvals in pnpm-workspace.yaml have to survive a frozen install. If
+      # this step starts failing after a dependency bump, that is the first
+      # place to look.
+      - run: pnpm install --frozen-lockfile
+
+      # typecheck → lint → format → test. Live provider tests stay off; they are
+      # opt-in via LITFIRE_LIVE_TESTS and would fire at four companies' APIs from
+      # a shared runner on every pull request.
+      - run: pnpm check
+
+  secrets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a key deleted in a later commit is still in an earlier
+          # one, and a shallow clone would not see it.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

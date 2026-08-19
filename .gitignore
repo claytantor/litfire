@@ -5,3 +5,69 @@ dist/
 .claude/
 .claude/*
 SCRATCH.md
+
+# ─── Story vaults ────────────────────────────────────────────────────────────
+# Test vaults live here; `pnpm vault:new <name>` creates one.
+/vaults/*
+!/vaults/.gitkeep
+!/vaults/README.md
+
+# `.litrpg/` is a vault's unambiguous signature. Ignoring it anywhere means a
+# vault created outside /vaults/ still can't have its cache or config committed.
+.litrpg/
+
+# Guard against `litfire .` scaffolding a vault into the repo root.
+#
+# Every pattern below is ROOT-ANCHORED with a leading slash. That is
+# load-bearing: this repo contains source/system/, source/themes/,
+# source/ledger/, source/domain/, and source/vault/, and an unanchored
+# `system/` would silently stop tracking real source code.
+/raw/
+/system/
+/timeline/
+/characters/
+/themes/
+/places/
+/factions/
+/situations/
+/chapters/
+/wiki/
+/ledger/
+/index.md
+/log.md
+/manuscript.md
+
+# ─── Credentials ─────────────────────────────────────────────────────────────
+# Provider API keys normally live in ~/.config/litfire/credentials.json —
+# outside this repo entirely. These patterns catch a credentials file that ends
+# up in the working tree anyway, e.g. XDG_CONFIG_HOME pointed at the repo while
+# testing, which is exactly the mistake that leaks a key.
+credentials.json
+.litfire/
+litfire/credentials.json
+
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# ─── Editors and OS ──────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# ─── Build and test artefacts ────────────────────────────────────────────────
+*.tsbuildinfo
+coverage/
+.pnpm-store/
+
+SCRATCH.md
+CLAUDE.md
+
