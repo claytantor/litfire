@@ -135,6 +135,29 @@ export const flush = (ms = 40): Promise<void> =>
 		setTimeout(done, ms);
 	});
 
+/**
+ * Waits for the screen to satisfy a predicate, rather than for a fixed delay.
+ *
+ * `flush(250)` encodes how long *this* machine happens to take to mount an app
+ * and paint a frame. A slower shared CI runner takes longer, the assertion then
+ * runs against an empty screen, and the failure reads as a rendering bug rather
+ * than as a race. Polling costs nothing when the condition already holds, and
+ * removes the guess when it does not.
+ */
+export async function waitFor(
+	check: () => boolean,
+	{timeout = 5000, interval = 25}: {timeout?: number; interval?: number} = {},
+): Promise<void> {
+	const deadline = Date.now() + timeout;
+	while (Date.now() < deadline) {
+		if (check()) {
+			return;
+		}
+		await flush(interval);
+	}
+	throw new Error(`waitFor: condition still false after ${String(timeout)}ms`);
+}
+
 export function mount(
 	node: ReactNode,
 	columns = 80,

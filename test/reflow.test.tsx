@@ -15,7 +15,7 @@ import {InterviewSession} from '../source/interview/index.js';
 import type {ChatMessage, Provider} from '../source/llm/index.js';
 import {ReviewBatch} from '../source/review/index.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
-import {flush, heightOf, mount, widest} from './terminal.js';
+import {flush, heightOf, mount, waitFor, widest} from './terminal.js';
 
 /** Every width the layout has to survive, plus the narrow end of the range. */
 const WIDTHS = [40, 60, 80, 200];
@@ -522,7 +522,10 @@ describe('the app shell', () => {
 	it('leaves no fragment of an earlier frame behind when dragged narrower', async () => {
 		await scaffoldVault(root);
 		const term = mount(<App root={root} version="1.2.3" watch={false} />, 100, 30, false);
-		await flush(250);
+		// Wait for the composer to actually be on screen. A fixed delay here is a
+		// bet on this machine's speed, and the assertion below counts borders —
+		// so losing that bet reads as "0 borders", not as "not painted yet".
+		await waitFor(() => term.screen().includes('╭'));
 
 		await term.drag([
 			[96, 30],
@@ -559,7 +562,7 @@ describe('the app shell', () => {
 			false,
 			{incrementalRendering: true},
 		);
-		await flush(250);
+		await waitFor(() => term.screen().includes('╭'));
 
 		await term.drag([
 			[96, 30],
