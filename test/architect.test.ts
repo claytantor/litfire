@@ -163,21 +163,27 @@ describe('the structural pass', () => {
 		expect(outcome.proposals[0]?.rationale).toContain('two apparatuses');
 	});
 
-	it('refuses a write to raw/, and says so rather than dropping it', async () => {
-		// The invariant this whole agent is built around: it reads raw constantly
-		// and never writes there. A refusal must be visible, not silent.
+	/**
+	 * The architect is the one agent that may propose changes to `raw/`, on the
+	 * author's instruction and still only as a diff they accept (D15).
+	 * Reconciling a corpus sometimes means correcting the material it was drawn
+	 * from, and it had no way to say so.
+	 */
+	it('may propose a change to raw/, since the author pointed it there', async () => {
 		const outcome = await plan(
 			JSON.stringify({
 				writes: [
-					{path: 'raw/interviews/system-a.md', contents: 'rewritten history'},
+					{path: 'raw/interviews/system-a.md', contents: 'corrected transcript'},
 					{path: 'systems/the-seed.md', contents: '---\nid: the-seed\n---\n\n# x\n'},
 				],
 			}),
 		);
 
-		expect(outcome.proposals.map(p => p.path)).toEqual(['systems/the-seed.md']);
-		expect(outcome.refusals[0]?.path).toBe('raw/interviews/system-a.md');
-		expect(outcome.refusals[0]?.reason).toContain('not author-writable');
+		expect(outcome.proposals.map(p => p.path)).toEqual([
+			'raw/interviews/system-a.md',
+			'systems/the-seed.md',
+		]);
+		expect(outcome.refusals).toHaveLength(0);
 	});
 
 	it('refuses the other derived directories too', async () => {

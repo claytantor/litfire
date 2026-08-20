@@ -379,3 +379,40 @@ Four details:
 
 **Writing to `raw/` is still forbidden.** Nothing here changes that — `raw/` is
 the author's own record and the tool never writes to it.
+
+## D15 — The architect may propose changes to raw, and the gate asks before losing them
+
+**Committed:** `allowRaw` on the batch, not on the proposal; and `q`/`esc` now
+confirm when accepted changes have not been written.
+
+### Raw
+
+`raw/` was closed to every agent, because it is the author's own record and the
+whole reason it can be trusted is that only they write it. That held until the
+architect was asked to reconcile a corpus against the material it came from and
+found the error was _in the record_ — a name the transcript spells one way and
+the vault another. It could describe the problem and not fix it.
+
+So the architect may propose there, and only the architect: extraction and the
+reviewer keep the old rule. The permission belongs to the **batch**, not to a
+proposal — a proposal that could grant itself the right to rewrite a transcript
+would be no rule at all. `ReviewBatch.create(root, proposals, {allowRaw: true})`
+is called in exactly one place.
+
+Nothing else moves. `ledger/`, `wiki/`, `manuscript.md` and `.litrpg/` stay
+closed to everyone, including the architect, because they are derived and a
+write there is overwritten on the next recompute. A raw proposal is labelled
+`(your raw record)` in the gate so it never reads as an ordinary corpus write,
+and the persona is explicit that it corrects what is wrong _about_ the record
+and never rewrites what the author said.
+
+### The gate
+
+`q` and `esc` called `onCancel` outright. An author who accepted six proposals
+and then left the gate lost all six, with `nothing was written` printed after
+the fact. Accepting marks a decision and only applying writes it — a distinction
+that is invisible until it costs someone their work.
+
+Leaving with accepted changes now asks: `ctrl+s` to write them, the same key
+again to discard, anything else to go back. With nothing accepted it still
+leaves at once, because a prompt whose answer is always the same is noise.

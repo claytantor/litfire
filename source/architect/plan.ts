@@ -143,7 +143,7 @@ export async function runPlan(
 
 	for (const write of parsed.writes) {
 		try {
-			resolveInsideVault(root, write.path);
+			resolveInsideVault(root, write.path, {allowRaw: true});
 		} catch (caught) {
 			refusals.push({
 				path: write.path,

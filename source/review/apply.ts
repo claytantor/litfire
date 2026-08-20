@@ -8,8 +8,9 @@ import type {ApplyOutcome, ReviewItem} from './types.js';
  *
  * `.litrpg/` is cache the tool owns. `ledger/` is derived — replay regenerates
  * it, so a write there would be silently overwritten and is a sign the model
- * misunderstood the schema. `raw/` is the author's own input (P: the tool never
- * edits it). `manuscript.md` is assembled by `/export` from `chapters/` and
+ * misunderstood the schema. `raw/` is the author's own record, and only the
+ * architect may propose changes there, on the author's explicit instruction —
+ * see `allowRaw`. `manuscript.md` is assembled by `/export` from `chapters/` and
  * `situations/`, so a proposal there would edit the output instead of the
  * source and vanish on the next export. `wiki/` is derived the same way, from
  * the corpus and the ledger.
@@ -37,7 +38,25 @@ export class UnsafePathError extends Error {
  * class of bug the formula sandbox exists to prevent, and the reason the check
  * is a canonical-path comparison rather than a string test for `..`.
  */
-export function resolveInsideVault(root: string, candidate: string): string {
+export type PathOptions = {
+	/**
+	 * Permit proposals under `raw/`.
+	 *
+	 * Off everywhere by default, and deliberately a parameter rather than a
+	 * relaxed constant: extraction and the reviewer must never touch a
+	 * transcript, because the whole reason `raw/` is trustworthy is that only
+	 * the author writes it. `/architect` may, because reconciling a corpus
+	 * sometimes means correcting the material it was drawn from, and the author
+	 * asked for that. It still lands as a diff they accept (D15).
+	 */
+	readonly allowRaw?: boolean;
+};
+
+export function resolveInsideVault(
+	root: string,
+	candidate: string,
+	options: PathOptions = {},
+): string {
 	if (candidate.trim() === '') {
 		throw new UnsafePathError(candidate, 'empty path');
 	}
@@ -60,6 +79,9 @@ export function resolveInsideVault(root: string, candidate: string): string {
 
 	const normalized = relative.split(path.sep).join('/');
 	for (const prefix of FORBIDDEN_PREFIXES) {
+		if (prefix === VAULT.raw && options.allowRaw === true) {
+			continue;
+		}
 		if (normalized === prefix || normalized.startsWith(`${prefix}/`)) {
 			throw new UnsafePathError(candidate, `${prefix}/ is not author-writable`);
 		}
@@ -91,6 +113,7 @@ export async function readExisting(
 export async function applyAccepted(
 	root: string,
 	items: readonly ReviewItem[],
+	options: PathOptions = {},
 ): Promise<ApplyOutcome> {
 	const written: string[] = [];
 	const removed: string[] = [];
@@ -107,7 +130,7 @@ export async function applyAccepted(
 			// The same path check either way: a removal is as capable of naming
 			// `raw/` or somewhere outside the vault as a write is, and rather more
 			// costly if it succeeds.
-			const target = resolveInsideVault(root, item.proposal.path);
+			const target = resolveInsideVault(root, item.proposal.path, options);
 
 			if (item.proposal.remove === true) {
 				// `force: false` on purpose. A removal that finds nothing there has

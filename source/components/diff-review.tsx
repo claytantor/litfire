@@ -56,6 +56,12 @@ function label(item: ReviewItem | undefined): string {
 	if (item.proposal.remove === true) {
 		return ' (removes file)';
 	}
+	// Called out because `raw/` is the author's own record and everything else
+	// in the tool is forbidden from touching it. A change here should never look
+	// like an ordinary corpus write.
+	if (item.proposal.path.startsWith('raw/')) {
+		return item.existing === undefined ? ' (new raw file)' : ' (your raw record)';
+	}
 	return item.existing === undefined ? ' (new file)' : '';
 }
 
@@ -75,7 +81,16 @@ export function DiffReview({
 	// Two-step save: `ctrl+s` asks, a second `ctrl+s` writes. Applying is the one
 	// irreversible thing this screen does, and the confirm is where the author
 	// finds out that pending items are about to be skipped rather than written.
-	const [confirming, setConfirming] = useState(false);
+	/**
+	 * Which question is on screen, if any.
+	 *
+	 * `write` is the deliberate save. `discard` is the one that was missing: `q`
+	 * and `esc` used to call `onCancel` outright, so an author who accepted six
+	 * proposals and then left the gate lost all six with nothing said. Accepting
+	 * marks a decision; only applying writes it, and that distinction is
+	 * invisible until it costs someone their work.
+	 */
+	const [prompt, setPrompt] = useState<'none' | 'write' | 'discard'>('none');
 	const [editing, setEditing] = useState(false);
 	const bump = () => setRevision(n => n + 1);
 
@@ -134,46 +149,57 @@ export function DiffReview({
 	// on an external process is the worst case for looking hung.
 	const hints: readonly Line[] = busy
 		? [{text: `${frame} working…`.trim(), dim: true}]
-		: confirming
+		: prompt === 'discard'
 			? [
-					blocked.length > 0
-						? {
-								text: `${String(blocked.length)} accepted item(s) have a path the vault refuses — ${blocked
-									.map(entry => entry.proposal.path)
-									.join(', ')}`,
-								color: theme.color.error,
-							}
-						: counts.accepted === 0
-							? {
-									text: 'nothing is accepted — there is nothing to write',
-									color: '#e0af68',
-								}
-							: {
-									text: `write ${String(counts.accepted)} file(s)?${
-										counts.rejected + counts.pending > 0
-											? ` ${String(counts.rejected)} rejected and ${String(counts.pending)} still pending will be skipped`
-											: ''
-									}`,
-									color: '#e0af68',
-								},
 					{
-						text:
-							counts.accepted > 0 && blocked.length === 0
-								? 'ctrl+s again to write · any other key to go back'
-								: 'any key to go back',
+						text: `${String(counts.accepted)} accepted change(s) have not been written yet`,
+						color: '#e0af68',
+					},
+					{
+						text: 'ctrl+s to write them · esc again to discard · any other key to go back',
 						dim: true,
 					},
 				]
-			: [
-					{
-						text: `a accept · r reject · ${
-							item?.proposal.remove === true ? '' : 'e edit · '
-						}A accept-all · ←→ item · ↑↓ scroll · ${
-							batch.settled ? 'enter apply · ' : ''
-						}ctrl+s save · q cancel`,
-						dim: true,
-					},
-				];
+			: prompt === 'write'
+				? [
+						blocked.length > 0
+							? {
+									text: `${String(blocked.length)} accepted item(s) have a path the vault refuses — ${blocked
+										.map(entry => entry.proposal.path)
+										.join(', ')}`,
+									color: theme.color.error,
+								}
+							: counts.accepted === 0
+								? {
+										text: 'nothing is accepted — there is nothing to write',
+										color: '#e0af68',
+									}
+								: {
+										text: `write ${String(counts.accepted)} file(s)?${
+											counts.rejected + counts.pending > 0
+												? ` ${String(counts.rejected)} rejected and ${String(counts.pending)} still pending will be skipped`
+												: ''
+										}`,
+										color: '#e0af68',
+									},
+						{
+							text:
+								counts.accepted > 0 && blocked.length === 0
+									? 'ctrl+s again to write · any other key to go back'
+									: 'any key to go back',
+							dim: true,
+						},
+					]
+				: [
+						{
+							text: `a accept · r reject · ${
+								item?.proposal.remove === true ? '' : 'e edit · '
+							}A accept-all · ←→ item · ↑↓ scroll · ${
+								batch.settled ? 'enter apply · ' : ''
+							}ctrl+s save · q cancel`,
+							dim: true,
+						},
+					];
 
 	/** The hints wrap on a narrow terminal; the diff window pays for it. */
 	const hintRows = rowsForAll(
@@ -266,21 +292,33 @@ export function DiffReview({
 
 			// While confirming, every key means yes or no and nothing else — a
 			// stray `a` must not quietly accept another item behind the prompt.
-			if (confirming) {
+			if (prompt !== 'none') {
 				if (key.ctrl && input === 's' && counts.accepted > 0 && blocked.length === 0) {
-					setConfirming(false);
+					setPrompt('none');
 					finish();
 					return;
 				}
-				setConfirming(false);
+				// Leaving is confirmed by repeating the key that asked, so an author
+				// who meant it is one keystroke away and one who did not is safe.
+				if (prompt === 'discard' && (key.escape || input === 'q')) {
+					onCancel();
+					return;
+				}
+				setPrompt('none');
 				return;
 			}
 
 			if (key.ctrl && input === 's') {
-				setConfirming(true);
+				setPrompt('write');
 				return;
 			}
 			if (key.escape || input === 'q') {
+				// Nothing accepted means nothing to lose, and asking then would be
+				// a prompt that always has the same answer.
+				if (counts.accepted > 0) {
+					setPrompt('discard');
+					return;
+				}
 				onCancel();
 				return;
 			}
@@ -374,7 +412,9 @@ export function DiffReview({
 			>
 				<Text>
 					<Text color={theme.color.user}>{item.proposal.path}</Text>
-					{item.proposal.remove === true ? (
+					{item.proposal.path.startsWith('raw/') && item.proposal.remove !== true ? (
+						<Text color="#e0af68">{label(item)}</Text>
+					) : item.proposal.remove === true ? (
 						// Coloured like an error rather than dimmed: this is the one
 						// decision in the gate that cannot be undone by rejecting the
 						// next item, and it should not look like an ordinary write.

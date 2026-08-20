@@ -400,7 +400,10 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 				return;
 			}
 
-			const batch = await ReviewBatch.create(root, outcome.proposals);
+			// The architect alone may propose changes to `raw/` (D15). Extraction
+			// and the reviewer keep the old rule, so a transcript can only be
+			// rewritten by the agent the author pointed at it deliberately.
+			const batch = await ReviewBatch.create(root, outcome.proposals, {allowRaw: true});
 			for (const problem of batch.validatePaths()) {
 				append([error(`unsafe proposal ${problem.path}: ${problem.reason}`)]);
 			}

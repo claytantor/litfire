@@ -94,6 +94,45 @@ describe('removing a file through the gate', () => {
 		expect(outcome.failed).toHaveLength(1);
 	});
 
+	/**
+	 * The architect may propose into `raw/` (D15). Nothing else may, and the
+	 * permission belongs to the batch rather than to the proposal — otherwise a
+	 * proposal could grant itself the right to rewrite a transcript.
+	 */
+	it('keeps raw/ closed to every batch that was not opened to it', async () => {
+		const closed = await ReviewBatch.create(root, [
+			{path: 'raw/interview.md', contents: 'rewritten'},
+		]);
+		closed.decide('accepted');
+		const refused = await closed.apply();
+
+		expect(refused.written).toEqual([]);
+		expect(refused.failed[0]?.reason).toContain('not author-writable');
+
+		const opened = await ReviewBatch.create(
+			root,
+			[{path: 'raw/interview.md', contents: 'corrected'}],
+			{allowRaw: true},
+		);
+		opened.decide('accepted');
+		const applied = await opened.apply();
+
+		expect(applied.written).toEqual(['raw/interview.md']);
+	});
+
+	it('never opens the derived directories, even to the architect', async () => {
+		for (const derived of ['ledger/index.md', 'wiki/index.md', '.litrpg/state.md']) {
+			const batch = await ReviewBatch.create(root, [{path: derived, contents: 'x'}], {
+				allowRaw: true,
+			});
+			batch.decide('accepted');
+			const outcome = await batch.apply();
+
+			expect(outcome.written, derived).toEqual([]);
+			expect(outcome.failed, derived).toHaveLength(1);
+		}
+	});
+
 	it('refuses to remove what the author owns or the tool derives', async () => {
 		// The same path rules a write passes. A removal naming these is worse.
 		for (const forbidden of [

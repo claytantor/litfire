@@ -45,9 +45,10 @@ comments will refer to them.
   a first-class peer. If a feature would only work through the TUI, it is the
   wrong shape.
 - **Derived state is regenerated, never edited.** `ledger/`, `wiki/` and
-  `manuscript.md` are outputs. `raw/` is the author's own record and the tool
-  never writes to it. Both rules are enforced in `resolveInsideVault`, not by
-  convention.
+  `manuscript.md` are outputs. `raw/` is the author's own record: only
+  `/architect` may propose changes there, on the author's instruction and still
+  only as a diff they accept — every other path to disk is closed to it. Both
+  rules are enforced in `resolveInsideVault`, not by convention.
 - **Nothing lands without an explicit decision.** Every model-proposed write
   goes through the review gate as a diff the author accepts or rejects.
 - **Report, never block.** A contradiction becomes an open question. The tool

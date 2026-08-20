@@ -1,6 +1,11 @@
 import {createTwoFilesPatch} from 'diff';
 import type {Line} from '../commands/types.js';
-import {applyAccepted, readExisting, resolveInsideVault} from './apply.js';
+import {
+	applyAccepted,
+	readExisting,
+	resolveInsideVault,
+	type PathOptions,
+} from './apply.js';
 import type {ApplyOutcome, Decision, Proposal, ReviewItem} from './types.js';
 
 /**
@@ -14,16 +19,24 @@ export class ReviewBatch {
 	readonly #root: string;
 	#items: ReviewItem[];
 	#cursor = 0;
+	/**
+	 * Carried by the batch rather than by a proposal, because a proposal must
+	 * not be able to grant itself permission. Whoever creates the batch decides
+	 * what it is allowed to touch.
+	 */
+	readonly #paths: PathOptions;
 
-	private constructor(root: string, items: ReviewItem[]) {
+	private constructor(root: string, items: ReviewItem[], paths: PathOptions = {}) {
 		this.#root = root;
 		this.#items = items;
+		this.#paths = paths;
 	}
 
 	/** Loads current contents for each proposal so diffs show real changes. */
 	static async create(
 		root: string,
 		proposals: readonly Proposal[],
+		options: PathOptions = {},
 	): Promise<ReviewBatch> {
 		const items: ReviewItem[] = [];
 		for (const proposal of proposals) {
@@ -38,7 +51,7 @@ export class ReviewBatch {
 				edited: false,
 			});
 		}
-		return new ReviewBatch(root, items);
+		return new ReviewBatch(root, items, options);
 	}
 
 	get items(): readonly ReviewItem[] {
@@ -120,7 +133,7 @@ export class ReviewBatch {
 	}
 
 	apply(): Promise<ApplyOutcome> {
-		return applyAccepted(this.#root, this.#items);
+		return applyAccepted(this.#root, this.#items, this.#paths);
 	}
 
 	/** Throws if a proposal targets somewhere it must not. */
@@ -128,7 +141,7 @@ export class ReviewBatch {
 		const problems: {path: string; reason: string}[] = [];
 		for (const item of this.#items) {
 			try {
-				resolveInsideVault(this.#root, item.proposal.path);
+				resolveInsideVault(this.#root, item.proposal.path, this.#paths);
 			} catch (caught) {
 				problems.push({
 					path: item.proposal.path,

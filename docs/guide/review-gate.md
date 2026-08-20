@@ -38,6 +38,36 @@ a accept · r reject · e edit · A accept-all · ←→ item · ↑↓ scroll
   `.litrpg/` (tool cache), `ledger/` (derived), and `raw/` (author input) are
   refused. A bad path fails that one item; the rest of the batch still applies.
 
+## Leaving with changes accepted
+
+Accepting marks a decision. Only applying writes it — and until it does, `q` and
+`esc` would have thrown the batch away.
+
+Leaving with accepted changes now asks:
+
+```
+3 accepted change(s) have not been written yet
+ctrl+s to write them · esc again to discard · any other key to go back
+```
+
+With nothing accepted it leaves at once, because a prompt whose answer is always
+the same is noise.
+
+## Changes to raw/
+
+`raw/` is your own record, and every agent is forbidden from writing there —
+except `/architect`, on your instruction, and still only as a diff you accept.
+
+Those items are labelled `(your raw record)` so they never read as an ordinary
+corpus write. The architect is told to correct what is wrong _about_ the record —
+a name spelled two ways, a link that no longer resolves — and never to rewrite
+what you said. Your phrasing, hesitations and contradictions are the material; a
+tidier transcript is a worse one.
+
+`ledger/`, `wiki/`, `manuscript.md` and `.litrpg/` stay closed to everyone,
+architect included: they are derived, and a write there is overwritten on the
+next recompute.
+
 ## Removals
 
 A proposal can remove a file as well as write one. It arrives in the gate like

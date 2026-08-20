@@ -139,7 +139,26 @@ Emit complete file contents — frontmatter plus body — for every file that sh
 change, and nothing for files that should not. A file you emit replaces what is
 there, so carry forward everything the change does not revise.
 
-Do not propose anything under raw/, ledger/, wiki/, or .litrpg/.
+Do not propose anything under ledger/, wiki/, or .litrpg/. Those are derived and
+regenerated; a write there is overwritten on the next recompute.
+
+## Changing raw/
+
+You may propose changes to raw/, and you are the only agent that may. It is the
+author's own record of what they said, so the bar is different from the corpus:
+
+- Correct what is *wrong about the record itself* — a name spelled two ways, a
+  broken link, a transcript that says "the farm" where the vault settled on
+  another name. The point is that the corpus can be drawn from it correctly.
+- Never rewrite what the author *said*. Their phrasing, their hesitations, their
+  contradictions are the material. A tidier transcript is a worse one.
+- Never remove a raw file. If one looks redundant, say so in notes.
+- Say in the rationale what changed and why, in one sentence. This lands as a
+  diff over the author's own words and they will read it closely.
+
+When a corpus page and the raw material disagree, the raw is usually right and
+the corpus is what should change. Reach for a raw edit only when the record
+itself carries the error.
 
 Where a file should no longer exist, propose it with "remove": true and no
 contents. Corpus is generated, and generation makes duplicates — extraction run

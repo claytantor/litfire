@@ -126,8 +126,13 @@ describe('DiffReview', () => {
 		await expect(readFile(path.join(root, 'characters/b.md'), 'utf8')).rejects.toThrow();
 	});
 
-	it('cancels without writing anything', async () => {
-		const {stdin, onCancel} = await mount(two);
+	/**
+	 * Accepting marks a decision; only applying writes it. That distinction was
+	 * invisible until it cost someone their work — `q` used to discard a batch
+	 * of accepted proposals outright, with nothing said.
+	 */
+	it('asks before discarding changes that were accepted but never written', async () => {
+		const {stdin, onCancel, lastFrame} = await mount(two);
 		await flush();
 
 		stdin.write('a');
@@ -135,8 +140,41 @@ describe('DiffReview', () => {
 		stdin.write('q');
 		await flush();
 
+		expect(onCancel).not.toHaveBeenCalled();
+		expect(lastFrame()).toContain('have not been written yet');
+
+		stdin.write('q');
+		await flush();
 		expect(onCancel).toHaveBeenCalled();
 		await expect(readFile(path.join(root, 'characters/a.md'), 'utf8')).rejects.toThrow();
+	});
+
+	it('leaves at once when there is nothing to lose', async () => {
+		const {stdin, onCancel} = await mount(two);
+		await flush();
+
+		stdin.write('q');
+		await flush();
+
+		expect(onCancel).toHaveBeenCalled();
+	});
+
+	it('offers to write them instead of discarding', async () => {
+		const {stdin, onCancel} = await mount([two[0]!]);
+		await flush();
+
+		stdin.write('a');
+		await flush();
+		stdin.write('q');
+		await flush();
+		// ctrl+s from the leaving prompt saves rather than discards.
+		stdin.write('\u0013');
+		await flush(200);
+
+		expect(onCancel).not.toHaveBeenCalled();
+		await expect(readFile(path.join(root, 'characters/a.md'), 'utf8')).resolves.toContain(
+			'id: a',
+		);
 	});
 
 	it('opens the native buffer on "e"', async () => {
