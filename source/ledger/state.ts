@@ -91,6 +91,22 @@ export function momentByStep(
 		clock.set(step.id, anchored.get(step.id) ?? current);
 	}
 
+	/**
+	 * An unplaced situation is not a step, so the loop above never reaches it —
+	 * and a scene whose author has written `moment:` on it has a clock position
+	 * whether or not it sits on an arc. Reading the anchor only for situations
+	 * that replay meant the tool ignored the very field it had just written, and
+	 * went on telling the author to set the thing they had set.
+	 *
+	 * Inheritance still requires the sequence: a scene with no anchor and no arc
+	 * has nothing before it to inherit from, which is a real answer.
+	 */
+	for (const [id, moment] of anchored) {
+		if (!clock.has(id)) {
+			clock.set(id, moment);
+		}
+	}
+
 	return clock;
 }
 
@@ -154,12 +170,28 @@ export function castOf(
 	clock: Clock,
 	situation: Situation,
 ): SituationCast {
-	const states = statesAt(replay, clock, situation.id, situation.characters);
+	const moment = clock.get(situation.id);
+
+	/**
+	 * A placed scene has a snapshot of its own, taken after its events. An
+	 * unplaced one has none — it never replays — so the states are read at the
+	 * moment it says it happens at instead. That is the best available truth and
+	 * it is exact: a scene outside the sequence contributes no events, so the
+	 * state at it *is* the state at its moment.
+	 */
+	const at = replay.snapshots.has(situation.id) ? situation.id : (moment ?? situation.id);
+	const states = statesAt(replay, clock, at, situation.characters).map(state => ({
+		...state,
+		// Addressed by the scene's moment however the snapshot was found, so two
+		// scenes at one moment agree about where they are.
+		id: stateId(state.character, moment),
+		moment,
+	}));
 	const present = new Set(states.map(state => state.character));
 
 	return {
 		situation: situation.id,
-		moment: clock.get(situation.id),
+		moment,
 		anchored: situation.moment !== undefined,
 		states,
 		missing: situation.characters.filter(id => !present.has(id)),

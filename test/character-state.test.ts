@@ -116,6 +116,77 @@ describe('the clock', () => {
 		expect(stateId('inanna', clock.get('sit-001'))).toBe('inanna@unplaced');
 	});
 
+	/**
+	 * The reported failure. `/situation <id> moment <m>` wrote the anchor and the
+	 * tool went on saying "No moment on the clock, so every character state here
+	 * is unplaced" — telling the author to set the field they had just set.
+	 *
+	 * A scene with no arc is not a replay step, and the clock was built by
+	 * walking the sequence, so its explicit anchor was never read at all.
+	 */
+	it('honours an anchor on a scene that is not in the sequence at all', async () => {
+		const inbox = [
+			situationSchema.parse({
+				id: 'sit-900',
+				characters: ['inanna'],
+				moment: 'substrate-patch',
+				// No arc: it never replays.
+			}),
+		];
+		const result = await replay({
+			systems: [system],
+			moments,
+			arcs,
+			situations: inbox,
+			characters,
+			formulas: undefined,
+		});
+
+		expect(result.sequence.some(step => step.id === 'sit-900')).toBe(false);
+		expect(momentByStep(result.sequence, inbox).get('sit-900')).toBe('substrate-patch');
+	});
+
+	it('reads the cast of an unplaced scene at the moment it names', async () => {
+		const inbox = [
+			situationSchema.parse({
+				id: 'sit-900',
+				characters: ['inanna'],
+				moment: 'substrate-patch',
+			}),
+		];
+		const result = await replay({
+			systems: [system],
+			moments,
+			arcs,
+			situations: inbox,
+			characters,
+			formulas: undefined,
+		});
+		const cast = castOf(result, momentByStep(result.sequence, inbox), inbox[0]!);
+
+		expect(cast.moment).toBe('substrate-patch');
+		expect(cast.anchored).toBe(true);
+		// A scene outside the sequence contributes no events, so the state at it
+		// is exactly the state at its moment — not an approximation.
+		expect(cast.states.map(state => state.id)).toEqual(['inanna@substrate-patch']);
+		expect(cast.missing).toEqual([]);
+	});
+
+	it('leaves an unplaced scene with no anchor unplaced', async () => {
+		const inbox = [situationSchema.parse({id: 'sit-901', characters: ['inanna']})];
+		const result = await replay({
+			systems: [system],
+			moments,
+			arcs,
+			situations: inbox,
+			characters,
+			formulas: undefined,
+		});
+
+		// Nothing before it to inherit from, which is a real answer.
+		expect(momentByStep(result.sequence, inbox).get('sit-901')).toBeUndefined();
+	});
+
 	it('still places a scene an unanchored arc holds, when the page says so', async () => {
 		const loose = [arcSchema.parse({id: 'arc-01', order: 1})];
 		const anchored = [

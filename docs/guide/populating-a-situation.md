@@ -173,9 +173,31 @@ The buffer deliberately cannot touch them — it edits the body only.
 | Scene reads "unplaced"              | No arc, or the arc has no `starts_after`      |
 | Character has no appearances        | They are not in any situation's `characters:` |
 
-Each situation page lists what it is still missing under **Not linked yet**,
-with the command that fixes it. A scene that names nothing renders as a page
-saying so, rather than a tidy stub that looks finished.
+Each situation page lists what it is still missing under **Not linked yet**, as
+a numbered checklist in the order the steps have to be done:
+
+```
+1. **Put it on an arc** — /situation sit-002 arc <arc>. Until then the scene
+   never replays and nothing it carries reaches the ledger.
+2. **Give it a moment** — /situation sit-002 moment <moment>. Until then every
+   character state here is unplaced.
+3. **Cast it** — /situation sit-002 cast <character>…
+4. **Say where it happens** — /situation sit-002 place <place>.
+```
+
+The order is by what blocks what, not by the order the fields appear in the
+file. An arc is first because without one the scene never enters the replay
+sequence, so fixing anything else changes nothing that reaches the ledger; place
+is last because it blocks only its own wiki page.
+
+Each step names its own prerequisite when that is missing too — "no arcs exist
+yet, so `/arc new <title>` first" — because sending you to a command that will
+refuse is worse than saying nothing. A placed scene whose arc has no
+`starts_after` gets its own step, since that is the gap that most often hides.
+
+`/situation <id>` prints the same list, in the same order. A scene that names
+nothing renders as a page saying so, rather than a tidy stub that looks
+finished.
 
 ## The whole thing, once
 

@@ -171,6 +171,22 @@ describe('the documented workflow', () => {
 		expect(moment?.body).toContain('unplaced');
 	});
 
+	it('stops asking for a moment once the scene has one, arc or no arc', async () => {
+		await writeMoment('the-breach', 0);
+		await run('/situation new The Ledger Room');
+		await refresh();
+		await run('/situation sit-002 moment the-breach');
+
+		const page = buildWiki(context.project!).pages.find(
+			p => p.kind === 'situation' && p.id === 'sit-002',
+		);
+
+		expect(page?.body).toContain('[[the-breach]]');
+		expect(page?.body).not.toContain('Give it a moment');
+		// Still unplaced, which is a different gap and still worth saying.
+		expect(page?.body).toContain('Put it on an arc');
+	});
+
 	it('says on the page what is still unlinked, rather than looking finished', async () => {
 		await run('/situation new A Bare Scene');
 		await refresh();
@@ -178,12 +194,76 @@ describe('the documented workflow', () => {
 		const page = buildWiki(context.project!).pages.find(
 			p => p.kind === 'situation' && p.id === 'sit-002',
 		);
+		const body = page?.body ?? '';
 
-		expect(page?.body).toContain('Not linked yet');
-		expect(page?.body).toContain('No arc');
-		expect(page?.body).toContain('No moment');
-		expect(page?.body).toContain('No place');
-		expect(page?.body).toContain('Nobody in it');
+		expect(body).toContain('Not linked yet');
+		expect(body).toContain('In the order they need doing');
+		expect(body).toContain('Put it on an arc');
+		expect(body).toContain('Give it a moment');
+		expect(body).toContain('Cast it');
+		expect(body).toContain('Say where it happens');
+	});
+
+	/**
+	 * The order is the useful part. An arc comes first because without one the
+	 * scene never replays, so fixing anything else changes nothing that reaches
+	 * the ledger; place is last because it blocks only its own wiki page.
+	 */
+	it('lists the gaps in the order they have to be done', async () => {
+		await run('/situation new A Bare Scene');
+		await refresh();
+
+		const body =
+			buildWiki(context.project!).pages.find(
+				p => p.kind === 'situation' && p.id === 'sit-002',
+			)?.body ?? '';
+
+		const order = [
+			'Put it on an arc',
+			'Give it a moment',
+			'Cast it',
+			'Say where it happens',
+		];
+		const positions = order.map(step => body.indexOf(step));
+		expect(positions.every(at => at !== -1)).toBe(true);
+		expect(positions).toEqual([...positions].sort((a, b) => a - b));
+
+		// Numbered, because it genuinely is a sequence.
+		expect(body).toContain('1. **Put it on an arc');
+		expect(body).toContain('4. **Say where it happens');
+	});
+
+	it('names the prerequisite when the step cannot be run yet', async () => {
+		// A fresh vault has an arc but no dated moments, so the moment step has
+		// to send the author to /moment first rather than to a refusal.
+		await run('/situation new A Bare Scene');
+		await refresh();
+
+		const body =
+			buildWiki(context.project!).pages.find(
+				p => p.kind === 'situation' && p.id === 'sit-002',
+			)?.body ?? '';
+
+		expect(body).toContain('No dated moments exist yet');
+		expect(body).toContain('/moment new <name>');
+	});
+
+	it('flags an arc that has no clock position for its scenes to inherit', async () => {
+		// The scaffold's arc-01 is already anchored, so this needs a bare one.
+		await run('/arc new The Long Descent');
+		await run('/situation new A Bare Scene');
+		await refresh();
+		await run('/situation sit-002 arc arc-02');
+
+		const body =
+			buildWiki(context.project!).pages.find(
+				p => p.kind === 'situation' && p.id === 'sit-002',
+			)?.body ?? '';
+
+		// Placed, so the arc step is done — but the arc itself is unanchored.
+		expect(body).not.toContain('Put it on an arc');
+		expect(body).toContain('Anchor its arc to the clock');
+		expect(body).toContain('/arc arc-02 after <moment>');
 	});
 
 	it('refuses a link to something that does not exist, and says how to make it', async () => {

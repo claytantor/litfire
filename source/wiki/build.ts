@@ -1214,26 +1214,61 @@ function buildSituationPage(
 		plural(situation.characters.length, 'character'),
 	].join(' · ');
 
-	// What is missing is the useful half of this page while a scene is being
-	// built up, so it is listed rather than left for the author to infer.
-	const gaps: string[] = [];
+	/**
+	 * What is still missing, in the order it has to be done.
+	 *
+	 * Ordered by what blocks what, not by the order the fields appear in the
+	 * schema. An arc is first because without one the scene never enters the
+	 * replay sequence, so nothing else it links can reach the ledger — fixing
+	 * the cast of a scene that does not replay changes nothing. Place is last
+	 * because it blocks only its own wiki page.
+	 *
+	 * Each step names its own prerequisite when that is missing too. "No arc,
+	 * run `/situation X arc <arc>`" is useless advice in a vault with no arcs,
+	 * and following it produces a refusal rather than a scene.
+	 */
+	const steps: string[] = [];
+	const own = situation.id;
+
 	if (situation.arc === undefined) {
-		gaps.push(`- No arc. \`/situation ${situation.id} arc <arc>\` places it.`);
+		steps.push(
+			project.vault.arcs.length === 0
+				? `**Put it on an arc.** No arcs exist yet, so \`/arc new <title>\` first, then \`/situation ${own} arc <arc>\`. Until then the scene never replays and nothing it carries reaches the ledger.`
+				: `**Put it on an arc** — \`/situation ${own} arc <arc>\`. Until then the scene never replays and nothing it carries reaches the ledger.`,
+		);
+	} else if (
+		project.vault.arcs.find(candidate => candidate.id === situation.arc)?.starts_after ===
+		undefined
+	) {
+		// Easiest gap to miss: the scene is placed, but its arc has no clock
+		// position for the scene to inherit.
+		steps.push(
+			`**Anchor its arc to the clock** — \`/arc ${situation.arc} after <moment>\`. The arc has no \`starts_after\`, so its scenes have nothing on the clock before them.`,
+		);
 	}
+
 	if (cast.moment === undefined) {
-		gaps.push(
-			`- No moment on the clock, so every character state here is unplaced. ` +
-				`\`/situation ${situation.id} moment <moment>\` anchors it.`,
+		const dated = project.vault.moments.filter(each => each.at !== undefined);
+		steps.push(
+			dated.length === 0
+				? `**Give it a moment.** No dated moments exist yet, so \`/moment new <name>\` then \`/moment <id> at <when>\` first, then \`/situation ${own} moment <moment>\`. Until then every character state here is unplaced.`
+				: `**Give it a moment** — \`/situation ${own} moment <moment>\`. Until then every character state here is unplaced.`,
 		);
 	}
-	if (situation.place === undefined) {
-		gaps.push(`- No place. \`/situation ${situation.id} place <place>\` sets one.`);
-	}
+
 	if (situation.characters.length === 0) {
-		gaps.push(
-			`- Nobody in it. \`/situation ${situation.id} cast <character>…\` adds them.`,
+		steps.push(
+			`**Cast it** — \`/situation ${own} cast <character>…\`. Nobody appears in it, so it has no character states at all.`,
 		);
 	}
+
+	if (situation.place === undefined) {
+		steps.push(
+			`**Say where it happens** — \`/situation ${own} place <place>\`. Without it there is no place page for this scene to sit in.`,
+		);
+	}
+
+	const gaps = steps.map((step, index) => `${String(index + 1)}. ${step}`);
 
 	const castLines =
 		cast.states.length === 0
@@ -1261,7 +1296,9 @@ function buildSituationPage(
 		'',
 		facts,
 		'',
-		...(gaps.length > 0 ? ['## Not linked yet', '', ...gaps, ''] : []),
+		...(gaps.length > 0
+			? ['## Not linked yet', '', '_In the order they need doing:_', '', ...gaps, '']
+			: []),
 		'## Cast',
 		'',
 		cast.moment === undefined

@@ -1,5 +1,6 @@
 import {findSeams, partitionChapters, type Seam} from '../chapters/index.js';
 import type {Project} from '../core/project.js';
+import type {Situation} from '../domain/schema.js';
 import type {OrphanedInterview} from '../interview/index.js';
 import type {LedgerState} from '../ledger/replay.js';
 import {
@@ -338,14 +339,7 @@ export function renderCast(project: Project, situationId: string): Line[] {
 	];
 
 	if (cast.moment === undefined) {
-		lines.push(
-			warn('unplaced — no moment on the clock precedes this scene'),
-			muted(
-				situation.arc === undefined
-					? '/situation <id> moment <moment> anchors it on the clock'
-					: 'set moment: in its frontmatter, or date a moment before it',
-			),
-		);
+		lines.push(warn('no moment — every character state here is unplaced'));
 	} else {
 		const when = moment?.at === undefined ? 'undated' : `at ${String(moment.at)}`;
 		lines.push(
@@ -377,7 +371,72 @@ export function renderCast(project: Project, situationId: string): Line[] {
 		);
 	}
 
+	// Same order the wiki page uses, and for the same reason: by what blocks
+	// what. The two must agree, or the screen and the page give an author
+	// different advice about the same scene.
+	const todo = linkageSteps(project, situation, cast.moment);
+	if (todo.length > 0) {
+		lines.push(blank(), muted('not linked yet — in the order they need doing'));
+		for (const [index, step] of todo.entries()) {
+			lines.push(text(`  ${String(index + 1)}. ${step}`));
+		}
+	}
+
 	return lines;
+}
+
+/**
+ * What a scene still needs, in the order it has to be done.
+ *
+ * Ordered by what blocks what. An arc is first because without one the scene
+ * never enters the replay sequence, so nothing else it links can reach the
+ * ledger — casting a scene that does not replay changes nothing. Place is last
+ * because it blocks only its own wiki page.
+ *
+ * Each step names its own prerequisite when that is missing too: telling an
+ * author to run `/situation X arc <arc>` in a vault with no arcs sends them to
+ * a refusal rather than to a scene.
+ */
+export function linkageSteps(
+	project: Project,
+	situation: Situation,
+	moment: string | undefined,
+): string[] {
+	const steps: string[] = [];
+	const id = situation.id;
+
+	if (situation.arc === undefined) {
+		steps.push(
+			project.vault.arcs.length === 0
+				? `/arc new <title>, then /situation ${id} arc <arc> — it never replays until then`
+				: `/situation ${id} arc <arc> — it never replays until then`,
+		);
+	} else if (
+		project.vault.arcs.find(candidate => candidate.id === situation.arc)?.starts_after ===
+		undefined
+	) {
+		steps.push(
+			`/arc ${situation.arc} after <moment> — its arc has no clock position to inherit`,
+		);
+	}
+
+	if (moment === undefined) {
+		steps.push(
+			project.vault.moments.some(each => each.at !== undefined)
+				? `/situation ${id} moment <moment> — states here are unplaced until then`
+				: `/moment new <name> and /moment <id> at <when>, then /situation ${id} moment <moment>`,
+		);
+	}
+
+	if (situation.characters.length === 0) {
+		steps.push(`/situation ${id} cast <character>… — nobody is in it`);
+	}
+
+	if (situation.place === undefined) {
+		steps.push(`/situation ${id} place <place> — nowhere for it to happen`);
+	}
+
+	return steps;
 }
 
 /** The body of one character state — indented, shared by every state view. */
