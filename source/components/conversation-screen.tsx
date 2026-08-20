@@ -97,7 +97,16 @@ export function ConversationScreen({
 	onCancel,
 	speaker,
 }: Props): ReactElement {
-	const speakers = speakersFor(speaker);
+	/**
+	 * Memoised on the speaker, not rebuilt per render.
+	 *
+	 * This is a dependency of the memo that wraps the *entire* conversation, so
+	 * a fresh object each render meant re-wrapping every turn on every frame —
+	 * and during a streaming reply that is every token. The work is quadratic in
+	 * the length of the conversation and it happens while the terminal is at its
+	 * busiest.
+	 */
+	const speakers = useMemo(() => speakersFor(speaker), [speaker]);
 	const [draft, setDraft] = useState('');
 	/**
 	 * Counted from the *tail*, not the head: 0 always means "pinned to the live

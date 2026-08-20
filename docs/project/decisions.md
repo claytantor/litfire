@@ -313,3 +313,31 @@ them apart — "no scenes" against "no page yet".
 
 `renderPrimitives` loses its `places` parameter, since there is no longer a kind
 the caller has to read off disk on the view's behalf.
+
+## D13 — Streaming repaints are coalesced
+
+**Committed:** at most one repaint per 50ms while a reply streams.
+
+Every streaming screen — interview, reviewer, architect — accumulated a reply
+delta by delta and set state on each one. A provider delivers a reply as
+hundreds or thousands of deltas, so that is hundreds or thousands of React
+renders per reply, each one asking Ink to rebuild the tree.
+
+`ConversationScreen` made it quadratic. Its `speakers` record was rebuilt on
+every render and sat in the dependency array of the memo that wraps the _entire_
+conversation, so every token re-wrapped every turn that had ever been said. A
+long architect session therefore did more string work per token the longer it
+ran, while the terminal was at its busiest.
+
+Both are fixed: the record is memoised on the speaker, and `streamPainter`
+coalesces deltas into repaints at 50ms — twenty frames a second, which is faster
+than anyone reads. Nothing is dropped; `flush()` is mandatory because the last
+tokens almost always arrive inside the final interval.
+
+This was found after a `RuntimeError: memory access out of bounds` inside
+`yoga-layout`'s WASM, thrown from Ink's debounced renderer during an architect
+reply. The render storm is a plausible contributor and not a proven cause — the
+fault is inside Ink's layout, and a single stack trace does not establish which
+pressure produced it. What is certain is that the work removed here was waste:
+Ink debounces its own render, so almost every frame those renders produced was
+computed and discarded.

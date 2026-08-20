@@ -11,6 +11,7 @@ import {
 } from '../reviewer/index.js';
 import type {Provider} from '../llm/index.js';
 import {resolve} from '../vault/paths.js';
+import {streamPainter} from './use-stream-paint.js';
 import type {ConversationTurn} from '../conversation/types.js';
 
 export type ReviewerController = {
@@ -106,12 +107,12 @@ export function useReviewer(options: UseReviewerOptions): ReviewerController {
 			setTurns([...session.turns, {role: 'author', text: question}]);
 			setStreaming('');
 
-			let reply = '';
 			try {
+				const paint = streamPainter(setStreaming);
 				for await (const delta of session.ask(question, controller.signal)) {
-					reply += delta;
-					setStreaming(reply);
+					paint.push(delta);
 				}
+				paint.flush();
 			} catch (caught) {
 				session.recordFailure(
 					question,

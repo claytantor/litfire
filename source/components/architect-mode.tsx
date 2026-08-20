@@ -5,6 +5,7 @@ import type {ConversationTurn} from '../conversation/types.js';
 import type {Project} from '../core/project.js';
 import type {Provider} from '../llm/index.js';
 import {buildRawContext, renderRawContext} from '../architect/raw.js';
+import {streamPainter} from '../hooks/use-stream-paint.js';
 import {ConversationScreen} from './conversation-screen.js';
 
 type Props = {
@@ -91,11 +92,11 @@ export function ArchitectMode({rows, columns, ...options}: Props) {
 					}
 
 					setStatus('reading the vault…');
-					let reply = '';
+					const paint = streamPainter(setStreaming);
 					for await (const delta of session.ask(trimmed, controller.signal)) {
-						reply += delta;
-						setStreaming(reply);
+						paint.push(delta);
 					}
+					paint.flush();
 					setTurns(session.turns);
 				} catch (caught) {
 					session.recordFailure(

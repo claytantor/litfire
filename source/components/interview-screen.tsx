@@ -19,6 +19,7 @@ import {
 } from '../hooks/use-viewport.js';
 import type {Provider} from '../llm/index.js';
 import type {Proposal} from '../review/index.js';
+import {streamPainter} from '../hooks/use-stream-paint.js';
 import {theme} from '../theme.js';
 import {Composer} from './composer.js';
 
@@ -88,10 +89,12 @@ export function InterviewScreen({
 		let buffer = '';
 
 		try {
+			const paint = streamPainter(setStreaming);
 			for await (const delta of session.ask(controller.signal)) {
-				buffer += delta;
-				setStreaming(buffer);
+				paint.push(delta);
 			}
+			paint.flush();
+			buffer = paint.text;
 			append('q', buffer.trim());
 			setStreaming('');
 			setPhase('answering');
