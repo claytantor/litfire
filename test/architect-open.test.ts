@@ -35,13 +35,53 @@ describe('asking for a file', () => {
 	it('reads a READ line, however it is punctuated', () => {
 		expect(parseRequest('READ: a.md, b.md')).toEqual(['a.md', 'b.md']);
 		expect(parseRequest('read: `a.md`')).toEqual(['a.md']);
-		expect(parseRequest('Some thinking.\nREAD: a.md b.md')).toEqual(['a.md', 'b.md']);
 		expect(parseRequest('READ: a.md, a.md')).toEqual(['a.md']);
+	});
+
+	/**
+	 * The reported failure, verbatim in shape: the model explains itself first
+	 * and the request is nowhere near the start of the reply. A prefix test
+	 * missed it entirely, so the line reached the screen and nothing opened.
+	 */
+	it('finds a request that follows a paragraph of reasoning', () => {
+		const reply = [
+			'Before I propose the merge, I want to pin provenance — the surviving',
+			'page should carry a "Raised in" link to the interview that produced it.',
+			'',
+			'READ: raw/interviews/timeline-2026-08-19T08-51-59.md',
+		].join('\n');
+
+		expect(parseRequest(reply)).toEqual([
+			'raw/interviews/timeline-2026-08-19T08-51-59.md',
+		]);
+	});
+
+	it('collects a request that wraps onto the next line', () => {
+		const reply = [
+			'Not yet — I still have not read either moment file.',
+			'',
+			'READ: timeline/moments/inannas-first-memory.md, timeline/moments/the-first-memory.md,',
+			' raw/interviews/timeline-2026-08-19T08-51-59.md, raw/interviews/timeline-2026-08-19T09-19-46.md',
+		].join('\n');
+
+		expect(parseRequest(reply)).toEqual([
+			'timeline/moments/inannas-first-memory.md',
+			'timeline/moments/the-first-memory.md',
+			'raw/interviews/timeline-2026-08-19T08-51-59.md',
+			'raw/interviews/timeline-2026-08-19T09-19-46.md',
+		]);
+	});
+
+	it('caps how many one request may open', () => {
+		const many = Array.from({length: 20}, (_unused, i) => `p${String(i)}.md`).join(', ');
+		expect(parseRequest(`READ: ${many}`)).toHaveLength(6);
 	});
 
 	it('is not confused by an ordinary answer', () => {
 		expect(parseRequest('I would read characters/inanna.md first.')).toBeUndefined();
 		expect(parseRequest('')).toBeUndefined();
+		// A READ with no path is not a request it can act on.
+		expect(parseRequest('READ: nothing in particular')).toBeUndefined();
 	});
 });
 
@@ -156,6 +196,39 @@ describe('the architect opening a file mid-answer', () => {
 
 		expect(shown).toBe('Her page links the farm. Here is the fix.');
 		expect(shown).not.toContain('READ:');
+	});
+
+	/**
+	 * The reported failure end to end: reasoning, then a wrapped request. The
+	 * reasoning is worth showing — it says why a file is wanted — and the
+	 * request must be acted on rather than displayed.
+	 */
+	it('acts on a request that follows reasoning, and shows only the reasoning', async () => {
+		await write(
+			'timeline/moments/the-first-memory.md',
+			'---\nid: the-first-memory\n---\n\nUndated.\n',
+		);
+		const {session: s, seen} = await session([
+			[
+				'Before I propose the merge, I want to pin provenance.',
+				'',
+				'READ: timeline/moments/the-first-memory.md,',
+				' timeline/moments/inannas-first-memory.md',
+			].join('\n'),
+			'Merged. Keep the dated one.',
+		]);
+
+		const shown = await drain(
+			s.ask('merge the duplicates', new AbortController().signal),
+		);
+
+		expect(shown).toContain('pin provenance');
+		expect(shown).not.toContain('READ:');
+		expect(shown).not.toContain('the-first-memory.md');
+		expect(shown).toContain('Merged.');
+
+		expect(seen).toHaveLength(2);
+		expect(seen[1]!.map(m => m.content).join('\n')).toContain('Undated.');
 	});
 
 	it('puts the file in front of it on the second pass', async () => {

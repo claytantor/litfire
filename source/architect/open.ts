@@ -14,33 +14,50 @@ export const MAX_BYTES = 40_000;
  */
 export const MAX_ROUNDS = 2;
 
-/** The line the architect emits to ask for files it has not been given. */
-const REQUEST = /^\s*READ:\s*(.+)$/im;
+/** Where a request starts. Everything after it is taken to be paths. */
+const REQUEST_START = /^\s*READ:/im;
+
+/** A vault-relative markdown path, as it appears in a request. */
+const PATH = /[\w./@+-]+\.md/g;
 
 /**
- * The first characters of a reply that is a read request rather than an answer.
+ * A single line that is a request rather than prose.
  *
- * Streaming has to decide early whether to show a reply or intercept it, and
- * this is the shortest prefix that settles it. Kept next to `REQUEST` because
- * the two must agree.
+ * Matched per line, because the prefix-of-the-reply test this replaced did not
+ * survive contact with a real model. Told to "reply with nothing but a READ
+ * line", it reliably explains itself first:
+ *
+ *     Before I propose the merge, I want to pin provenance — ...
+ *
+ *     READ: raw/interviews/timeline-2026-08-19T08-51-59.md
+ *
+ * That is reasonable behaviour and worth keeping; the author gets to see why it
+ * is asking. What must not happen is the request reaching the screen while
+ * nothing opens the files, which is exactly what a prefix test produced.
  */
-export const REQUEST_PREFIX = 'READ:';
+export const REQUEST_LINE = /^\s*READ:/i;
 
-/** Paths the architect asked for, or undefined when this is an ordinary reply. */
+/**
+ * Paths the architect asked for, or undefined when this is an ordinary reply.
+ *
+ * Everything from the first `READ:` to the end of the reply is treated as the
+ * request, and every markdown path in it is taken. A request is the last thing
+ * in a reply — there is nothing to say after asking — and reading the whole
+ * tail is what survives the ways a real one is written: wrapped across lines,
+ * comma-separated, backticked, or split into two READ lines.
+ *
+ * Taking a stray path from prose is the harmless direction to be wrong in. This
+ * only ever opens a file for the model to read.
+ */
 export function parseRequest(reply: string): string[] | undefined {
-	const match = REQUEST.exec(reply);
-	if (!match) {
+	const start = REQUEST_START.exec(reply);
+	if (!start) {
 		return undefined;
 	}
 
-	return [
-		...new Set(
-			(match[1] ?? '')
-				.split(/[,\s]+/)
-				.map(entry => entry.trim().replace(/^[`'"]|[`'"]$/g, ''))
-				.filter(entry => entry !== ''),
-		),
-	].slice(0, MAX_FILES);
+	const found = reply.slice(start.index + start[0].length).match(PATH) ?? [];
+	const paths = [...new Set(found)].slice(0, MAX_FILES);
+	return paths.length > 0 ? paths : undefined;
 }
 
 export class UnreadablePathError extends Error {

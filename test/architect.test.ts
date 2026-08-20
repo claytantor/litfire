@@ -228,11 +228,26 @@ describe('the brief', () => {
 		}
 	});
 
-	it('forbids raw and the derived directories in the brief, not just in code', () => {
+	it('forbids the derived directories in the brief, not just in code', () => {
 		// Belt and braces: the path check is what enforces it, but a model told
 		// the rule proposes fewer writes that have to be thrown away.
-		expect(ARCHITECT_PERSONA).toContain("`raw/` is the author's own record");
+		expect(ARCHITECT_PERSONA).toContain('derived and regenerated');
 		expect(ARCHITECT_PERSONA).toContain('Never resolve a contradiction');
+	});
+
+	it('states the higher bar for raw, rather than forbidding it outright', () => {
+		expect(ARCHITECT_PERSONA).toContain("author's own record");
+		expect(ARCHITECT_PERSONA).toContain('never rewrite what the author said');
+	});
+
+	/**
+	 * The conversation writes nothing, and an architect that pastes a finished
+	 * page into a reply leaves the author believing a change landed when it did
+	 * not. It has to name the verb that actually proposes.
+	 */
+	it('tells the author which command turns agreement into diffs', () => {
+		expect(ARCHITECT_PERSONA).toContain('plan <the change');
+		expect(ARCHITECT_PERSONA).toContain('This conversation writes nothing');
 	});
 
 	it('asks the plan for whole files, since a write replaces what is there', () => {

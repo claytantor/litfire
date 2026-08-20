@@ -416,3 +416,42 @@ that is invisible until it costs someone their work.
 Leaving with accepted changes now asks: `ctrl+s` to write them, the same key
 again to discard, anything else to go back. With nothing accepted it still
 leaves at once, because a prompt whose answer is always the same is noise.
+
+## D16 — A request is a line, not a prefix
+
+**Committed:** `READ:` is matched per line anywhere in a reply, and everything
+after it is taken as paths.
+
+D14 decided whether a reply was a request by testing its first characters, on
+the strength of a persona line telling the architect to "reply with nothing but
+a READ line". A real model does not do that. It explains itself first:
+
+```
+Before I propose the merge, I want to pin provenance — the surviving
+page should carry a "Raised in" link to the interview that produced it.
+
+READ: raw/interviews/timeline-2026-08-19T08-51-59.md
+```
+
+The prefix test missed that entirely, so the request reached the screen and
+nothing opened the files. The author asked three times and got the same refusal
+each time, which is the worst possible shape for this failure: the tool looked
+like it was being obstinate while it was in fact never hearing the question.
+
+The explanation is worth keeping — it says _why_ a file is wanted — so the
+reasoning still streams and only the request is swallowed. Once a request line
+appears, nothing more is shown: a request routinely wraps onto a second line,
+and half a path list is worse to look at than none of it.
+
+Paths are collected from the whole tail rather than parsed out of one line,
+which is what survives the ways a real request is written — wrapped, comma
+separated, backticked, or split across two `READ:` lines. Taking a stray path
+from prose is the harmless direction to be wrong in; this only ever opens a file
+for the model to read.
+
+Two stale pieces of the persona went with it. It still said it may never propose
+a write to `raw/`, which D15 changed. And it never mentioned `plan` — so an
+architect asked to fix something would reason at length, offer to "hand you the
+merged page", and leave the author believing a change had landed when the
+conversation writes nothing at all. It now names the command that turns
+agreement into diffs.

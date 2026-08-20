@@ -4,13 +4,7 @@ import type {ConversationTurn} from '../conversation/types.js';
 import type {ChatMessage, Provider} from '../llm/index.js';
 import {ARCHITECT_PERSONA} from './prompts.js';
 import {buildRawContext, renderRawContext} from './raw.js';
-import {
-	MAX_ROUNDS,
-	openFiles,
-	parseRequest,
-	renderOpened,
-	REQUEST_PREFIX,
-} from './open.js';
+import {MAX_ROUNDS, openFiles, parseRequest, renderOpened, REQUEST_LINE} from './open.js';
 
 export type ArchitectSessionOptions = {
 	readonly root: string;
@@ -108,48 +102,57 @@ export class ArchitectSession {
 			const messages = await this.messagesFor(question, opened);
 
 			/**
-			 * Held back until it is clear whether this is an answer or a request:
-			 * `READ:` is the shortest prefix that settles it, so the delay costs a
-			 * few characters rather than the whole reply.
-			 *
-			 * A request is consumed to the end rather than abandoned early — the
-			 * paths are what the round is for, and stopping at the prefix leaves
-			 * nothing to open.
+			 * Streamed a line at a time, holding each until its newline arrives so
+			 * a `READ:` line can be swallowed without swallowing the reasoning
+			 * around it. The author sees why it wants a file; they never see the
+			 * request itself, and never a request that nothing acted on.
 			 */
-			let head = '';
-			let mode: 'deciding' | 'answering' | 'reading' =
-				round < MAX_ROUNDS ? 'deciding' : 'answering';
+			let pending = '';
+			let asking = false;
+			const canRead = round < MAX_ROUNDS;
 			reply = '';
 
 			for await (const delta of this.#options.provider.chat(messages, signal)) {
 				reply += delta;
 
-				if (mode === 'answering') {
+				if (!canRead) {
 					yield delta;
 					continue;
 				}
-				if (mode === 'reading') {
+
+				// Once it has started asking, nothing more reaches the screen: a
+				// request often wraps onto a second line, and half a path list is
+				// worse to look at than none of it. There is nothing to say after
+				// asking anyway.
+				if (asking) {
 					continue;
 				}
 
-				head += delta;
-				if (head.length < REQUEST_PREFIX.length) {
-					continue;
+				pending += delta;
+				let ending = pending.indexOf('\n');
+				while (ending !== -1) {
+					const line = pending.slice(0, ending + 1);
+					pending = pending.slice(ending + 1);
+					if (REQUEST_LINE.test(line)) {
+						asking = true;
+						pending = '';
+						break;
+					}
+					yield line;
+					ending = pending.indexOf('\n');
 				}
-				if (head.trimStart().toUpperCase().startsWith(REQUEST_PREFIX)) {
-					mode = 'reading';
-					continue;
-				}
-				mode = 'answering';
-				yield head;
 			}
 
-			// A reply that finished inside the lookahead was never flushed.
-			if (mode === 'deciding' && head !== '') {
-				yield head;
+			// The last line has no newline to close it.
+			if (canRead && !asking && pending !== '') {
+				if (REQUEST_LINE.test(pending)) {
+					asking = true;
+				} else {
+					yield pending;
+				}
 			}
 
-			const wanted = mode === 'reading' ? parseRequest(reply) : undefined;
+			const wanted = asking ? parseRequest(reply) : undefined;
 			if (wanted === undefined || wanted.length === 0) {
 				break;
 			}
