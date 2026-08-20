@@ -341,3 +341,41 @@ fault is inside Ink's layout, and a single stack trace does not establish which
 pressure produced it. What is certain is that the work removed here was waste:
 Ink debounces its own render, so almost every frame those renders produced was
 computed and discarded.
+
+## D14 — The architect can open a file
+
+**Committed:** a `READ:` round in the conversation, a `read` field in the plan,
+both read-only and both allowed into `raw/`.
+
+The architect is given a map of the whole corpus and the full text of whatever
+scored highest against the question. That selection is a guess made before it
+has read anything, and it is routinely wrong in a specific way: a page it needs
+to rewrite is listed in the map and not in front of it.
+
+What it did then was correct and useless. It refused to emit a replacement for a
+file it could not see and asked the author to paste it — _"Paste either file and
+I'll return it whole with the link fixed."_ Refusing to rewrite unseen prose is
+exactly right; making the author be the file system is not.
+
+So it can ask. A conversational reply beginning `READ:` is intercepted rather
+than shown, the files are opened, and the question is put again with them
+attached. The structural pass asks the same thing through its JSON, returning
+`read` and no writes — writes sent alongside a read are discarded, because they
+were made blind.
+
+Four details:
+
+- **Reads may enter `raw/`.** `resolveReadable` is deliberately not
+  `resolveInsideVault`: the latter forbids `raw/` because the tool never
+  _writes_ to the author's record, and reading the transcript beside the corpus
+  is the entire reason `/architect` exists. Everything else holds — inside the
+  vault, canonically, markdown only, and `.litrpg/` excluded as tool cache.
+- **Two rounds.** Enough to read a page and then the one it links. A third is
+  nearly always the model circling, and each round costs the whole context.
+- **A truncated file is marked as truncated.** An architect rewriting from a
+  silently clipped copy would delete whatever was cut.
+- **Refusals go back to the architect**, not to nobody. One told "that file does
+  not exist" stops asking; one told nothing asks again and burns the round.
+
+**Writing to `raw/` is still forbidden.** Nothing here changes that — `raw/` is
+the author's own record and the tool never writes to it.

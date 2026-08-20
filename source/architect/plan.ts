@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {extractJsonObject} from '../interview/extract.js';
 import type {ChatMessage, Provider} from '../llm/index.js';
 import {resolveInsideVault, type Proposal} from '../review/index.js';
+import {MAX_ROUNDS, openFiles, renderOpened} from './open.js';
 import {PLAN_PERSONA, PLAN_SHAPE} from './prompts.js';
 
 export type PlanOutcome = {
@@ -33,6 +34,15 @@ const planWriteSchema = z.object({
 
 const planSchema = z.object({
 	writes: z.array(planWriteSchema).default([]),
+	/**
+	 * Files it needs before it can propose anything.
+	 *
+	 * The structural pass has the same blind spot as the conversation: the
+	 * context it is given was selected against the instruction, before it had
+	 * read anything. Emitting a rewrite of a file it has not seen is the one
+	 * failure that actually destroys work, so it is given a way to ask instead.
+	 */
+	read: z.array(z.string()).default([]),
 	notes: z.array(z.string()).default([]),
 });
 
@@ -40,6 +50,7 @@ export function buildPlanMessages(
 	instruction: string,
 	context: string,
 	register: string,
+	opened: readonly string[] = [],
 ): ChatMessage[] {
 	return [
 		{
@@ -62,6 +73,7 @@ export function buildPlanMessages(
 				PLAN_SHAPE,
 			].join('\n'),
 		},
+		...opened.map((content): ChatMessage => ({role: 'user', content})),
 	];
 }
 
@@ -84,33 +96,46 @@ export async function runPlan(
 	register: string,
 	signal: AbortSignal,
 ): Promise<PlanOutcome> {
-	let raw = '';
-	try {
-		for await (const delta of provider.chat(
-			buildPlanMessages(instruction, context, register),
-			signal,
-		)) {
-			raw += delta;
-		}
-	} catch (caught) {
-		return {
-			proposals: [],
-			refusals: [],
-			notes: [],
-			error: caught instanceof Error ? caught.message : String(caught),
-		};
-	}
-
+	const opened: string[] = [];
 	let parsed;
-	try {
-		parsed = planSchema.parse(extractJsonObject(raw));
-	} catch (caught) {
-		return {
-			proposals: [],
-			refusals: [],
-			notes: [],
-			error: caught instanceof Error ? caught.message : String(caught),
-		};
+
+	// Rounds, because the pass may need a file before it can propose anything.
+	// It either reads or writes on a given round; a plan that asked for files is
+	// not yet a plan, and its partial writes are discarded rather than kept,
+	// since the point of reading is that they would have been made blind.
+	for (let round = 0; ; round++) {
+		let raw = '';
+		try {
+			for await (const delta of provider.chat(
+				buildPlanMessages(instruction, context, register, opened),
+				signal,
+			)) {
+				raw += delta;
+			}
+		} catch (caught) {
+			return {
+				proposals: [],
+				refusals: [],
+				notes: [],
+				error: caught instanceof Error ? caught.message : String(caught),
+			};
+		}
+
+		try {
+			parsed = planSchema.parse(extractJsonObject(raw));
+		} catch (caught) {
+			return {
+				proposals: [],
+				refusals: [],
+				notes: [],
+				error: caught instanceof Error ? caught.message : String(caught),
+			};
+		}
+
+		if (parsed.read.length === 0 || round >= MAX_ROUNDS) {
+			break;
+		}
+		opened.push(renderOpened(await openFiles(root, parsed.read)));
 	}
 
 	const proposals: Proposal[] = [];
