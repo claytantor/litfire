@@ -38,6 +38,16 @@ a accept · r reject · e edit · A accept-all · ←→ item · ↑↓ scroll
   `.litrpg/` (tool cache), `ledger/` (derived), and `raw/` (author input) are
   refused. A bad path fails that one item; the rest of the batch still applies.
 
+## Where proposals come from
+
+Extraction, `/reviewer`'s correction pass, and `/architect` all produce them.
+The architect may decide to propose on its own — it ends a reply with a plan
+directive and the structural pass runs — or you can ask for one directly with
+`plan <instruction>` inside `/architect`.
+
+Either way nothing has happened yet. A proposal is a suggestion until you accept
+it here, which is why it does not matter who started the pass.
+
 ## Leaving with changes accepted
 
 Accepting marks a decision. Only applying writes it — and until it does, `q` and

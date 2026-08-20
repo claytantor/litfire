@@ -191,3 +191,29 @@ export function renderOpened(opened: Opened): string {
 		'Answer now. Do not ask for more files unless you genuinely cannot proceed.',
 	].join('\n');
 }
+
+/** Where a plan directive starts. Everything after it is the instruction. */
+const PLAN_START = /^\s*PLAN:/im;
+
+/**
+ * A line that hands the reply to the structural pass rather than to the author.
+ *
+ * The architect used to end a reply by asking the author to type its own
+ * conclusion back as a `plan` command. That is friction protecting nothing —
+ * the review gate is what makes a change safe, not the keystrokes that reached
+ * it — and it was worse than friction, because the plan pass then re-derived
+ * everything cold from an instruction string. An architect that had just
+ * computed five timestamps would watch them be worked out again from scratch.
+ */
+export const DIRECTIVE_LINE = /^\s*(READ|PLAN):/i;
+
+/** The instruction the architect wants planned, or undefined. */
+export function parsePlan(reply: string): string | undefined {
+	const start = PLAN_START.exec(reply);
+	if (!start) {
+		return undefined;
+	}
+
+	const instruction = reply.slice(start.index + start[0].length).trim();
+	return instruction === '' ? undefined : instruction;
+}

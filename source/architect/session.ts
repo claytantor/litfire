@@ -4,7 +4,14 @@ import type {ConversationTurn} from '../conversation/types.js';
 import type {ChatMessage, Provider} from '../llm/index.js';
 import {ARCHITECT_PERSONA} from './prompts.js';
 import {buildRawContext, renderRawContext} from './raw.js';
-import {MAX_ROUNDS, openFiles, parseRequest, renderOpened, REQUEST_LINE} from './open.js';
+import {
+	DIRECTIVE_LINE,
+	MAX_ROUNDS,
+	openFiles,
+	parsePlan,
+	parseRequest,
+	renderOpened,
+} from './open.js';
 
 export type ArchitectSessionOptions = {
 	readonly root: string;
@@ -31,6 +38,13 @@ export type ArchitectSessionOptions = {
 export class ArchitectSession {
 	readonly #options: ArchitectSessionOptions;
 	#turns: ConversationTurn[] = [];
+	/**
+	 * What the last reply asked to have planned, if anything.
+	 *
+	 * Read by the caller after `ask` finishes, and cleared when the next one
+	 * starts, so a plan directive can never outlive the reply that made it.
+	 */
+	#plan: string | undefined;
 
 	constructor(options: ArchitectSessionOptions) {
 		this.#options = options;
@@ -38,6 +52,10 @@ export class ArchitectSession {
 
 	get turns(): readonly ConversationTurn[] {
 		return this.#turns;
+	}
+
+	get pendingPlan(): string | undefined {
+		return this.#plan;
 	}
 
 	async messagesFor(
@@ -97,6 +115,7 @@ export class ArchitectSession {
 	async *ask(question: string, signal: AbortSignal): AsyncGenerator<string> {
 		const opened: string[] = [];
 		let reply = '';
+		this.#plan = undefined;
 
 		for (let round = 0; ; round++) {
 			const messages = await this.messagesFor(question, opened);
@@ -108,7 +127,7 @@ export class ArchitectSession {
 			 * request itself, and never a request that nothing acted on.
 			 */
 			let pending = '';
-			let asking = false;
+			let directed = false;
 			const canRead = round < MAX_ROUNDS;
 			reply = '';
 
@@ -120,11 +139,10 @@ export class ArchitectSession {
 					continue;
 				}
 
-				// Once it has started asking, nothing more reaches the screen: a
-				// request often wraps onto a second line, and half a path list is
-				// worse to look at than none of it. There is nothing to say after
-				// asking anyway.
-				if (asking) {
+				// Once a directive starts, nothing more reaches the screen: it often
+				// wraps onto a second line, and half a path list is worse to look at
+				// than none of it. There is nothing to say after one anyway.
+				if (directed) {
 					continue;
 				}
 
@@ -133,8 +151,8 @@ export class ArchitectSession {
 				while (ending !== -1) {
 					const line = pending.slice(0, ending + 1);
 					pending = pending.slice(ending + 1);
-					if (REQUEST_LINE.test(line)) {
-						asking = true;
+					if (DIRECTIVE_LINE.test(line)) {
+						directed = true;
 						pending = '';
 						break;
 					}
@@ -144,15 +162,17 @@ export class ArchitectSession {
 			}
 
 			// The last line has no newline to close it.
-			if (canRead && !asking && pending !== '') {
-				if (REQUEST_LINE.test(pending)) {
-					asking = true;
+			if (canRead && !directed && pending !== '') {
+				if (DIRECTIVE_LINE.test(pending)) {
+					directed = true;
 				} else {
 					yield pending;
 				}
 			}
 
-			const wanted = asking ? parseRequest(reply) : undefined;
+			// Reading comes first when a reply asks for both: files are what the
+			// plan would be written from.
+			const wanted = directed ? parseRequest(reply) : undefined;
 			if (wanted === undefined || wanted.length === 0) {
 				break;
 			}
@@ -161,6 +181,7 @@ export class ArchitectSession {
 			opened.push(renderOpened(files));
 		}
 
+		this.#plan = parsePlan(reply);
 		this.#turns = [
 			...this.#turns,
 			{role: 'author', text: question},

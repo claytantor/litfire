@@ -241,13 +241,22 @@ describe('the brief', () => {
 	});
 
 	/**
-	 * The conversation writes nothing, and an architect that pastes a finished
-	 * page into a reply leaves the author believing a change landed when it did
-	 * not. It has to name the verb that actually proposes.
+	 * A reply reaches no disk, and an architect that pastes a finished page into
+	 * one leaves the author believing a change landed when it did not. It has to
+	 * know how a proposal is actually made.
 	 */
-	it('tells the author which command turns agreement into diffs', () => {
-		expect(ARCHITECT_PERSONA).toContain('plan <the change');
-		expect(ARCHITECT_PERSONA).toContain('This conversation writes nothing');
+	it('knows a reply writes nothing, and how to propose instead', () => {
+		expect(ARCHITECT_PERSONA).toContain('Nothing you write in a reply reaches disk');
+		expect(ARCHITECT_PERSONA).toContain('PLAN:');
+	});
+
+	/**
+	 * The author had been asked to retype the architect's own conclusion — five
+	 * timestamps it had just computed — as a command. That is where a digit gets
+	 * dropped, and the gate is what makes a change safe regardless.
+	 */
+	it('is told not to make the author type the plan', () => {
+		expect(ARCHITECT_PERSONA).toContain('Do not ask the author to type the plan');
 	});
 
 	it('asks the plan for whole files, since a write replaces what is there', () => {

@@ -6,6 +6,7 @@ import {ArchitectSession} from '../source/architect/session.js';
 import {
 	MAX_BYTES,
 	openFiles,
+	parsePlan,
 	parseRequest,
 	renderOpened,
 	resolveReadable,
@@ -162,6 +163,102 @@ function scripted(replies: readonly string[]): {
 		} as unknown as Provider,
 	};
 }
+
+describe('deciding to propose', () => {
+	it('reads a PLAN line and takes everything after it as the instruction', () => {
+		const reply = [
+			'The five undated moments all have dates in the ordered list.',
+			'',
+			'PLAN: set at on bicameral-era -9839232000000, bootstrapping -1009152000000',
+		].join('\n');
+
+		expect(parsePlan(reply)).toBe(
+			'set at on bicameral-era -9839232000000, bootstrapping -1009152000000',
+		);
+	});
+
+	it('takes an instruction that runs on past one line', () => {
+		const reply = 'PLAN: do the first thing,\nand then the second thing';
+		expect(parsePlan(reply)).toBe('do the first thing,\nand then the second thing');
+	});
+
+	it('is not a plan when there is no instruction after it', () => {
+		expect(parsePlan('PLAN:')).toBeUndefined();
+		expect(parsePlan('I could plan that for you.')).toBeUndefined();
+		expect(parsePlan('')).toBeUndefined();
+	});
+});
+
+describe('the architect deciding for itself', () => {
+	async function planning(replies: readonly string[]) {
+		const {provider, seen} = scripted(replies);
+		return {
+			seen,
+			session: new ArchitectSession({
+				root,
+				project: await computeProject(root),
+				provider,
+				register: '',
+			}),
+		};
+	}
+
+	const drain = async (generator: AsyncGenerator<string>) => {
+		let out = '';
+		for await (const delta of generator) {
+			out += delta;
+		}
+		return out;
+	};
+
+	it('offers the instruction to the caller instead of the author', async () => {
+		const {session: s} = await planning([
+			['I will set the five dates.', '', 'PLAN: set at on the five undated moments'].join(
+				'\n',
+			),
+		]);
+
+		const shown = await drain(s.ask('align the dates', new AbortController().signal));
+
+		// The reasoning shows; the directive does not.
+		expect(shown).toContain('I will set the five dates.');
+		expect(shown).not.toContain('PLAN:');
+		expect(s.pendingPlan).toBe('set at on the five undated moments');
+	});
+
+	it('has no pending plan after a reply that did not ask for one', async () => {
+		const {session: s} = await planning(['The farm appears in one situation.']);
+		await drain(s.ask('where is the farm', new AbortController().signal));
+
+		expect(s.pendingPlan).toBeUndefined();
+	});
+
+	it('clears a plan from the previous reply', async () => {
+		const {session: s} = await planning(['PLAN: do the thing', 'Nothing further.']);
+
+		await drain(s.ask('first', new AbortController().signal));
+		expect(s.pendingPlan).toBe('do the thing');
+
+		await drain(s.ask('second', new AbortController().signal));
+		expect(s.pendingPlan).toBeUndefined();
+	});
+
+	/**
+	 * Files are what a plan would be written from, so a reply asking for both
+	 * reads first. The plan directive is re-read from the round that answers.
+	 */
+	it('reads before it plans when a reply asks for both', async () => {
+		await write('characters/inanna.md', '---\nid: inanna\n---\n\nShe lied.\n');
+		const {session: s} = await planning([
+			'READ: characters/inanna.md\nPLAN: too early',
+			'Now I know.\n\nPLAN: fix her page',
+		]);
+
+		await drain(s.ask('fix it', new AbortController().signal));
+
+		expect(s.pendingPlan).toBe('fix her page');
+	});
+});
 
 describe('the architect opening a file mid-answer', () => {
 	async function session(replies: readonly string[]) {

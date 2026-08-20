@@ -455,3 +455,44 @@ architect asked to fix something would reason at length, offer to "hand you the
 merged page", and leave the author believing a change had landed when the
 conversation writes nothing at all. It now names the command that turns
 agreement into diffs.
+
+## D17 — The architect proposes; the gate decides
+
+**Committed:** a `PLAN:` directive the architect ends a reply with, and the
+conversation goes into the structural pass as context.
+
+`/architect` split talking from doing: the conversation wrote nothing, and a
+proposal only happened when the author typed `plan <instruction>`. The intent
+was that a write should sit behind an explicit verb.
+
+It was protecting nothing. **The review gate is what makes a change safe** —
+every proposal arrives as a diff the author accepts one at a time (P3) — and
+that holds however the pass was started. What the verb actually bought was a
+step where the author retypes the architect's own conclusion:
+
+```
+If that all looks right, run:
+
+    plan set at on the five undated moments from the author's ordered list:
+    bicameral-era -9839232000000, bootstrapping -1009152000000, ...
+```
+
+Five timestamps the architect had just computed, handed back for a human to
+copy. That is where a digit gets dropped.
+
+Worse, the pass then re-derived them. It received the instruction string and
+fresh grounding — never the conversation — so the reasoning that produced those
+numbers was thrown away and done again, with nothing guaranteeing the second
+answer matched the first. The conversation is now part of the plan's context,
+told plainly that figures reached there are what the instruction refers to.
+
+The architect ends a reply with `PLAN: <instruction>` and the pass runs. The
+directive is suppressed from the screen the same way `READ:` is, and the
+reasoning before it still shows, so the author sees the shape of the change and
+then the diffs.
+
+Reading still wins when a reply asks for both: files are what a plan would be
+written from.
+
+`plan <instruction>` typed by the author still works. It is now one of two ways
+in rather than the only one.

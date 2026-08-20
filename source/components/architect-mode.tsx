@@ -52,42 +52,66 @@ export function ArchitectMode({rows, columns, ...options}: Props) {
 			setBusy(true);
 
 			void (async () => {
+				/**
+				 * Runs the structural pass and hands its proposals to the gate.
+				 *
+				 * The conversation goes in with the grounding. Without it the pass
+				 * re-derived everything cold from one sentence — an architect that
+				 * had just computed five timestamps would watch them worked out
+				 * again from scratch, and nothing guaranteed the second answer
+				 * matched the first.
+				 */
+				const plan = async (instruction: string) => {
+					setStatus('planning the corpus…');
+					const [corpus, raw] = await Promise.all([
+						buildReviewerContext(root, project, instruction),
+						buildRawContext(root, instruction),
+					]);
+					const context = [
+						'# The corpus',
+						'',
+						corpus,
+						'',
+						'# The raw material',
+						'',
+						renderRawContext(raw),
+						...(session.turns.length === 0
+							? []
+							: [
+									'',
+									'# The conversation so far',
+									'',
+									'This is what was worked out with the author. Numbers, names and',
+									'decisions reached here are what the instruction refers to — use them',
+									'rather than deriving them again.',
+									'',
+									session.turns
+										.map(turn => `**${turn.role}:** ${turn.text}`)
+										.join('\n\n'),
+								]),
+					].join('\n');
+
+					const outcome = await runPlan(
+						provider,
+						root,
+						instruction,
+						context,
+						register,
+						controller.signal,
+					);
+					session.note(
+						outcome.error === undefined
+							? `Proposed ${String(outcome.proposals.length)} file(s).${outcome.notes.length === 0 ? '' : `\n\n${outcome.notes.map(note => `- ${note}`).join('\n')}`}`
+							: `Plan failed: ${outcome.error}`,
+					);
+					setTurns(session.turns);
+					onPlanned(outcome);
+				};
+
 				const planned = PLAN.exec(trimmed);
 				try {
 					if (planned?.[1] !== undefined) {
-						setStatus('planning the corpus…');
-						// The plan sees exactly what the conversation sees, so an
-						// instruction like "do that" refers to the same material the
-						// author was just discussing.
-						const [corpus, raw] = await Promise.all([
-							buildReviewerContext(root, project, planned[1]),
-							buildRawContext(root, planned[1]),
-						]);
-						const context = [
-							'# The corpus',
-							'',
-							corpus,
-							'',
-							'# The raw material',
-							'',
-							renderRawContext(raw),
-						].join('\n');
-
-						const outcome = await runPlan(
-							provider,
-							root,
-							planned[1],
-							context,
-							register,
-							controller.signal,
-						);
-						session.note(
-							outcome.error === undefined
-								? `Proposed ${String(outcome.proposals.length)} file(s).${outcome.notes.length === 0 ? '' : `\n\n${outcome.notes.map(note => `- ${note}`).join('\n')}`}`
-								: `Plan failed: ${outcome.error}`,
-						);
-						setTurns(session.turns);
-						onPlanned(outcome);
+						await plan(planned[1]);
 						return;
 					}
 
@@ -98,6 +122,14 @@ export function ArchitectMode({rows, columns, ...options}: Props) {
 					}
 					paint.flush();
 					setTurns(session.turns);
+
+					// The architect may decide the next step itself. The gate is what
+					// makes a change safe, not the keystrokes that reached it, so
+					// asking the author to retype a conclusion they had just been
+					// given was friction protecting nothing.
+					if (session.pendingPlan !== undefined) {
+						await plan(session.pendingPlan);
+					}
 				} catch (caught) {
 					session.recordFailure(
 						trimmed,
