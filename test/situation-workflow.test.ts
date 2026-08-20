@@ -125,6 +125,52 @@ describe('the documented workflow', () => {
 		expect(index?.body).toContain('Situations (');
 	});
 
+	/**
+	 * The reported failure: linking a scene to a moment wrote the frontmatter,
+	 * and the moment's page never mentioned it. A link the wiki shows from only
+	 * one end looks, after a rebuild, exactly like a link that did not happen.
+	 */
+	it('shows the link from the moment’s end as well as the scene’s', async () => {
+		await writeMoment('the-breach', 0);
+		await run('/situation new The Ledger Room');
+		await refresh();
+		await run('/situation sit-002 moment the-breach');
+		await run('/situation sit-002 place the-atrium');
+
+		const pages = buildWiki(context.project!).pages;
+		const moment = pages.find(p => p.kind === 'moment' && p.id === 'the-breach');
+
+		expect(moment?.body).toContain('Scenes anchored here');
+		expect(moment?.body).toContain('[[sit-002|The Ledger Room]]');
+		// And where it happens, so the moment page is navigable on its own.
+		expect(moment?.body).toContain('[[the-atrium]]');
+		// The index says how many, so a moment nothing happens at is visible.
+		expect(moment?.summary).toContain('1 scene');
+	});
+
+	it('says plainly when nothing happens at a moment', async () => {
+		await writeMoment('the-breach', 0);
+
+		const moment = buildWiki(context.project!).pages.find(
+			p => p.kind === 'moment' && p.id === 'the-breach',
+		);
+		expect(moment?.body).toContain('no situation says it happens at this moment');
+		expect(moment?.summary).not.toContain('scene');
+	});
+
+	it('marks an anchored scene that is still in the inbox', async () => {
+		await writeMoment('the-breach', 0);
+		await run('/situation new The Ledger Room');
+		await refresh();
+		await run('/situation sit-002 moment the-breach');
+
+		const moment = buildWiki(context.project!).pages.find(
+			p => p.kind === 'moment' && p.id === 'the-breach',
+		);
+		// It has a moment but no arc, so it contributes nothing to replay yet.
+		expect(moment?.body).toContain('unplaced');
+	});
+
 	it('says on the page what is still unlinked, rather than looking finished', async () => {
 		await run('/situation new A Bare Scene');
 		await refresh();

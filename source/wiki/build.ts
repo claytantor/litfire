@@ -804,6 +804,18 @@ function buildMomentPage(moment: Moment, project: Project, ctx: StepContext): Wi
 		.toSorted((a, b) => a.id.localeCompare(b.id));
 	const placed = ctx.sequenceIndex.has(moment.id);
 
+	/**
+	 * The scenes that say they happen here.
+	 *
+	 * `situation.moment` was read in one direction only: a scene's page named
+	 * its moment and the moment's page never named the scene, so linking one
+	 * and rebuilding looked like nothing had happened. A link the wiki shows
+	 * from one end is half a link.
+	 */
+	const scenes = project.vault.situations
+		.filter(situation => situation.moment === moment.id)
+		.toSorted(bySequenceThenId(ctx));
+
 	const body = [
 		`# ${title}`,
 		'',
@@ -831,6 +843,19 @@ function buildMomentPage(moment: Moment, project: Project, ctx: StepContext): Wi
 			? '_No ledger events._'
 			: moment.events.map(event => `- \`${event.type}\` — ${event.actor}`).join('\n'),
 		'',
+		'## Scenes anchored here',
+		'',
+		scenes.length === 0
+			? '_None — no situation says it happens at this moment._'
+			: scenes
+					.map(situation => {
+						const where =
+							situation.place === undefined ? '' : ` at [[${situation.place}]]`;
+						const unplaced = situation.arc === undefined ? ' — unplaced' : '';
+						return `- [[${situation.id}|${situation.title ?? situation.id}]]${where}${unplaced}`;
+					})
+					.join('\n'),
+		'',
 		'## Arcs anchored to it',
 		'',
 		anchored.length === 0
@@ -852,10 +877,15 @@ function buildMomentPage(moment: Moment, project: Project, ctx: StepContext): Wi
 		id: moment.id,
 		...(moment.at === undefined ? {} : {sortKey: moment.at}),
 		title,
-		summary:
-			moment.at === undefined
-				? `undated, ${plural(moment.events.length, 'event')}`
-				: `at ${grouped(moment.at)}, ${plural(moment.events.length, 'event')}${placed ? '' : ', unplaced'}`,
+		// The scene count earns its place in the index: it is what says whether a
+		// moment is a turning point the story actually visits or one nothing has
+		// been written at yet.
+		summary: [
+			moment.at === undefined ? 'undated' : `at ${grouped(moment.at)}`,
+			plural(moment.events.length, 'event'),
+			...(scenes.length > 0 ? [plural(scenes.length, 'scene')] : []),
+			...(moment.at !== undefined && !placed ? ['unplaced'] : []),
+		].join(', '),
 		body,
 	};
 }

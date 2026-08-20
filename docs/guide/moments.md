@@ -69,8 +69,13 @@ reports them, so they are never silently inert.
 Shows its time three ways, what it changes in the ledger, and the two things
 that point at it:
 
-- **Scenes anchored here** — situations with `moment: the-substrate-patch`.
+- **Scenes anchored here** — situations with `moment: the-substrate-patch`,
+  where each happens, and whether it is still unplaced.
 - **Arcs starting after it** — arcs with `starts_after: the-substrate-patch`.
+
+The wiki page carries the same two sections, and the index says how many scenes
+a moment holds — which is what distinguishes a turning point the story visits
+from one nothing has been written at yet.
 
 Both are listed because re-dating or removing a moment moves everything hanging
 off it, and that should never be a surprise.
