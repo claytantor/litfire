@@ -326,7 +326,22 @@ describe('buildWiki — index', () => {
 				page.title.toLowerCase() === page.id.toLowerCase()
 					? `[[${page.id}]]`
 					: `[[${page.id}|${page.title}]]`;
-			expect(index.body).toContain(`${link} — ${page.summary}`);
+			// The id follows the link in code, on every row: it is the handle a
+			// command takes, and a wikilink shows whichever of name or id the
+			// page happened to choose.
+			expect(index.body).toContain(`${link} \`${page.id}\` — ${page.summary}`);
+		}
+	});
+
+	it('sets every id in code, including where it matches the name', async () => {
+		const wiki = buildWiki(await project());
+		const index = findPage(wiki.pages, 'index', 'index');
+
+		for (const page of wiki.pages) {
+			if (page.kind === 'index') {
+				continue;
+			}
+			expect(index.body, page.id).toContain(`\`${page.id}\``);
 		}
 	});
 

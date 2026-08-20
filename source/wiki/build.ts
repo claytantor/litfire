@@ -1443,11 +1443,26 @@ function buildIndexPage(pages: readonly WikiPage[]): WikiPage {
 			// wikilink resolves against — but the id is a slug, and an index that
 			// shows slugs tells the author "system" about a thing they named The
 			// Lathe. Obsidian's alias form gives both: real target, real name.
-			...entries.map(page =>
-				page.title.toLowerCase() === page.id.toLowerCase()
-					? `- [[${page.id}]] — ${page.summary}`
-					: `- [[${page.id}|${page.title}]] — ${page.summary}`,
-			),
+			/**
+			 * Name, then id in code, then what it is.
+			 *
+			 * The id is set in code because that is what it is: the thing you type
+			 * into `/situation <id> arc <arc>`, not a word in a sentence. A reader
+			 * scanning this index is usually looking for the handle rather than
+			 * the name, and a wikilink displays whichever of the two the page
+			 * chose — so the id was visible on some rows and hidden on others.
+			 *
+			 * Shown even when it matches the name. The mild repetition buys a
+			 * column that is in the same place on every row, which is what makes
+			 * it scannable.
+			 */
+			...entries.map(page => {
+				const link =
+					page.title.toLowerCase() === page.id.toLowerCase()
+						? `[[${page.id}]]`
+						: `[[${page.id}|${page.title}]]`;
+				return `- ${link} \`${page.id}\` — ${page.summary}`;
+			}),
 		];
 	});
 
