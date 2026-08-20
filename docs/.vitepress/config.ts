@@ -45,6 +45,8 @@ export default defineConfig({
 					{text: 'Commands', link: '/guide/commands'},
 					{text: 'Writing a scene', link: '/guide/writing-a-scene'},
 					{text: 'Populating a situation', link: '/guide/populating-a-situation'},
+					{text: 'Moments', link: '/guide/moments'},
+					{text: 'Places', link: '/guide/places'},
 					{text: 'Interviews', link: '/guide/interviews'},
 					{text: 'Review gate', link: '/guide/review-gate'},
 					{text: 'The reviewer', link: '/guide/reviewer'},
@@ -55,6 +57,7 @@ export default defineConfig({
 				text: 'Concepts',
 				items: [
 					{text: 'Architecture', link: '/concepts/architecture'},
+					{text: 'Primitives', link: '/concepts/primitives'},
 					{text: 'Character systems', link: '/concepts/character-systems'},
 					{text: 'Artifacts', link: '/concepts/artifacts'},
 					{text: 'Assembly', link: '/concepts/assembly'},

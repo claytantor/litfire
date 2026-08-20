@@ -110,6 +110,8 @@ The README is the short version. Everything below lives on the
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | [Writing a scene](https://claytantor.github.io/litfire/guide/writing-a-scene)               | The native prose buffer                           |
 | [Populating a situation](https://claytantor.github.io/litfire/guide/populating-a-situation) | Linking a scene to characters, places and moments |
+| [Moments](https://claytantor.github.io/litfire/guide/moments)                               | Points on the clock: create, time, describe       |
+| [Places](https://claytantor.github.io/litfire/guide/places)                                 | Somewhere a scene happens                         |
 | [Interviews](https://claytantor.github.io/litfire/guide/interviews)                         | How the world gets built, and the interview agent |
 | [Review gate](https://claytantor.github.io/litfire/guide/review-gate)                       | How a model-proposed write reaches disk           |
 | [The reviewer](https://claytantor.github.io/litfire/guide/reviewer)                         | A literary editor over the rendered corpus        |
@@ -118,6 +120,7 @@ The README is the short version. Everything below lives on the
 | Concepts                                                                             |                                                    |
 | ------------------------------------------------------------------------------------ | -------------------------------------------------- |
 | [Architecture](https://claytantor.github.io/litfire/concepts/architecture)           | How the pieces fit                                 |
+| [Primitives](https://claytantor.github.io/litfire/concepts/primitives)               | Everything with an id, and how it links            |
 | [Character systems](https://claytantor.github.io/litfire/concepts/character-systems) | Stats, skills, curves, and porting between systems |
 | [Artifacts](https://claytantor.github.io/litfire/concepts/artifacts)                 | What a character uses to achieve an outcome        |
 | [Assembly](https://claytantor.github.io/litfire/concepts/assembly)                   | Situations into chapters into a manuscript         |
