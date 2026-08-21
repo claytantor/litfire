@@ -93,6 +93,7 @@ export default defineConfig({
 								link: '/project/proposals/documentation-site',
 							},
 							{text: 'Raw-first authoring', link: '/project/proposals/raw-first'},
+							{text: 'One verb for asking', link: '/project/proposals/questions'},
 						],
 					},
 				],
