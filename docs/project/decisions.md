@@ -72,13 +72,13 @@ The two collided. `$EDITOR` (D4) is what `/situation new` shells out to and what
 `^e` reaches from the prose buffer — the program the author writes in. `/editor`
 was also the model that reads the finished corpus and proposes corrections. Every
 sentence about either one had to say which was meant, and the shared conversation
-screen defaulted its speaker to `editor`, which is how `/architect` came to greet
+screen defaulted its speaker to `editor`, which is how `/curator` came to greet
 authors under the wrong name.
 
 The agent is now `/reviewer`, and `source/reviewer/` holds it. `source/editor/`
 keeps only `buffer.ts`, the in-app prose buffer, because that genuinely is an
 editor. The conversation types moved to `source/conversation/types.ts` with the
-role `agent` rather than `editor`, so `/architect` no longer imports a type named
+role `agent` rather than `editor`, so `/curator` no longer imports a type named
 after the other agent, and the screen's `speaker` prop is required — a shared
 screen that can default to a name is a screen that will eventually show the wrong
 one.
@@ -254,7 +254,7 @@ rules as a write.
 
 Corpus is generated, and generation makes duplicates. Extraction run twice over
 one interview slugged the same event two ways and left `inannas-first-memory`
-and `the-first-memory` — distinct ids, one name, one moment. The architect could
+and `the-first-memory` — distinct ids, one name, one moment. The curator could
 see it and could not fix it: a `Proposal` was `{path, contents}` with no way to
 say "this should not exist", and its prompt said so outright — _"you cannot
 delete"_. The tool could create the mess and not clear it up.
@@ -318,7 +318,7 @@ the caller has to read off disk on the view's behalf.
 
 **Committed:** at most one repaint per 50ms while a reply streams.
 
-Every streaming screen — interview, reviewer, architect — accumulated a reply
+Every streaming screen — interview, reviewer, curator — accumulated a reply
 delta by delta and set state on each one. A provider delivers a reply as
 hundreds or thousands of deltas, so that is hundreds or thousands of React
 renders per reply, each one asking Ink to rebuild the tree.
@@ -326,7 +326,7 @@ renders per reply, each one asking Ink to rebuild the tree.
 `ConversationScreen` made it quadratic. Its `speakers` record was rebuilt on
 every render and sat in the dependency array of the memo that wraps the _entire_
 conversation, so every token re-wrapped every turn that had ever been said. A
-long architect session therefore did more string work per token the longer it
+long curator session therefore did more string work per token the longer it
 ran, while the terminal was at its busiest.
 
 Both are fixed: the record is memoised on the speaker, and `streamPainter`
@@ -335,19 +335,19 @@ than anyone reads. Nothing is dropped; `flush()` is mandatory because the last
 tokens almost always arrive inside the final interval.
 
 This was found after a `RuntimeError: memory access out of bounds` inside
-`yoga-layout`'s WASM, thrown from Ink's debounced renderer during an architect
+`yoga-layout`'s WASM, thrown from Ink's debounced renderer during a curator
 reply. The render storm is a plausible contributor and not a proven cause — the
 fault is inside Ink's layout, and a single stack trace does not establish which
 pressure produced it. What is certain is that the work removed here was waste:
 Ink debounces its own render, so almost every frame those renders produced was
 computed and discarded.
 
-## D14 — The architect can open a file
+## D14 — The curator can open a file
 
 **Committed:** a `READ:` round in the conversation, a `read` field in the plan,
 both read-only and both allowed into `raw/`.
 
-The architect is given a map of the whole corpus and the full text of whatever
+The curator is given a map of the whole corpus and the full text of whatever
 scored highest against the question. That selection is a guess made before it
 has read anything, and it is routinely wrong in a specific way: a page it needs
 to rewrite is listed in the map and not in front of it.
@@ -368,19 +368,19 @@ Four details:
 - **Reads may enter `raw/`.** `resolveReadable` is deliberately not
   `resolveInsideVault`: the latter forbids `raw/` because the tool never
   _writes_ to the author's record, and reading the transcript beside the corpus
-  is the entire reason `/architect` exists. Everything else holds — inside the
+  is the entire reason `/curator` exists. Everything else holds — inside the
   vault, canonically, markdown only, and `.litrpg/` excluded as tool cache.
 - **Two rounds.** Enough to read a page and then the one it links. A third is
   nearly always the model circling, and each round costs the whole context.
-- **A truncated file is marked as truncated.** An architect rewriting from a
+- **A truncated file is marked as truncated.** A curator rewriting from a
   silently clipped copy would delete whatever was cut.
-- **Refusals go back to the architect**, not to nobody. One told "that file does
+- **Refusals go back to the curator**, not to nobody. One told "that file does
   not exist" stops asking; one told nothing asks again and burns the round.
 
 **Writing to `raw/` is still forbidden.** Nothing here changes that — `raw/` is
 the author's own record and the tool never writes to it.
 
-## D15 — The architect may propose changes to raw, and the gate asks before losing them
+## D15 — The curator may propose changes to raw, and the gate asks before losing them
 
 **Committed:** `allowRaw` on the batch, not on the proposal; and `q`/`esc` now
 confirm when accepted changes have not been written.
@@ -389,18 +389,18 @@ confirm when accepted changes have not been written.
 
 `raw/` was closed to every agent, because it is the author's own record and the
 whole reason it can be trusted is that only they write it. That held until the
-architect was asked to reconcile a corpus against the material it came from and
+curator was asked to reconcile a corpus against the material it came from and
 found the error was _in the record_ — a name the transcript spells one way and
 the vault another. It could describe the problem and not fix it.
 
-So the architect may propose there, and only the architect: extraction and the
+So the curator may propose there, and only the curator: extraction and the
 reviewer keep the old rule. The permission belongs to the **batch**, not to a
 proposal — a proposal that could grant itself the right to rewrite a transcript
 would be no rule at all. `ReviewBatch.create(root, proposals, {allowRaw: true})`
 is called in exactly one place.
 
 Nothing else moves. `ledger/`, `wiki/`, `manuscript.md` and `.litrpg/` stay
-closed to everyone, including the architect, because they are derived and a
+closed to everyone, including the curator, because they are derived and a
 write there is overwritten on the next recompute. A raw proposal is labelled
 `(your raw record)` in the gate so it never reads as an ordinary corpus write,
 and the persona is explicit that it corrects what is wrong _about_ the record
@@ -423,7 +423,7 @@ leaves at once, because a prompt whose answer is always the same is noise.
 after it is taken as paths.
 
 D14 decided whether a reply was a request by testing its first characters, on
-the strength of a persona line telling the architect to "reply with nothing but
+the strength of a persona line telling the curator to "reply with nothing but
 a READ line". A real model does not do that. It explains itself first:
 
 ```
@@ -451,24 +451,24 @@ for the model to read.
 
 Two stale pieces of the persona went with it. It still said it may never propose
 a write to `raw/`, which D15 changed. And it never mentioned `plan` — so an
-architect asked to fix something would reason at length, offer to "hand you the
+curator asked to fix something would reason at length, offer to "hand you the
 merged page", and leave the author believing a change had landed when the
 conversation writes nothing at all. It now names the command that turns
 agreement into diffs.
 
-## D17 — The architect proposes; the gate decides
+## D17 — The curator proposes; the gate decides
 
-**Committed:** a `PLAN:` directive the architect ends a reply with, and the
+**Committed:** a `PLAN:` directive the curator ends a reply with, and the
 conversation goes into the structural pass as context.
 
-`/architect` split talking from doing: the conversation wrote nothing, and a
+`/curator` split talking from doing: the conversation wrote nothing, and a
 proposal only happened when the author typed `plan <instruction>`. The intent
 was that a write should sit behind an explicit verb.
 
 It was protecting nothing. **The review gate is what makes a change safe** —
 every proposal arrives as a diff the author accepts one at a time (P3) — and
 that holds however the pass was started. What the verb actually bought was a
-step where the author retypes the architect's own conclusion:
+step where the author retypes the curator's own conclusion:
 
 ```
 If that all looks right, run:
@@ -477,7 +477,7 @@ If that all looks right, run:
     bicameral-era -9839232000000, bootstrapping -1009152000000, ...
 ```
 
-Five timestamps the architect had just computed, handed back for a human to
+Five timestamps the curator had just computed, handed back for a human to
 copy. That is where a digit gets dropped.
 
 Worse, the pass then re-derived them. It received the instruction string and
@@ -486,7 +486,7 @@ numbers was thrown away and done again, with nothing guaranteeing the second
 answer matched the first. The conversation is now part of the plan's context,
 told plainly that figures reached there are what the instruction refers to.
 
-The architect ends a reply with `PLAN: <instruction>` and the pass runs. The
+The curator ends a reply with `PLAN: <instruction>` and the pass runs. The
 directive is suppressed from the screen the same way `READ:` is, and the
 reasoning before it still shows, so the author sees the shape of the change and
 then the diffs.
@@ -504,7 +504,7 @@ in rather than the only one.
 The interviews go one way — ask, transcribe, extract. An author who already
 knows their world works the other way: they write it into `raw/characters/` and
 `raw/moments/` and want the corpus to catch up. There was no path from a page of
-notes to a page in the vault except describing it to the architect in
+notes to a page in the vault except describing it to the curator in
 conversation.
 
 Ingest is not a new agent. It builds an instruction and a context and hands them
@@ -524,7 +524,7 @@ Three things the instruction is explicit about, each for a failure seen before:
 - **Never invent.** A field the notes do not answer is left out for the checks
   to raise.
 
-The raw directory is read and never written. `/architect` remains the one agent
+The raw directory is read and never written. `/curator` remains the one agent
 that may propose into `raw/` (D15), which is a different job: correcting the
 record, not deriving from it.
 
@@ -569,3 +569,27 @@ what let ingest propose removing the lesser copy (D18).
 
 **Still open:** whether the corpus should be authored at all, or derived wholly
 from `raw/`. That is a larger question than this one and is not settled here.
+
+## D20 — /architect becomes /curator
+
+**Committed:** the agent is a curator, and the module, persona and command say so.
+
+`architect` described the wrong job. An architect designs a structure that does
+not exist yet. What this agent does is take what fits out of raw material and
+place it in a knowledge base that is orderly, linked and cited — which is
+curation, and naming it that changes what it reaches for.
+
+The persona changed with the name rather than only the word. It used to open
+"you are the architect of a LitRPG vault: a structural editor", which invited
+designing. It now opens on the actual job: an author writes down what they know
+and it accumulates faster than it organises; take what fits, shelve it in the
+kind it belongs to, under an id everything else can resolve, carrying a link to
+whatever established it. **The writing is theirs; the shelving is yours.**
+
+`source/curator/`, `CuratorSession`, `CURATOR_PERSONA`, `/curator`. Earlier
+decision records are updated to the new name so a reader following a reference
+finds a command that exists — the history is what the entry says, not which noun
+it used.
+
+`docs/concepts/architecture.md` is unaffected. That is the tool's architecture,
+which is a different word doing an honest job.

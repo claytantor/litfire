@@ -22,7 +22,7 @@ const planWriteSchema = z.object({
 	/**
 	 * Remove the file rather than write it.
 	 *
-	 * The architect's job is the shape of the corpus, and shape includes what
+	 * The curator's job is the shape of the corpus, and shape includes what
 	 * should not be there: extraction run twice over one interview leaves two
 	 * pages for one moment, and until this existed the agent that noticed could
 	 * only describe the problem. A removal still lands as a diff through the
@@ -80,12 +80,12 @@ export function buildPlanMessages(
 /**
  * Runs the structural pass.
  *
- * Unlike `/reviewer`'s correction pass there is no content guard: the architect is
+ * Unlike `/reviewer`'s correction pass there is no content guard: the curator is
  * *supposed* to move things around, so a guard that rejected structural change
  * would reject the feature. What stands in its place is `resolveInsideVault` —
  * the same path check every proposal in this tool passes — and the review gate,
  * where the author sees each rewrite as a diff before any of it lands. A refused
- * path is reported rather than dropped, so an architect reaching for `raw/` is
+ * path is reported rather than dropped, so an curator reaching for `raw/` is
  * visible instead of silently ignored.
  */
 export async function runPlan(

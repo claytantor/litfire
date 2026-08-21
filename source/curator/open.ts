@@ -38,7 +38,7 @@ const PATH = /[\w./@+-]+\.md/g;
 export const REQUEST_LINE = /^\s*READ:/i;
 
 /**
- * Paths the architect asked for, or undefined when this is an ordinary reply.
+ * Paths the curator asked for, or undefined when this is an ordinary reply.
  *
  * Everything from the first `READ:` to the end of the reply is treated as the
  * request, and every markdown path in it is taken. A request is the last thing
@@ -68,18 +68,18 @@ export class UnreadablePathError extends Error {
 }
 
 /**
- * Resolves a path the architect may *read*.
+ * Resolves a path the curator may *read*.
  *
  * Deliberately not `resolveInsideVault`, which governs writing and is stricter
  * in the one place that matters here: it forbids `raw/` outright, because the
  * tool never writes to the author's own record. Reading it is the opposite —
- * seeing the transcript beside the corpus is the entire reason `/architect`
+ * seeing the transcript beside the corpus is the entire reason `/curator`
  * exists, and refusing to open the material it is reasoning about would make
  * the feature pointless.
  *
  * Everything else stays: inside the vault, canonically, and markdown only.
  * `.litrpg/` is excluded because it is the tool's own cache and holds nothing
- * an architect should reason from.
+ * an curator should reason from.
  */
 export function resolveReadable(root: string, candidate: string): string {
 	const trimmed = candidate.trim();
@@ -123,7 +123,7 @@ export type Opened = {
 /**
  * Opens what was asked for, within the budget.
  *
- * A refusal is handed back to the architect rather than dropped: an agent told
+ * A refusal is handed back to the curator rather than dropped: an agent told
  * "that file does not exist" stops asking for it, while one told nothing asks
  * again and burns the next round.
  */
@@ -157,7 +157,7 @@ export async function openFiles(
 			continue;
 		}
 
-		// Truncation is marked rather than quiet: an architect that rewrites a
+		// Truncation is marked rather than quiet: an curator that rewrites a
 		// file from a silently clipped copy would delete whatever was cut.
 		const clipped = contents.length > remaining;
 		const text = clipped ? contents.slice(0, remaining) : contents;
@@ -179,7 +179,7 @@ export async function openFiles(
 	return {blocks, paths, refusals};
 }
 
-/** The opened files and refusals, as a message the architect can read. */
+/** The opened files and refusals, as a message the curator can read. */
 export function renderOpened(opened: Opened): string {
 	return [
 		'# Files you asked for',
@@ -198,16 +198,16 @@ const PLAN_START = /^\s*PLAN:/im;
 /**
  * A line that hands the reply to the structural pass rather than to the author.
  *
- * The architect used to end a reply by asking the author to type its own
+ * The curator used to end a reply by asking the author to type its own
  * conclusion back as a `plan` command. That is friction protecting nothing —
  * the review gate is what makes a change safe, not the keystrokes that reached
  * it — and it was worse than friction, because the plan pass then re-derived
- * everything cold from an instruction string. An architect that had just
+ * everything cold from an instruction string. An curator that had just
  * computed five timestamps would watch them be worked out again from scratch.
  */
 export const DIRECTIVE_LINE = /^\s*(READ|PLAN):/i;
 
-/** The instruction the architect wants planned, or undefined. */
+/** The instruction the curator wants planned, or undefined. */
 export function parsePlan(reply: string): string | undefined {
 	const start = PLAN_START.exec(reply);
 	if (!start) {

@@ -240,30 +240,30 @@ describe('who the author is talking to', () => {
 
 		expect(frame).toContain('reviewer');
 		expect(frame).toContain('ask the reviewer…');
-		expect(frame).not.toContain('architect');
+		expect(frame).not.toContain('curator');
 		ui.unmount();
 	});
 
-	it('names the architect throughout when it is the architect', async () => {
-		// The reported bug: `/architect` greeted the author as the editor. They do
+	it('names the curator throughout when it is the curator', async () => {
+		// The reported bug: `/curator` greeted the author as the editor. They do
 		// different jobs — one shapes raw material into corpus, the other corrects
 		// prose — and a screen that misnames itself is worse than an unnamed one.
 		// The screen has no default speaker now, which is why it cannot recur.
-		const ui = mount({turns, speaker: 'architect'});
+		const ui = mount({turns, speaker: 'curator'});
 		await flush();
 		const frame = ui.lastFrame() ?? '';
 
-		expect(frame).toContain('architect');
-		expect(frame).toContain('ask the architect…');
+		expect(frame).toContain('curator');
+		expect(frame).toContain('ask the curator…');
 		// Not one mention of the other agent survives.
 		expect(frame).not.toContain('reviewer');
 		ui.unmount();
 	});
 
 	it('names it in the busy line too', async () => {
-		const ui = mount({turns, speaker: 'architect', busy: true});
+		const ui = mount({turns, speaker: 'curator', busy: true});
 		await flush();
-		expect(ui.lastFrame() ?? '').toContain('the architect is replying…');
+		expect(ui.lastFrame() ?? '').toContain('the curator is replying…');
 		ui.unmount();
 	});
 });

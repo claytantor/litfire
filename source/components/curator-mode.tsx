@@ -1,10 +1,10 @@
 import {useCallback, useRef, useState} from 'react';
-import {ArchitectSession, runPlan, type PlanOutcome} from '../architect/index.js';
+import {CuratorSession, runPlan, type PlanOutcome} from '../curator/index.js';
 import {buildReviewerContext} from '../reviewer/corpus.js';
 import type {ConversationTurn} from '../conversation/types.js';
 import type {Project} from '../core/project.js';
 import type {Provider} from '../llm/index.js';
-import {buildRawContext, renderRawContext} from '../architect/raw.js';
+import {buildRawContext, renderRawContext} from '../curator/raw.js';
 import {streamPainter} from '../hooks/use-stream-paint.js';
 import {ConversationScreen} from './conversation-screen.js';
 
@@ -12,7 +12,7 @@ type Props = {
 	readonly root: string;
 	readonly project: Project;
 	readonly provider: Provider;
-	readonly session: ArchitectSession;
+	readonly session: CuratorSession;
 	readonly register: string;
 	readonly rows: number;
 	readonly columns: number;
@@ -24,15 +24,15 @@ type Props = {
 const PLAN = /^plan\s+(.+)$/is;
 
 /**
- * Binds the architect to the shared conversation screen.
+ * Binds the curator to the shared conversation screen.
  *
  * The split mirrors `/reviewer`: talking is free and changes nothing, and a write
  * only ever happens behind an explicit verb. Here that verb is `plan`, and what
  * it produces goes to the same review gate as every other proposal in the tool —
- * the architect may restructure a world, but not without the author reading each
+ * the curator may restructure a world, but not without the author reading each
  * diff first.
  */
-export function ArchitectMode({rows, columns, ...options}: Props) {
+export function CuratorMode({rows, columns, ...options}: Props) {
 	const {root, project, provider, session, register, onPlanned, onExit} = options;
 	const [turns, setTurns] = useState<readonly ConversationTurn[]>(session.turns);
 	const [streaming, setStreaming] = useState<string | undefined>(undefined);
@@ -56,7 +56,7 @@ export function ArchitectMode({rows, columns, ...options}: Props) {
 				 * Runs the structural pass and hands its proposals to the gate.
 				 *
 				 * The conversation goes in with the grounding. Without it the pass
-				 * re-derived everything cold from one sentence — an architect that
+				 * re-derived everything cold from one sentence — an curator that
 				 * had just computed five timestamps would watch them worked out
 				 * again from scratch, and nothing guaranteed the second answer
 				 * matched the first.
@@ -123,7 +123,7 @@ export function ArchitectMode({rows, columns, ...options}: Props) {
 					paint.flush();
 					setTurns(session.turns);
 
-					// The architect may decide the next step itself. The gate is what
+					// The curator may decide the next step itself. The gate is what
 					// makes a change safe, not the keystrokes that reached it, so
 					// asking the author to retype a conclusion they had just been
 					// given was friction protecting nothing.
@@ -165,7 +165,7 @@ export function ArchitectMode({rows, columns, ...options}: Props) {
 			columns={columns}
 			onSubmit={submit}
 			onCancel={cancel}
-			speaker="architect"
+			speaker="curator"
 		/>
 	);
 }

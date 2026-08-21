@@ -40,10 +40,10 @@ a accept · r reject · e edit · A accept-all · ←→ item · ↑↓ scroll
 
 ## Where proposals come from
 
-Extraction, `/reviewer`'s correction pass, and `/architect` all produce them.
-The architect may decide to propose on its own — it ends a reply with a plan
+Extraction, `/reviewer`'s correction pass, and `/curator` all produce them.
+The curator may decide to propose on its own — it ends a reply with a plan
 directive and the structural pass runs — or you can ask for one directly with
-`plan <instruction>` inside `/architect`.
+`plan <instruction>` inside `/curator`.
 
 Either way nothing has happened yet. A proposal is a suggestion until you accept
 it here, which is why it does not matter who started the pass.
@@ -66,16 +66,16 @@ the same is noise.
 ## Changes to raw/
 
 `raw/` is your own record, and every agent is forbidden from writing there —
-except `/architect`, on your instruction, and still only as a diff you accept.
+except `/curator`, on your instruction, and still only as a diff you accept.
 
 Those items are labelled `(your raw record)` so they never read as an ordinary
-corpus write. The architect is told to correct what is wrong _about_ the record —
+corpus write. The curator is told to correct what is wrong _about_ the record —
 a name spelled two ways, a link that no longer resolves — and never to rewrite
 what you said. Your phrasing, hesitations and contradictions are the material; a
 tidier transcript is a worse one.
 
 `ledger/`, `wiki/`, `manuscript.md` and `.litrpg/` stay closed to everyone,
-architect included: they are derived, and a write there is overwritten on the
+curator included: they are derived, and a write there is overwritten on the
 next recompute.
 
 ## Removals

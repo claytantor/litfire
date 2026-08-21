@@ -3,13 +3,13 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {
-	ARCHITECT_PERSONA,
-	ArchitectSession,
+	CURATOR_PERSONA,
+	CuratorSession,
 	buildPlanMessages,
 	buildRawContext,
 	renderRawContext,
 	runPlan,
-} from '../source/architect/index.js';
+} from '../source/curator/index.js';
 import {computeProject} from '../source/core/project.js';
 import type {ChatMessage, Provider} from '../source/llm/index.js';
 import {saveTranscript} from '../source/interview/index.js';
@@ -54,7 +54,7 @@ async function transcript(id: string, kind: 'system' | 'timeline', answer: strin
 	});
 }
 
-describe('what the architect can see of raw/', () => {
+describe('what the curator can see of raw/', () => {
 	it('always inventories every transcript', async () => {
 		await transcript('system-a', 'system', 'The Seed and the Custodian.');
 		await transcript('timeline-b', 'timeline', 'It starts with the patch.');
@@ -94,7 +94,7 @@ describe('the conversation', () => {
 	it('grounds on the corpus and the raw material at once', async () => {
 		await transcript('system-a', 'system', 'The Seed and the Custodian.');
 		const provider = scripted(['Two systems, by the sound of it.']);
-		const session = new ArchitectSession({
+		const session = new CuratorSession({
 			root,
 			project: await computeProject(root),
 			provider,
@@ -120,7 +120,7 @@ describe('the conversation', () => {
 	});
 
 	it('keeps the question when a reply never arrives', async () => {
-		const session = new ArchitectSession({
+		const session = new CuratorSession({
 			root,
 			project: await computeProject(root),
 			provider: scripted([]),
@@ -164,7 +164,7 @@ describe('the structural pass', () => {
 	});
 
 	/**
-	 * The architect is the one agent that may propose changes to `raw/`, on the
+	 * The curator is the one agent that may propose changes to `raw/`, on the
 	 * author's instruction and still only as a diff they accept (D15).
 	 * Reconciling a corpus sometimes means correcting the material it was drawn
 	 * from, and it had no way to say so.
@@ -224,39 +224,39 @@ describe('the brief', () => {
 			'artifacts/<id>.md',
 			'themes/<id>.md',
 		]) {
-			expect(ARCHITECT_PERSONA).toContain(primitive);
+			expect(CURATOR_PERSONA).toContain(primitive);
 		}
 	});
 
 	it('forbids the derived directories in the brief, not just in code', () => {
 		// Belt and braces: the path check is what enforces it, but a model told
 		// the rule proposes fewer writes that have to be thrown away.
-		expect(ARCHITECT_PERSONA).toContain('derived and regenerated');
-		expect(ARCHITECT_PERSONA).toContain('Never resolve a contradiction');
+		expect(CURATOR_PERSONA).toContain('derived and regenerated');
+		expect(CURATOR_PERSONA).toContain('Never resolve a contradiction');
 	});
 
 	it('states the higher bar for raw, rather than forbidding it outright', () => {
-		expect(ARCHITECT_PERSONA).toContain("author's own record");
-		expect(ARCHITECT_PERSONA).toContain('never rewrite what the author said');
+		expect(CURATOR_PERSONA).toContain("author's own record");
+		expect(CURATOR_PERSONA).toContain('never rewrite what the author said');
 	});
 
 	/**
-	 * A reply reaches no disk, and an architect that pastes a finished page into
+	 * A reply reaches no disk, and an curator that pastes a finished page into
 	 * one leaves the author believing a change landed when it did not. It has to
 	 * know how a proposal is actually made.
 	 */
 	it('knows a reply writes nothing, and how to propose instead', () => {
-		expect(ARCHITECT_PERSONA).toContain('Nothing you write in a reply reaches disk');
-		expect(ARCHITECT_PERSONA).toContain('PLAN:');
+		expect(CURATOR_PERSONA).toContain('Nothing you write in a reply reaches disk');
+		expect(CURATOR_PERSONA).toContain('PLAN:');
 	});
 
 	/**
-	 * The author had been asked to retype the architect's own conclusion — five
+	 * The author had been asked to retype the curator's own conclusion — five
 	 * timestamps it had just computed — as a command. That is where a digit gets
 	 * dropped, and the gate is what makes a change safe regardless.
 	 */
 	it('is told not to make the author type the plan', () => {
-		expect(ARCHITECT_PERSONA).toContain('Do not ask the author to type the plan');
+		expect(CURATOR_PERSONA).toContain('Do not ask the author to type the plan');
 	});
 
 	it('asks the plan for whole files, since a write replaces what is there', () => {

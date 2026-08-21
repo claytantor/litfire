@@ -95,7 +95,7 @@ describe('removing a file through the gate', () => {
 	});
 
 	/**
-	 * The architect may propose into `raw/` (D15). Nothing else may, and the
+	 * The curator may propose into `raw/` (D15). Nothing else may, and the
 	 * permission belongs to the batch rather than to the proposal — otherwise a
 	 * proposal could grant itself the right to rewrite a transcript.
 	 */
@@ -120,7 +120,7 @@ describe('removing a file through the gate', () => {
 		expect(applied.written).toEqual(['raw/interview.md']);
 	});
 
-	it('never opens the derived directories, even to the architect', async () => {
+	it('never opens the derived directories, even to the curator', async () => {
 		for (const derived of ['ledger/index.md', 'wiki/index.md', '.litrpg/state.md']) {
 			const batch = await ReviewBatch.create(root, [{path: derived, contents: 'x'}], {
 				allowRaw: true,

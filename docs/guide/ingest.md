@@ -57,7 +57,7 @@ wrote them — they are the record the corpus is derived _from_, and the tool
 having rewritten them would make that record worthless.
 
 ::: tip The one exception
-`/architect` may propose changes to `raw/` when the error is in the record
+`/curator` may propose changes to `raw/` when the error is in the record
 itself — a name spelled two ways, a link that no longer resolves. That is a
 different job, done deliberately, and still only as a diff you accept.
 :::
@@ -79,7 +79,7 @@ Two failures are worth watching for, and the checks catch both:
   copies what the notes say rather than guessing, and `broken_reference` names
   each one.
 
-Neither is resolved for you. `/architect` can propose the merge or the rename;
+Neither is resolved for you. `/curator` can propose the merge or the rename;
 you accept it in the gate.
 
 If a proposal is nearly right, press `e` and fix it there rather than rejecting

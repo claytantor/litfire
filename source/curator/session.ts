@@ -2,7 +2,7 @@ import type {Project} from '../core/project.js';
 import {buildReviewerContext} from '../reviewer/corpus.js';
 import type {ConversationTurn} from '../conversation/types.js';
 import type {ChatMessage, Provider} from '../llm/index.js';
-import {ARCHITECT_PERSONA} from './prompts.js';
+import {CURATOR_PERSONA} from './prompts.js';
 import {buildRawContext, renderRawContext} from './raw.js';
 import {
 	DIRECTIVE_LINE,
@@ -13,7 +13,7 @@ import {
 	renderOpened,
 } from './open.js';
 
-export type ArchitectSessionOptions = {
+export type CuratorSessionOptions = {
 	readonly root: string;
 	readonly project: Project;
 	readonly provider: Provider;
@@ -22,7 +22,7 @@ export type ArchitectSessionOptions = {
 };
 
 /**
- * The conversation half of `/architect`.
+ * The conversation half of `/curator`.
  *
  * It sees both halves of the vault, which is the whole point: `/reviewer` reads
  * the corpus and cannot tell you what the transcript said, and an extraction
@@ -35,8 +35,8 @@ export type ArchitectSessionOptions = {
  * grounded once would answer its fifth question with the files that mattered to
  * its first.
  */
-export class ArchitectSession {
-	readonly #options: ArchitectSessionOptions;
+export class CuratorSession {
+	readonly #options: CuratorSessionOptions;
 	#turns: ConversationTurn[] = [];
 	/**
 	 * What the last reply asked to have planned, if anything.
@@ -46,7 +46,7 @@ export class ArchitectSession {
 	 */
 	#plan: string | undefined;
 
-	constructor(options: ArchitectSessionOptions) {
+	constructor(options: CuratorSessionOptions) {
 		this.#options = options;
 	}
 
@@ -69,7 +69,7 @@ export class ArchitectSession {
 		]);
 
 		const system = [
-			ARCHITECT_PERSONA,
+			CURATOR_PERSONA,
 			'',
 			register === '' ? '' : `Register: ${register}`,
 			'',
@@ -100,7 +100,7 @@ export class ArchitectSession {
 	/**
 	 * Answers, opening files it asks for along the way.
 	 *
-	 * The architect is given a map of the whole corpus and the full text of
+	 * The curator is given a map of the whole corpus and the full text of
 	 * whatever scored highest against the question, which is a guess made before
 	 * it has read anything. It routinely discovers mid-reasoning that it needs a
 	 * page the guess missed — and the honest thing it did then was refuse to

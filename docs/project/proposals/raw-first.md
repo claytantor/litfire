@@ -128,12 +128,12 @@ proportional to what you actually edited.
 
 | Layer     | Written by              | Author edits?                   |
 | --------- | ----------------------- | ------------------------------- |
-| `raw/`    | You, and `/architect`\* | Yes — this is the only one      |
+| `raw/`    | You, and `/curator`\*   | Yes — this is the only one      |
 | corpus    | `/ingest`, via the gate | No; edits are lost on re-ingest |
 | `ledger/` | replay                  | No — enforced                   |
 | `wiki/`   | `/wiki build`           | No — enforced                   |
 
-\* `/architect` may propose raw corrections (D15) when the error is _in the
+\* `/curator` may propose raw corrections (D15) when the error is _in the
 record_. That stays.
 
 Corpus joins `ledger/` and `wiki/` as derived. `resolveInsideVault` gains it as

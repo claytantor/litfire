@@ -717,15 +717,15 @@ const primitives: Command = {
 	},
 };
 
-const architect: Command = {
-	name: 'architect',
-	usage: '/architect',
-	summary: 'reshape the corpus from the raw interviews, before re-extracting',
+const curator: Command = {
+	name: 'curator',
+	usage: '/curator',
+	summary: 'shelve the raw material into an orderly, linked, cited corpus',
 	async run(_args, context) {
 		if (!context.project) {
 			return needsProject();
 		}
-		return {lines: [], architect: true};
+		return {lines: [], curator: true};
 	},
 };
 
@@ -977,7 +977,7 @@ const time: Command = {
  * author works — they already know their world, they write it into
  * `raw/characters/` and `raw/moments/`, and what they want is for the corpus to
  * catch up. There was no path from a page of notes to a page in the vault
- * except describing it to the architect.
+ * except describing it to the curator.
  */
 const ingest: Command = {
 	name: 'ingest',
@@ -2444,7 +2444,7 @@ export const commands: readonly Command[] = [
 	exportManuscript,
 	wiki,
 	reviewer,
-	architect,
+	curator,
 	primitives,
 	timeline,
 	themes,

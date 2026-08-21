@@ -27,12 +27,12 @@ type Props = {
 	/** esc — cancels an in-flight reply, or leaves the conversation when idle. */
 	readonly onCancel: () => void;
 	/**
-	 * Who the assistant side of the conversation is — `reviewer`, `architect`.
+	 * Who the assistant side of the conversation is — `reviewer`, `curator`.
 	 *
 	 * Names every user-visible mention of them: the heading, the turn labels,
 	 * the placeholder, the busy line. Required, and deliberately without a
 	 * default: this screen is shared, and the last time it defaulted, it greeted
-	 * `/architect` users as the editor. A screen that names the wrong agent is
+	 * `/curator` users as the editor. A screen that names the wrong agent is
 	 * worse than one that names none, and the type system is a better guard
 	 * against that than remembering to pass the prop.
 	 */

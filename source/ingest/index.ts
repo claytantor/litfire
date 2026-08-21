@@ -12,7 +12,7 @@ import type {CorpusMap} from '../reviewer/types.js';
  * other way an author works: they already know their world, they write it down
  * in `raw/characters/`, `raw/moments/`, `raw/places/`, and what they want is
  * for the corpus to catch up. Before this there was no path from a page of
- * notes to a page in the vault except describing it to the architect.
+ * notes to a page in the vault except describing it to the curator.
  *
  * The raw file is never touched. Ingest reads it and proposes the corpus that
  * should exist beside it, which is the same contract every other write in the

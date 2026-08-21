@@ -4,11 +4,11 @@ import {INTERVIEWS_DIR, listTranscripts, type Transcript} from '../interview/ind
 import {resolve} from '../vault/paths.js';
 
 /**
- * What the architect can see of `raw/`.
+ * What the curator can see of `raw/`.
  *
  * An inventory always ships; full text arrives only for the transcripts a
  * question is actually about. A vault with a dozen 45KB interviews would spend
- * its whole context on material nobody asked about, and the architect would
+ * its whole context on material nobody asked about, and the curator would
  * answer its fifth question with the transcripts that mattered to its first.
  */
 

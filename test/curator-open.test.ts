@@ -2,7 +2,7 @@ import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {ArchitectSession} from '../source/architect/session.js';
+import {CuratorSession} from '../source/curator/session.js';
 import {
 	MAX_BYTES,
 	openFiles,
@@ -10,7 +10,7 @@ import {
 	parseRequest,
 	renderOpened,
 	resolveReadable,
-} from '../source/architect/open.js';
+} from '../source/curator/open.js';
 import {computeProject} from '../source/core/project.js';
 import type {ChatMessage, Provider} from '../source/llm/index.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
@@ -89,7 +89,7 @@ describe('asking for a file', () => {
 describe('what may be opened', () => {
 	/**
 	 * Deliberately unlike `resolveInsideVault`, which forbids `raw/` because the
-	 * tool never *writes* there. Reading it is the whole point of `/architect`.
+	 * tool never *writes* there. Reading it is the whole point of `/curator`.
 	 */
 	it('allows the author’s raw material', () => {
 		expect(() => resolveReadable(root, 'raw/interview-001.md')).not.toThrow();
@@ -127,7 +127,7 @@ describe('what may be opened', () => {
 		expect(opened.blocks[0]).toContain('do not rewrite');
 	});
 
-	it('hands refusals back to the architect rather than dropping them', () => {
+	it('hands refusals back to the curator rather than dropping them', () => {
 		const rendered = renderOpened({
 			blocks: [],
 			paths: [],
@@ -189,12 +189,12 @@ describe('deciding to propose', () => {
 	});
 });
 
-describe('the architect deciding for itself', () => {
+describe('the curator deciding for itself', () => {
 	async function planning(replies: readonly string[]) {
 		const {provider, seen} = scripted(replies);
 		return {
 			seen,
-			session: new ArchitectSession({
+			session: new CuratorSession({
 				root,
 				project: await computeProject(root),
 				provider,
@@ -260,12 +260,12 @@ describe('the architect deciding for itself', () => {
 	});
 });
 
-describe('the architect opening a file mid-answer', () => {
+describe('the curator opening a file mid-answer', () => {
 	async function session(replies: readonly string[]) {
 		const {provider, seen} = scripted(replies);
 		return {
 			seen,
-			session: new ArchitectSession({
+			session: new CuratorSession({
 				root,
 				project: await computeProject(root),
 				provider,
@@ -364,7 +364,7 @@ describe('the architect opening a file mid-answer', () => {
 
 	it('stops asking after its rounds are spent', async () => {
 		await write('characters/inanna.md', '---\nid: inanna\n---\n\nShe lied.\n');
-		// An architect that only ever asks would otherwise loop forever.
+		// An curator that only ever asks would otherwise loop forever.
 		const {session: s, seen} = await session([
 			'READ: characters/inanna.md',
 			'READ: characters/inanna.md',

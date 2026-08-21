@@ -47,11 +47,11 @@ export type CommandResult = {
 	 */
 	readonly reviewer?: boolean;
 	/**
-	 * Opens the architect over the raw material *and* the corpus. Where the
-	 * reviewer may only correct, the architect may restructure — so every write
+	 * Opens the curator over the raw material *and* the corpus. Where the
+	 * reviewer may only correct, the curator may restructure — so every write
 	 * it proposes goes through the same review gate, one diff at a time.
 	 */
-	readonly architect?: boolean;
+	readonly curator?: boolean;
 	/**
 	 * Turns the author's notes in `raw/<kind>/` into typed pages.
 	 *

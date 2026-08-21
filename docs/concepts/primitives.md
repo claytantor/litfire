@@ -139,5 +139,5 @@ one interview can slug the same event two ways. `/lint` reports both cases:
   happens, which no id check would catch.
 
 Neither is resolved for you. Which page is the real one is an author's call —
-though `/architect` can propose removing one, and it reaches you as a diff
+though `/curator` can propose removing one, and it reaches you as a diff
 through the [review gate](../guide/review-gate.md).

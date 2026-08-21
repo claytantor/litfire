@@ -18,12 +18,12 @@ import {Pager} from './components/pager.js';
 import {DiffReview} from './components/diff-review.js';
 import {TextBuffer} from './components/text-buffer.js';
 import {ReviewerMode} from './components/reviewer-mode.js';
-import {ArchitectMode} from './components/architect-mode.js';
+import {CuratorMode} from './components/curator-mode.js';
 import {InterviewScreen, type InterviewOutcome} from './components/interview-screen.js';
 import {ProviderWizard} from './components/provider-wizard.js';
 import type {Project} from './core/project.js';
 import {ReviewerSession, type FixOutcome} from './reviewer/index.js';
-import {ArchitectSession, type PlanOutcome} from './architect/index.js';
+import {CuratorSession, type PlanOutcome} from './curator/index.js';
 import {loadSetting, overlayFor} from './genre/index.js';
 import {stopWikiServe} from './wiki/host.js';
 import {
@@ -41,7 +41,7 @@ import {
 import {loadProvider, type Provider} from './llm/index.js';
 import {ReviewBatch, type Proposal} from './review/index.js';
 import {buildIngest, readRaw, type IngestKind} from './ingest/index.js';
-import {runPlan} from './architect/index.js';
+import {runPlan} from './curator/index.js';
 import {editText, resolveEditor} from './vault/editor.js';
 import {
 	displayPath,
@@ -134,9 +134,9 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 		  }
 		| undefined
 	>(undefined);
-	const [architecting, setArchitecting] = useState<
+	const [curating, setCurating] = useState<
 		| {
-				session: ArchitectSession;
+				session: CuratorSession;
 				provider: Provider;
 				register: string;
 				project: Project;
@@ -340,8 +340,8 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 		});
 	}, [append, ensure, root]);
 
-	/** Opens the architect over the raw material and the corpus together. */
-	const openArchitect = useCallback(async () => {
+	/** Opens the curator over the raw material and the corpus together. */
+	const openCurator = useCallback(async () => {
 		const resolved = await ensure();
 		if (!resolved) {
 			append([error('no vault loaded here — run /init first')]);
@@ -363,14 +363,14 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 		const register = profile.register ?? '';
 
 		append([
-			muted('architect — ask anything about the raw interviews and the corpus'),
+			muted('curator — ask anything about the raw interviews and the corpus'),
 			muted('`plan <what you want>` proposes the files that should exist;'),
 			muted('every one goes through review, and raw/ is never written'),
 			muted('esc to leave'),
 		]);
 
-		setArchitecting({
-			session: new ArchitectSession({
+		setCurating({
+			session: new CuratorSession({
 				root,
 				project: resolved,
 				provider: loaded.provider,
@@ -402,14 +402,14 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 				return;
 			}
 
-			// The architect alone may propose changes to `raw/` (D15). Extraction
+			// The curator alone may propose changes to `raw/` (D15). Extraction
 			// and the reviewer keep the old rule, so a transcript can only be
 			// rewritten by the agent the author pointed at it deliberately.
 			const batch = await ReviewBatch.create(root, outcome.proposals, {allowRaw: true});
 			for (const problem of batch.validatePaths()) {
 				append([error(`unsafe proposal ${problem.path}: ${problem.reason}`)]);
 			}
-			setReview({batch, title: 'review — architect'});
+			setReview({batch, title: 'review — curator'});
 		},
 		[append, root],
 	);
@@ -749,8 +749,8 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 							result.extract.focus,
 							result.extract.all ?? false,
 						);
-					} else if (result.architect) {
-						await openArchitect();
+					} else if (result.curator) {
+						await openCurator();
 					} else if (result.ingest) {
 						append(result.lines);
 						await runIngest(result.ingest.kind, result.ingest.focus);
@@ -788,7 +788,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			runExtract,
 			startReviewer,
 			runIngest,
-			openArchitect,
+			openCurator,
 			openAuthoring,
 			startInterview,
 		],
@@ -949,22 +949,22 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 		);
 	}
 
-	if (architecting) {
+	if (curating) {
 		return (
-			<ArchitectMode
+			<CuratorMode
 				root={root}
-				project={project ?? architecting.project}
-				provider={architecting.provider}
-				session={architecting.session}
-				register={architecting.register}
+				project={project ?? curating.project}
+				provider={curating.provider}
+				session={curating.session}
+				register={curating.register}
 				rows={rows}
 				columns={columns}
 				onPlanned={outcome => {
 					void handlePlanned(outcome);
 				}}
 				onExit={() => {
-					setArchitecting(undefined);
-					append([muted('architect closed')]);
+					setCurating(undefined);
+					append([muted('curator closed')]);
 				}}
 			/>
 		);

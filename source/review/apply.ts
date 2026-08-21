@@ -9,7 +9,7 @@ import type {ApplyOutcome, ReviewItem} from './types.js';
  * `.litrpg/` is cache the tool owns. `ledger/` is derived — replay regenerates
  * it, so a write there would be silently overwritten and is a sign the model
  * misunderstood the schema. `raw/` is the author's own record, and only the
- * architect may propose changes there, on the author's explicit instruction —
+ * curator may propose changes there, on the author's explicit instruction —
  * see `allowRaw`. `manuscript.md` is assembled by `/export` from `chapters/` and
  * `situations/`, so a proposal there would edit the output instead of the
  * source and vanish on the next export. `wiki/` is derived the same way, from
@@ -45,7 +45,7 @@ export type PathOptions = {
 	 * Off everywhere by default, and deliberately a parameter rather than a
 	 * relaxed constant: extraction and the reviewer must never touch a
 	 * transcript, because the whole reason `raw/` is trustworthy is that only
-	 * the author writes it. `/architect` may, because reconciling a corpus
+	 * the author writes it. `/curator` may, because reconciling a corpus
 	 * sometimes means correcting the material it was drawn from, and the author
 	 * asked for that. It still lands as a diff they accept (D15).
 	 */
