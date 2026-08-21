@@ -1,5 +1,6 @@
 import type {Project} from '../core/project.js';
 import type {SourceKind} from '../ingest/index.js';
+import type {Proposal} from '../review/types.js';
 
 export type Line = {
 	readonly text: string;
@@ -62,6 +63,19 @@ export type CommandResult = {
 		readonly kind: SourceKind;
 		/** A filename stem in the raw directory; absent means all of them. */
 		readonly focus?: string | undefined;
+	};
+	/**
+	 * Gives authored corpus pages a note in `raw/` to have come from.
+	 *
+	 * Unlike `ingest`, the proposals arrive already computed: adoption is a copy
+	 * of what the page says, not an inference about it, so the command does the
+	 * whole job and App only has to open the gate. Writing into `raw/` needs
+	 * `allowRaw` on the batch — the one other place that is granted is the
+	 * curator.
+	 */
+	readonly adopt?: {
+		readonly proposals: readonly Proposal[];
+		readonly title: string;
 	};
 	/**
 	 * Opens a vault file in the native prose buffer, by absolute path.

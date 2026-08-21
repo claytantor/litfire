@@ -685,6 +685,26 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 		[append, ensure, root],
 	);
 
+	/**
+	 * Adoption arrives already decided — it is a copy of what a page says, not a
+	 * model's reading of it — so App only opens the gate.
+	 *
+	 * `allowRaw` because the point is to write into `raw/`. The curator is the
+	 * only other holder of that permission, and for the same reason: both put
+	 * something into the author's own record rather than deriving from it, which
+	 * is exactly the write that must never happen unreviewed.
+	 */
+	const openAdoption = useCallback(
+		async (proposals: readonly Proposal[], title: string) => {
+			const batch = await ReviewBatch.create(root, [...proposals], {allowRaw: true});
+			for (const problem of batch.validatePaths()) {
+				append([error(`unsafe proposal ${problem.path}: ${problem.reason}`)]);
+			}
+			setReview({batch, title});
+		},
+		[append, root],
+	);
+
 	/** Corrections that survived the guard go to the same gate every write uses. */
 	const handleFixed = useCallback(
 		async (outcome: FixOutcome) => {
@@ -823,6 +843,9 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 						);
 					} else if (result.curator) {
 						await openCurator();
+					} else if (result.adopt) {
+						append(result.lines);
+						await openAdoption(result.adopt.proposals, result.adopt.title);
 					} else if (result.ingest) {
 						append(result.lines);
 						await runIngest(result.ingest.kind, result.ingest.focus);
@@ -860,6 +883,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			runExtract,
 			startReviewer,
 			runIngest,
+			openAdoption,
 			openCurator,
 			openAuthoring,
 			startInterview,

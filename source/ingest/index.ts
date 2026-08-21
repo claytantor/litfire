@@ -153,6 +153,28 @@ export function targetsOf(kind: SourceKind): readonly IngestKind[] {
 	return kind === 'interview' ? INGEST_KINDS : [kind];
 }
 
+/**
+ * A frontmatter value, as the YAML scalar the author wrote.
+ *
+ * `JSON.stringify` did this job, and JSON has no bigint. A moment's `at` is
+ * parsed as one so deep time survives the round trip, so the first raw note to
+ * carry `at:` made this throw `Do not know how to serialize a BigInt` — which
+ * the scaffold's own seeded moments would have triggered on the next
+ * `/ingest moment`. Whole seconds are written as their digits, which is what
+ * the note said and what YAML reads back.
+ *
+ * The replacer covers a bigint nested inside an object or array. That renders
+ * as a quoted string rather than a number, which is a small loss of fidelity in
+ * a prompt and much better than failing to build one.
+ */
+function asYaml(value: unknown): string {
+	return typeof value === 'bigint'
+		? value.toString()
+		: JSON.stringify(value, (_key, nested: unknown) =>
+				typeof nested === 'bigint' ? nested.toString() : nested,
+			);
+}
+
 export type RawDocument = {
 	/** Vault-relative, so a proposal can cite where a fact came from. */
 	readonly path: string;
@@ -355,7 +377,7 @@ export async function buildIngest(
 								'',
 								'```yaml',
 								...Object.entries(document.data).map(
-									([key, value]) => `${key}: ${JSON.stringify(value)}`,
+									([key, value]) => `${key}: ${asYaml(value)}`,
 								),
 								'```',
 								'',

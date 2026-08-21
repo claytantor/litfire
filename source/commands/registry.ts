@@ -17,7 +17,14 @@ import {
 	readWhen,
 	timeSchema,
 } from '../time/index.js';
-import {isIngestKind, readRaw, SOURCE_KINDS, type IngestKind} from '../ingest/index.js';
+import {
+	INGEST_KINDS,
+	SOURCE_KINDS,
+	isIngestKind,
+	readRaw,
+	type IngestKind,
+} from '../ingest/index.js';
+import {planAdoption} from '../ingest/adopt.js';
 import {readIngestState, statusOf} from '../ingest/state.js';
 import {authoredFile, setAuthored} from '../ingest/authoring.js';
 import {partitionChapters} from '../chapters/index.js';
@@ -982,9 +989,93 @@ const time: Command = {
  * catch up. There was no path from a page of notes to a page in the vault
  * except describing it to the curator.
  */
+/**
+ * `/ingest adopt [<kind>]` — give an authored page a note to have come from.
+ *
+ * The migration raw-first needs and could not previously offer. A vault written
+ * before the corpus was derived has pages the author typed directly: they are
+ * not a duplicate of anything in `raw/`, they are the only copy, and deleting a
+ * corpus directory would take them with it. Adoption writes the note each page
+ * should have had, and stamps the page to cite it.
+ *
+ * No model is involved. The page's own frontmatter and prose become the note,
+ * unchanged — the same copy `authoredFile` makes when a single page is edited,
+ * done across a whole kind at once. What it costs is one review, not one
+ * request.
+ *
+ * Per-kind because a vault may sit half-adopted indefinitely, which is the
+ * point: this is not a migration that has to be finished in one sitting.
+ */
+async function adopt(
+	kind: string | undefined,
+	context: CommandContext,
+): Promise<CommandResult> {
+	// Narrowed one branch at a time: `isIngestKind` also admits `interview`,
+	// which is a source without a corpus directory and so cannot be adopted from.
+	let only: IngestKind | undefined;
+	if (kind !== undefined) {
+		if (!isIngestKind(kind) || kind === 'interview') {
+			return {
+				lines: [
+					error(`no kind '${kind}' to adopt`),
+					muted(`try one of: ${INGEST_KINDS.join(', ')}`),
+				],
+			};
+		}
+		only = kind;
+	}
+
+	const kinds = only === undefined ? INGEST_KINDS : [only];
+	const plan = await planAdoption(context.root, kinds);
+	const scope = only === undefined ? 'this vault' : `${only}s`;
+
+	// Reported before anything is proposed, because a page with a note already is
+	// the case where adoption would destroy work rather than migrate it — and the
+	// author should see that named even when there is nothing else to do.
+	const notes: Line[] = plan.skipped.map(skip => warn(`  ${skip.page} — ${skip.reason}`));
+
+	if (plan.adopting.length === 0) {
+		return {
+			lines: [
+				plan.alreadyAdopted > 0
+					? ok(
+							`nothing to adopt — all ${String(plan.alreadyAdopted)} page(s) in ${scope} already cite a note`,
+						)
+					: muted(`nothing to adopt in ${scope}`),
+				...notes,
+			],
+		};
+	}
+
+	const byKind = new Map<string, number>();
+	for (const one of plan.adopting) {
+		byKind.set(one.kind, (byKind.get(one.kind) ?? 0) + 1);
+	}
+
+	return {
+		lines: [
+			heading(`adopting ${String(plan.adopting.length)} page(s) from ${scope}`),
+			...[...byKind].map(([name, count]) =>
+				muted(`  ${String(count).padStart(3)} ${name}`),
+			),
+			blank(),
+			muted('each page becomes a note in raw/ and is stamped to cite it —'),
+			muted('after this /ingest can rebuild the corpus, so it becomes disposable'),
+			...(plan.alreadyAdopted > 0
+				? [muted(`${String(plan.alreadyAdopted)} page(s) already adopted, untouched`)]
+				: []),
+			...notes,
+		],
+		adopt: {
+			proposals: plan.proposals,
+			title: `review — adopt ${only ?? 'all'}`,
+		},
+	};
+}
+
 const ingest: Command = {
 	name: 'ingest',
-	usage: '/ingest <kind> [<document>] · kinds include interview',
+	usage: '/ingest <kind> [<document>] · /ingest adopt [<kind>]',
 	summary: 'turn notes in raw/<kind>/ into typed pages, through the review gate',
 	async run(args, context) {
 		if (!context.project) {
@@ -992,11 +1083,15 @@ const ingest: Command = {
 		}
 
 		const [kind, ...rest] = args;
+		if (kind === 'adopt') {
+			return adopt(rest[0], context);
+		}
 		if (kind === undefined) {
 			return {
 				lines: [
 					error('usage: /ingest <kind> [<document>]'),
 					muted(`kinds: ${SOURCE_KINDS.join(', ')}`),
+					muted('/ingest adopt gives authored pages a note in raw/'),
 				],
 			};
 		}
