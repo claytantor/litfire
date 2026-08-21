@@ -34,6 +34,22 @@ One directory per kind, under `raw/`:
 | `artifact`  | `raw/artifacts/`  | `artifacts/`        |
 | `theme`     | `raw/themes/`     | `themes/`           |
 
+One more source is not a primitive folder:
+
+```
+/ingest interview            # everything in raw/interviews/
+/ingest interview system     # just the system transcripts
+```
+
+A note in `raw/characters/` is about one character. A transcript is about
+whatever you happened to say — a system interview establishes a system, and
+names three characters and a turning point on the way. So it has no single
+destination: the pass is given every kind and told to file what it finds where
+it belongs.
+
+Everything else is identical. Provenance, skipping unchanged sources, and the
+review gate work exactly as they do for a note.
+
 Notes are freeform. There is no format to learn — headings, bullets, a wall of
 prose, a table you pasted from somewhere. Naming a file after the thing it
 describes helps, because that is what `/ingest <kind> <document>` matches, but

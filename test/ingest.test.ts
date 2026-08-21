@@ -5,7 +5,15 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {findCommand} from '../source/commands/registry.js';
 import type {CommandContext} from '../source/commands/types.js';
 import {computeProject} from '../source/core/project.js';
-import {buildIngest, INGEST, isIngestKind, readRaw} from '../source/ingest/index.js';
+import {
+	buildIngest,
+	INGEST,
+	INGEST_KINDS,
+	isIngestKind,
+	readRaw,
+	targetsOf,
+} from '../source/ingest/index.js';
+import {hashSource, stampSource} from '../source/ingest/state.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
 
 let root = '';
@@ -247,5 +255,67 @@ describe('/<primitive> extract', () => {
 
 	it('reports an empty directory the same way /ingest does', async () => {
 		expect(said(await run('/place extract'))).toContain('nothing to ingest');
+	});
+});
+
+describe('interviews as a source', () => {
+	/**
+	 * A note in `raw/characters/` is about one character. A transcript is about
+	 * whatever the author happened to say, so it has no single destination.
+	 */
+	it('is a kind, and reads the transcript folder', async () => {
+		await note('raw/interviews/system-2026-01-01.md', 'The Lathe tracks five stats.');
+
+		const result = await run('/ingest interview');
+		expect(result.ingest).toEqual({kind: 'interview'});
+		expect(said(result)).toContain('raw/interviews/system-2026-01-01.md');
+	});
+
+	it('is offered alongside the primitives', async () => {
+		expect(isIngestKind('interview')).toBe(true);
+		expect(said(await run('/ingest nonsense'))).toContain('interview');
+	});
+
+	it('may file a page under any kind, and is told where each goes', async () => {
+		await note('raw/interviews/system-2026-01-01.md', 'The Lathe tracks five stats.');
+		const {documents} = await readRaw(root, 'interview');
+		const {instruction} = await buildIngest(
+			root,
+			context.project!,
+			'interview',
+			documents,
+		);
+
+		expect(targetsOf('interview')).toEqual(INGEST_KINDS);
+		for (const kind of INGEST_KINDS) {
+			expect(instruction, kind).toContain(`${INGEST[kind].to}/<id>.md`);
+		}
+		// A transcript names people it does not establish.
+		expect(instruction).toContain('mentioned in passing is not a character page');
+	});
+
+	it('narrows to one interview by its filename', async () => {
+		await note('raw/interviews/system-2026-01-01.md', 'A system.');
+		await note('raw/interviews/timeline-2026-01-02.md', 'A timeline.');
+
+		const result = await run('/ingest interview system');
+		expect(said(result)).toContain('system-2026-01-01');
+		expect(said(result)).not.toContain('timeline-2026-01-02');
+	});
+
+	/** Provenance lands across several directories, so it is looked for in all. */
+	it('knows a transcript is already reflected, wherever its pages went', async () => {
+		await note('raw/interviews/system-2026-01-01.md', 'The Lathe.');
+		await note(
+			'characters/inanna.md',
+			stampSource(
+				'---\nid: inanna\n---\n\nProse.\n',
+				'raw/interviews/system-2026-01-01.md',
+				hashSource('The Lathe.'),
+			),
+		);
+		context = {...context, project: await computeProject(root)};
+
+		expect(said(await run('/ingest interview'))).toContain('nothing to do');
 	});
 });

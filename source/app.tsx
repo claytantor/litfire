@@ -40,7 +40,7 @@ import {
 } from './interview/index.js';
 import {loadProvider, type Provider} from './llm/index.js';
 import {ReviewBatch, type Proposal} from './review/index.js';
-import {buildIngest, readRaw, type IngestKind} from './ingest/index.js';
+import {buildIngest, readRaw, type SourceKind} from './ingest/index.js';
 import {
 	hashSource,
 	honourAuthored,
@@ -432,7 +432,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 	 * the author accepts one at a time.
 	 */
 	const runIngest = useCallback(
-		async (kind: IngestKind, focus: string | undefined) => {
+		async (kind: SourceKind, focus: string | undefined) => {
 			const resolved = await ensure();
 			if (!resolved) {
 				append([error('no vault loaded here — run /init first')]);

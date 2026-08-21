@@ -3,7 +3,7 @@ import {readdir, readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {parseDocument, stringifyDocument} from '../vault/frontmatter.js';
 import {resolve} from '../vault/paths.js';
-import {INGEST, type IngestKind, type RawDocument} from './index.js';
+import {INGEST, targetsOf, type RawDocument, type SourceKind} from './index.js';
 
 /**
  * What a page records about where it came from.
@@ -42,28 +42,34 @@ export function hashSource(contents: string): string {
  */
 export async function readIngestState(
 	root: string,
-	kind: IngestKind,
+	kind: SourceKind,
 ): Promise<Map<string, string>> {
-	const directory = resolve(root, INGEST[kind].to);
-	const entries = await readdir(directory, {withFileTypes: true}).catch(() => []);
 	const state = new Map<string, string>();
 
-	for (const entry of entries) {
-		if (!entry.isFile() || !entry.name.endsWith('.md')) {
-			continue;
-		}
-		const raw = await readFile(path.join(directory, entry.name), 'utf8').catch(
-			() => undefined,
-		);
-		if (raw === undefined) {
-			continue;
-		}
+	// A transcript files pages across every kind, so its provenance has to be
+	// looked for in all of them. A note's is in one directory, but scanning the
+	// same way costs nothing and keeps one code path.
+	for (const target of targetsOf(kind)) {
+		const directory = resolve(root, INGEST[target].to);
+		const entries = await readdir(directory, {withFileTypes: true}).catch(() => []);
 
-		const {data} = parseDocument(raw);
-		const source = data[SOURCE_FIELD];
-		const hash = data[HASH_FIELD];
-		if (typeof source === 'string' && typeof hash === 'string') {
-			state.set(source, hash);
+		for (const entry of entries) {
+			if (!entry.isFile() || !entry.name.endsWith('.md')) {
+				continue;
+			}
+			const raw = await readFile(path.join(directory, entry.name), 'utf8').catch(
+				() => undefined,
+			);
+			if (raw === undefined) {
+				continue;
+			}
+
+			const {data} = parseDocument(raw);
+			const source = data[SOURCE_FIELD];
+			const hash = data[HASH_FIELD];
+			if (typeof source === 'string' && typeof hash === 'string') {
+				state.set(source, hash);
+			}
 		}
 	}
 

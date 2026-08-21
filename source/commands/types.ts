@@ -1,5 +1,5 @@
 import type {Project} from '../core/project.js';
-import type {IngestKind} from '../ingest/index.js';
+import type {SourceKind} from '../ingest/index.js';
 
 export type Line = {
 	readonly text: string;
@@ -59,7 +59,7 @@ export type CommandResult = {
 	 * and which document, having already checked there is something to read.
 	 */
 	readonly ingest?: {
-		readonly kind: IngestKind;
+		readonly kind: SourceKind;
 		/** A filename stem in the raw directory; absent means all of them. */
 		readonly focus?: string | undefined;
 	};

@@ -17,7 +17,7 @@ import {
 	readWhen,
 	timeSchema,
 } from '../time/index.js';
-import {INGEST_KINDS, isIngestKind, readRaw, type IngestKind} from '../ingest/index.js';
+import {isIngestKind, readRaw, SOURCE_KINDS, type IngestKind} from '../ingest/index.js';
 import {readIngestState, statusOf} from '../ingest/state.js';
 import {authoredFile, setAuthored} from '../ingest/authoring.js';
 import {partitionChapters} from '../chapters/index.js';
@@ -984,7 +984,7 @@ const time: Command = {
  */
 const ingest: Command = {
 	name: 'ingest',
-	usage: '/ingest <kind> [<document>]',
+	usage: '/ingest <kind> [<document>] · kinds include interview',
 	summary: 'turn notes in raw/<kind>/ into typed pages, through the review gate',
 	async run(args, context) {
 		if (!context.project) {
@@ -996,7 +996,7 @@ const ingest: Command = {
 			return {
 				lines: [
 					error('usage: /ingest <kind> [<document>]'),
-					muted(`kinds: ${INGEST_KINDS.join(', ')}`),
+					muted(`kinds: ${SOURCE_KINDS.join(', ')}`),
 				],
 			};
 		}
@@ -1004,7 +1004,7 @@ const ingest: Command = {
 			return {
 				lines: [
 					error(`no kind '${kind}'`),
-					muted(`try one of: ${INGEST_KINDS.join(', ')}`),
+					muted(`try one of: ${SOURCE_KINDS.join(', ')}`),
 				],
 			};
 		}

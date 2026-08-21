@@ -120,8 +120,37 @@ for (const [kind, spec] of Object.entries(INGEST)) {
 	}
 }
 
-export function isIngestKind(value: string): value is IngestKind {
-	return (INGEST_KINDS as readonly string[]).includes(value);
+/**
+ * Interviews are a source, not a primitive.
+ *
+ * A note in `raw/characters/` is about one character. A transcript is about
+ * whatever the author happened to say — a system interview establishes a
+ * system, and names three characters and a turning point on the way. So it has
+ * no single destination, and the pass is given every kind and told to file what
+ * it finds where it belongs.
+ *
+ * That is the only difference. Provenance, hashing and the review gate work
+ * exactly as they do for a note, which is what let the per-kind `extract`
+ * commands fold into this one.
+ */
+export const INTERVIEWS = `${VAULT.raw}/interviews`;
+
+export type SourceKind = IngestKind | 'interview';
+
+export const SOURCE_KINDS: readonly SourceKind[] = [...INGEST_KINDS, 'interview'];
+
+export function isIngestKind(value: string): value is SourceKind {
+	return (SOURCE_KINDS as readonly string[]).includes(value);
+}
+
+/** Where a source kind reads from. */
+export function sourceDirectory(kind: SourceKind): string {
+	return kind === 'interview' ? INTERVIEWS : INGEST[kind].from;
+}
+
+/** Where its pages may land. A transcript may write to any of them. */
+export function targetsOf(kind: SourceKind): readonly IngestKind[] {
+	return kind === 'interview' ? INGEST_KINDS : [kind];
 }
 
 export type RawDocument = {
@@ -152,10 +181,10 @@ export type RawDocument = {
  */
 export async function readRaw(
 	root: string,
-	kind: IngestKind,
+	kind: SourceKind,
 	focus?: string,
 ): Promise<{documents: RawDocument[]; directory: string}> {
-	const directory = INGEST[kind].from;
+	const directory = sourceDirectory(kind);
 	const entries = await readdir(resolve(root, directory), {withFileTypes: true}).catch(
 		() => [],
 	);
@@ -235,19 +264,43 @@ function existing(map: CorpusMap, kind: IngestKind): string {
 export async function buildIngest(
 	root: string,
 	project: Project,
-	kind: IngestKind,
+	kind: SourceKind,
 	documents: readonly RawDocument[],
 ): Promise<{instruction: string; context: string}> {
-	const spec = INGEST[kind];
+	const targets = targetsOf(kind);
+
+	const where =
+		kind === 'interview'
+			? [
+					'These are interview transcripts. One of them establishes whatever the',
+					'author happened to say — a system, and three characters and a turning',
+					'point on the way — so file each thing you find under the kind it',
+					'belongs to:',
+					'',
+					...targets.map(
+						target =>
+							`- ${target}: \`${INGEST[target].to}/<id>.md\` — ${INGEST[target].fields}`,
+					),
+					'',
+					'Propose a page only for something the transcript actually establishes.',
+					'A name mentioned in passing is not a character page; it is a line in',
+					'one, or nothing at all.',
+				]
+			: [
+					`Write each page to \`${INGEST[kind].to}/<id>.md\` — the filename is the id,`,
+					'with nothing appended. One id means one file, and a page written',
+					'anywhere else or under any other name becomes a second copy nothing can',
+					'reconcile.',
+					'',
+					`Frontmatter fields: ${INGEST[kind].fields}.`,
+				];
 
 	const instruction = [
-		`Ingest the author's ${kind} notes below into ${kind} pages.`,
+		kind === 'interview'
+			? "Read the author's interview transcripts below and file what they establish."
+			: `Ingest the author's ${kind} notes below into ${kind} pages.`,
 		'',
-		`Write each page to \`${spec.to}/<id>.md\` — the filename is the id, with`,
-		'nothing appended. One id means one file, and a page written anywhere else',
-		'or under any other name becomes a second copy nothing can reconcile.',
-		'',
-		`Frontmatter fields: ${spec.fields}.`,
+		...where,
 		'',
 		'One note may describe several — an ordered list of moments is a page each,',
 		'not one page. One note may also describe only part of something that',
@@ -276,12 +329,15 @@ export async function buildIngest(
 		'Do not modify the raw notes themselves.',
 	].join('\n');
 
+	const map = await buildCorpusMap(root, project);
 	const context = [
-		`# ${kind} pages that already exist`,
+		'# pages that already exist',
 		'',
-		existing(await buildCorpusMap(root, project), kind),
+		targets.map(target => `## ${target}\n\n${existing(map, target)}`).join('\n\n'),
 		'',
-		`# The author's ${kind} notes`,
+		kind === 'interview'
+			? "# The author's interview transcripts"
+			: `# The author's ${kind} notes`,
 		'',
 		documents
 			.map(document =>
