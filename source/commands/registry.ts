@@ -17,7 +17,7 @@ import {
 	readWhen,
 	timeSchema,
 } from '../time/index.js';
-import {INGEST_KINDS, isIngestKind, readRaw} from '../ingest/index.js';
+import {INGEST_KINDS, isIngestKind, readRaw, type IngestKind} from '../ingest/index.js';
 import {readIngestState, statusOf} from '../ingest/state.js';
 import {authoredFile, setAuthored} from '../ingest/authoring.js';
 import {partitionChapters} from '../chapters/index.js';
@@ -83,6 +83,7 @@ import {
 	text,
 	warn,
 	type Command,
+	type CommandContext,
 	type CommandResult,
 	type Line,
 } from './types.js';
@@ -1067,7 +1068,27 @@ const ingest: Command = {
 	},
 };
 
-const PLACE_VERBS = new Set(['show', 'edit', 'name']);
+/**
+ * `/<primitive> extract` — read my notes for this kind.
+ *
+ * The same job `/ingest <kind>` does, reached from the primitive it concerns.
+ * An author working on moments should not have to change command to turn their
+ * notes into pages, and `extract` is the word the interview kinds already use
+ * for "read the source material and produce corpus".
+ *
+ * Delegated rather than reimplemented, so the reporting — what changed, what is
+ * already up to date, what would be skipped — is the same wherever it is asked
+ * for.
+ */
+function extractFor(
+	kind: IngestKind,
+	id: string | undefined,
+	context: CommandContext,
+): Promise<CommandResult> {
+	return ingest.run(id === undefined ? [kind] : [kind, id], context);
+}
+
+const PLACE_VERBS = new Set(['show', 'edit', 'extract', 'name']);
 
 /**
  * `/place` — somewhere a scene happens.
@@ -1079,7 +1100,7 @@ const PLACE_VERBS = new Set(['show', 'edit', 'name']);
  */
 const place: Command = {
 	name: 'place',
-	usage: '/place <id> [show|edit|name <text>] · /place new [name]',
+	usage: '/place [<id>] [show|edit|extract|name <text>] · /place new [name]',
 	summary: 'somewhere a scene happens: write one, name it, see what happened',
 	async run(args, context) {
 		if (!context.project) {
@@ -1134,6 +1155,10 @@ const place: Command = {
 		const verb = args.find(argument => PLACE_VERBS.has(argument));
 		const positional = args.filter(argument => !PLACE_VERBS.has(argument));
 		const [id] = positional;
+
+		if (verb === 'extract') {
+			return extractFor('place', id, context);
+		}
 
 		if (verb === 'edit' || verb === 'name') {
 			if (!id) {
@@ -1206,7 +1231,7 @@ function adoptionNote(result: {adopted: boolean; file?: string}): Line[] {
 		: [];
 }
 
-const MOMENT_VERBS = new Set(['show', 'edit', 'at', 'name']);
+const MOMENT_VERBS = new Set(['show', 'edit', 'extract', 'at', 'name']);
 
 /**
  * `/moment` — the points on the clock a story hangs on.
@@ -1218,7 +1243,7 @@ const MOMENT_VERBS = new Set(['show', 'edit', 'at', 'name']);
  */
 const moment: Command = {
 	name: 'moment',
-	usage: '/moment <id> [show|edit|at <when>|name <text>] · /moment new [name]',
+	usage: '/moment [<id>] [show|edit|extract|at <when>|name <text>] · new [name]',
 	summary: 'points on the in-world clock: create one, time it, describe it',
 	async run(args, context) {
 		if (!context.project) {
@@ -1279,6 +1304,10 @@ const moment: Command = {
 		const verb = args.find(argument => MOMENT_VERBS.has(argument));
 		const positional = args.filter(argument => !MOMENT_VERBS.has(argument));
 		const [id] = positional;
+
+		if (verb === 'extract') {
+			return extractFor('moment', id, context);
+		}
 
 		/**
 		 * Sets a field on the author's copy in `raw/`, adopting the page there if
@@ -1373,7 +1402,7 @@ const moment: Command = {
 	},
 };
 
-const ARC_VERBS = new Set(['show', 'order', 'after']);
+const ARC_VERBS = new Set(['show', 'extract', 'order', 'after']);
 
 /**
  * `/arc` — the narrative order situations are placed into.
@@ -1385,7 +1414,7 @@ const ARC_VERBS = new Set(['show', 'order', 'after']);
  */
 const arc: Command = {
 	name: 'arc',
-	usage: '/arc [<id> [show|order <n>|after <moment>]] · /arc new [title]',
+	usage: '/arc [<id> [show|extract|order <n>|after <moment>]] · /arc new [title]',
 	summary: 'the narrative order: create arcs, order them, anchor them',
 	async run(args, context) {
 		if (!context.project) {
@@ -1435,6 +1464,10 @@ const arc: Command = {
 		const verb = args.find(argument => ARC_VERBS.has(argument));
 		const positional = args.filter(argument => !ARC_VERBS.has(argument));
 		const [id] = positional;
+
+		if (verb === 'extract') {
+			return extractFor('arc', id, context);
+		}
 
 		if (verb === 'order') {
 			const [, value] = positional;
@@ -1524,7 +1557,15 @@ async function patchArc(
  * in the narrative order and `place:` is where it happens; one verb meaning both
  * is the kind of collision that makes a workflow impossible to write down.
  */
-const SITUATION_VERBS = new Set(['show', 'edit', 'arc', 'place', 'moment', 'cast']);
+const SITUATION_VERBS = new Set([
+	'show',
+	'edit',
+	'extract',
+	'arc',
+	'place',
+	'moment',
+	'cast',
+]);
 
 /**
  * Sets a field on a scene's authored copy.
@@ -1543,7 +1584,7 @@ async function patchSituation(
 
 const situation: Command = {
 	name: 'situation',
-	usage: '/situation <id> [show|edit|cast|place|moment|arc] · new [title]',
+	usage: '/situation <id> [show|edit|extract|cast|place|moment|arc] · new [title]',
 	summary: 'show a scene\u2019s cast, write it, and link it to the world',
 	async run(args, context) {
 		if (!context.project) {
@@ -1604,6 +1645,10 @@ const situation: Command = {
 		 */
 		const verb = args.find(argument => SITUATION_VERBS.has(argument));
 		const positional = args.filter(argument => !SITUATION_VERBS.has(argument));
+
+		if (verb === 'extract') {
+			return extractFor('situation', positional[0], context);
+		}
 
 		if (verb === 'edit') {
 			const [id] = positional;
@@ -2004,7 +2049,7 @@ function interviewCommand(
 				const moments = context.project.vault.moments;
 				if (
 					focus !== undefined &&
-					!moments.some(moment => moment.id === focus) &&
+					!moments.some(candidate => candidate.id === focus) &&
 					args.includes('show')
 				) {
 					return {lines: [error(`no moment '${focus}' in this vault`)]};

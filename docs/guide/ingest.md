@@ -10,6 +10,14 @@ typed pages.
 /ingest character sebastian-weber    # just that one
 ```
 
+Each primitive offers the same thing from its own command, so you do not have
+to change command to turn your notes into pages:
+
+```
+/moment extract                 # same as /ingest moment
+/moment the-breach extract      # same as /ingest moment the-breach
+```
+
 ## Where notes live
 
 One directory per kind, under `raw/`:

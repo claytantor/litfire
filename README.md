@@ -89,6 +89,7 @@ Then, in the TUI:
 | `/place <id> edit`             | Edit its description                             |
 | `/ingest <kind>`               | Turn notes in `raw/<kind>/` into typed pages     |
 | `/ingest <kind> <document>`    | Ingest one note                                  |
+| `/<primitive> extract`         | Ingest that kind’s notes, from the primitive     |
 | `/situation place <id> <arc>`  | Move a situation out of the inbox                |
 | `/help`, `/quit`               |                                                  |
 

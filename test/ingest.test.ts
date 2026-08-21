@@ -208,3 +208,44 @@ describe('/ingest', () => {
 		expect(isIngestKind('transcript')).toBe(false);
 	});
 });
+
+describe('/<primitive> extract', () => {
+	/**
+	 * The same job `/ingest <kind>` does, reached from the primitive it concerns.
+	 * An author working on moments should not have to change command to turn
+	 * their notes into pages.
+	 */
+	it('is the ingest for that kind', async () => {
+		await note('raw/moments/the-breach.md', 'It broke.');
+
+		const viaPrimitive = await run('/moment extract');
+		const viaIngest = await run('/ingest moment');
+
+		expect(viaPrimitive.ingest).toEqual(viaIngest.ingest);
+		expect(said(viaPrimitive)).toBe(said(viaIngest));
+	});
+
+	it('narrows to one note when given an id', async () => {
+		await note('raw/moments/the-breach.md', 'It broke.');
+		await note('raw/moments/the-aftermath.md', 'Then this.');
+
+		const result = await run('/moment the-breach extract');
+		expect(result.ingest).toEqual({kind: 'moment', focus: 'the-breach'});
+		expect(said(result)).not.toContain('the-aftermath');
+	});
+
+	it('is offered by every primitive that has notes', async () => {
+		for (const [command, kind] of [
+			['/place extract', 'place'],
+			['/arc extract', 'arc'],
+			['/situation extract', 'situation'],
+		] as const) {
+			await note(`raw/${kind}s/one.md`, 'Something.');
+			expect((await run(command)).ingest, command).toEqual({kind});
+		}
+	});
+
+	it('reports an empty directory the same way /ingest does', async () => {
+		expect(said(await run('/place extract'))).toContain('nothing to ingest');
+	});
+});
