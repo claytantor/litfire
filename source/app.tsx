@@ -43,6 +43,8 @@ import {
 	stampSource,
 	statusOf,
 } from './ingest/state.js';
+import {resolveDates} from './ingest/dates.js';
+import {calendarFor} from './time/binding.js';
 import {runPlan} from './curator/index.js';
 import {editText, resolveEditor} from './vault/editor.js';
 import {
@@ -497,6 +499,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			}
 
 			const {profile} = await loadSetting(root);
+			const {calendar} = calendarFor(resolved.vault.time);
 			const state = await readIngestState(root, kind);
 			const pending = documents.filter(
 				document => statusOf(state, document.path, document.contents) !== 'unchanged',
@@ -553,20 +556,30 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 					// later ingest.
 					const hash = hashSource(document.contents);
 					for (const proposal of outcome.proposals) {
-						proposals.push(
-							proposal.remove === true
-								? proposal
-								: {
-										...proposal,
-										// The author's own fields go back on last, so a decision
-										// they made outranks anything the model chose.
-										contents: stampSource(
-											honourAuthored(proposal.contents, document),
-											document.path,
-											hash,
-										),
-									},
-						);
+						if (proposal.remove === true) {
+							proposals.push(proposal);
+							continue;
+						}
+
+						// A date the note stated becomes a position on the clock here,
+						// in code. The model was asked for the date because it can read
+						// one off the page; it was not asked for the arithmetic, across
+						// a timezone with daylight saving and spans of geological time,
+						// because a plausible-looking number that lands in the ledger is
+						// the failure this whole tool is built to prevent.
+						const dated = resolveDates(proposal.contents, calendar);
+						notes.push(...dated.notes.map(note => `${document.path}: ${note}`));
+
+						proposals.push({
+							...proposal,
+							// The author's own fields go back on last, so a decision
+							// they made outranks anything the model chose.
+							contents: stampSource(
+								honourAuthored(dated.contents, document),
+								document.path,
+								hash,
+							),
+						});
 					}
 					notes.push(...outcome.notes.map(note => `${document.path}: ${note}`));
 				}

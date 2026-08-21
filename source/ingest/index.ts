@@ -3,6 +3,7 @@ import path from 'node:path';
 import type {Project} from '../core/project.js';
 import {parseDocument} from '../vault/frontmatter.js';
 import {RAW_KINDS, resolve, VAULT} from '../vault/paths.js';
+import {calendarFor} from '../time/binding.js';
 import {buildCorpusMap} from '../reviewer/corpus.js';
 import type {CorpusMap} from '../reviewer/types.js';
 
@@ -322,6 +323,21 @@ export async function buildIngest(
 ): Promise<{instruction: string; context: string}> {
 	const targets = targetsOf(kind);
 
+	// Only for the kinds that carry an `at`, and only when the bound calendar can
+	// read a date as well as write one. `parse` is optional — a fictional
+	// calendar that can only format is still useful — and offering a date format
+	// against one of those would invite a value nothing could convert back.
+	const {calendar} = calendarFor(project.vault.time);
+	// `rawSeconds` has a `parse` too — it reads "86400" — so asking only whether
+	// the calendar can parse would offer a date format to a vault that has no
+	// dates. It has to be a calendar *and* readable.
+	const clock =
+		targets.includes('moment') &&
+		calendar.id !== 'seconds' &&
+		calendar.parse !== undefined
+			? calendar.name
+			: undefined;
+
 	const where =
 		kind === 'interview'
 			? [
@@ -380,6 +396,27 @@ export async function buildIngest(
 		'field, say so in notes, and let them settle it.',
 		'',
 		'Do not modify the raw notes themselves.',
+		...(clock === undefined
+			? []
+			: [
+					'',
+					'## Dates',
+					'',
+					`This vault reads its clock as ${clock}.`,
+					'',
+					'So where a note states when something happened, you may write that',
+					'date into `at:` exactly as the note gives it — "2036-08-15", or',
+					'"2036-08-15 02:30" — instead of a number of seconds. The tool',
+					'converts it, including the timezone and its daylight saving.',
+					'',
+					'Never do that arithmetic yourself. A number you calculated is',
+					'indistinguishable from one the author chose, and it lands in a',
+					'ledger that computes with it. Write the date, or write nothing.',
+					'',
+					'A note that does not say when something happened still gets no',
+					'`at:` at all. "Long ago" and "before the war" are not dates, and an',
+					'undated moment is a normal state the checks already report.',
+				]),
 		'',
 		'## The summary block',
 		'',

@@ -194,6 +194,50 @@ an arbitrary function. `/time at` still converts seconds while one is bound, and
 says plainly why it cannot go the other way.
 :::
 
+## Ingest can date a moment for you
+
+When a calendar is bound and can read dates back — Gregorian can, raw seconds
+and a custom formula cannot — `/ingest` may write the date a note actually
+states into `at:` and let the tool convert it:
+
+```
+raw/moments/the-breach.md   "It happened on 16 August 2031, just after dinner."
+                          ↓
+corpus/moments/the-breach.md   at: 86400
+the-breach: read '2031-08-16 19:33:00' as 86400s from the origin
+```
+
+The conversion runs in code, against your binding, with its timezone and
+daylight saving. **The model is never asked for the number**, only for the date
+it can read off the page — arithmetic across a zone that observes DST and spans
+of geological time is precisely the thing this tool checks rather than hopes
+over, and a plausible-looking instant that lands in the ledger and is computed
+with is the failure it exists to prevent.
+
+Every conversion is reported by note before you accept the diff, so you can see
+what it read and what it made of it.
+
+A date the calendar cannot read is **dropped**, not kept. "Long ago" and
+"before the war" are not dates, and a page whose `at:` will not satisfy the
+schema loads as an issue and comes off the clock anyway — honestly undated is
+better, and `moment_undated` already reports it.
+
+## Nothing outside the vault is needed
+
+The whole clock is TypeScript and runs from the TUI: the Gregorian calendar,
+the timezone and DST handling, the bigint arithmetic, and the conversion both
+ways. There is no helper script to install, no interpreter to have, and nothing
+to keep in step with the tool by hand.
+
+The single exception is a **custom calendar**, which is author-written
+JavaScript for a fictional calendar and lives in the vault by design — it runs
+in [the formula sandbox](./formula-sandbox.md), consent-gated by hash, with no
+clock, no randomness and no I/O.
+
+If you have a script of your own that converts dates for this vault, `/time at`
+replaces it, and reads the epoch and zone from `setting/time.md` rather than
+having them written into it twice.
+
 ## Durations
 
 Spans longer than a day are reported with a leading `~` and computed against a
