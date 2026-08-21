@@ -140,7 +140,7 @@ export function stubPath(kind: StubKind, id: string): string {
 		case 'situation': {
 			// Unplaced by construction: the author has not said where it sits, and
 			// the inbox is where §5 puts a scene with no arc.
-			return `${VAULT.inbox}/${id}.md`;
+			return `${VAULT.situations}/${id}.md`;
 		}
 		case 'moment': {
 			return `${VAULT.moments}/${id}.md`;

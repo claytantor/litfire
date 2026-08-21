@@ -305,6 +305,7 @@ describe('the anchor', () => {
 			characters,
 			factions: [],
 			places: [],
+			sources: [],
 			artifacts: [],
 			themes: [],
 			replay: result,

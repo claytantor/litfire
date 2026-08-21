@@ -53,6 +53,23 @@ Two more have ids but no files of their own. **Skills** and **items** are
 declared by a system or named by ledger events, and their wiki pages are built
 from every use. **Character state** is derived — see below.
 
+## One id, one file
+
+A primitive lives at `<directory>/<id>.md`. The filename **is** the id, with
+nothing appended — the name goes in the frontmatter.
+
+That is not a convention the tool merely prefers. Two files declaring one id
+resolve to whichever loads first, and the other becomes invisible while still on
+disk, so `/lint` reports:
+
+- **`file_name_not_id`** — a page whose filename does not match its id.
+- **`legacy_location`** — a situation still in `situations/inbox/`, which was a
+  second home for the same thing and is no longer written to.
+- **`duplicate_id`** — two files declaring one id, named by path.
+
+A situation with no `arc:` is unplaced. That is a normal, permanent state and it
+is said once, in the frontmatter — not also by which directory the file sits in.
+
 ## Fields
 
 Only `id` is required anywhere. Everything optional is genuinely optional: a

@@ -185,7 +185,10 @@ describe('pages claiming to be the same thing', () => {
 		const finding = project.questions.find(q => q.kind === 'duplicate_id');
 
 		expect(finding?.detail).toContain('the-breach');
-		expect(finding?.detail).toContain('2 moment pages');
+		// Named, not counted: "two of these somewhere" is a fact you then have to
+		// go hunting for.
+		expect(finding?.detail).toContain('one.md');
+		expect(finding?.detail).toContain('two.md');
 	});
 
 	/**

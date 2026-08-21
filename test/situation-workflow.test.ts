@@ -1,4 +1,4 @@
-import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
@@ -360,6 +360,59 @@ describe('the documented workflow', () => {
 			p => p.kind === 'situation' && p.id === 'sit-002',
 		);
 		expect(page?.body).toContain('A line that must survive placement');
+	});
+
+	/**
+	 * The failure this whole change is about: one scene existing as two files.
+	 * `/situation new` wrote `<id>-<slug>.md` into the inbox while ingest
+	 * proposed `<id>.md` beside it, and nothing that looks at names could see
+	 * they were the same page.
+	 */
+	it('writes one file, named for the id', async () => {
+		const created = await run('/situation new The Ledger Room');
+		expect(created.openEditor).toContain(`${path.sep}situations${path.sep}sit-002.md`);
+		expect(created.openEditor).not.toContain('inbox');
+	});
+
+	it('does not move the file when it is placed on an arc', async () => {
+		const created = await run('/situation new A Scene');
+		await refresh();
+		await run('/situation sit-002 arc arc-01');
+
+		// The file stays put; `arc:` is what says it is placed.
+		await expect(readFile(created.openEditor!, 'utf8')).resolves.toContain('arc: arc-01');
+		expect(context.project!.vault.situations.find(s => s.id === 'sit-002')?.arc).toBe(
+			'arc-01',
+		);
+	});
+
+	it('reports a file whose name is not its id', async () => {
+		await writeFile(
+			resolve(root, VAULT.situations, 'not-the-id.md'),
+			'---\nid: sit-900\ntitle: Misfiled\n---\n\nProse.\n',
+			'utf8',
+		);
+		await refresh();
+
+		const finding = context.project!.questions.find(
+			q => q.kind === 'file_name_not_id' && q.detail.includes('not-the-id.md'),
+		);
+		expect(finding?.detail).toContain('not-the-id.md');
+		expect(finding?.detail).toContain('sit-900.md');
+	});
+
+	it('reports a scene left in the old inbox', async () => {
+		await mkdir(resolve(root, VAULT.inbox), {recursive: true});
+		await writeFile(
+			resolve(root, VAULT.inbox, 'sit-900.md'),
+			'---\nid: sit-900\ntitle: Legacy\n---\n\nProse.\n',
+			'utf8',
+		);
+		await refresh();
+
+		const finding = context.project!.questions.find(q => q.kind === 'legacy_location');
+		expect(finding?.detail).toContain('situations/inbox/sit-900.md');
+		expect(finding?.detail).toContain('already unplaced');
 	});
 
 	it('never rewrites the author body when linking', async () => {

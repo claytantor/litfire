@@ -75,8 +75,13 @@ describe('stub routing', () => {
 		expect(stubPath('moment', 'quiet-year')).toBe('timeline/moments/quiet-year.md');
 	});
 
-	it('files a situation stub unplaced, in the inbox', () => {
-		expect(stubPath('situation', 'the-audit')).toBe('situations/inbox/the-audit.md');
+	/**
+	 * One home per kind, named for the id. A stub situation is unplaced because
+	 * it has no `arc:`, not because of where its file sits — the inbox encoded
+	 * the same fact twice and let one scene exist in two places at once.
+	 */
+	it('files a situation stub beside every other situation', () => {
+		expect(stubPath('situation', 'the-audit')).toBe('situations/the-audit.md');
 	});
 });
 
@@ -295,6 +300,7 @@ describe('unplaced corpus reaches the ledger as a question, not a crash', () => 
 			characters: [],
 			factions: [],
 			places: [],
+			sources: [],
 			artifacts: [],
 			themes: [],
 			replay: replayResult,

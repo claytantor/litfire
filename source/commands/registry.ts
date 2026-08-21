@@ -1,4 +1,4 @@
-import {mkdir, readdir, readFile, rename, writeFile} from 'node:fs/promises';
+import {mkdir, readdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import type {Project} from '../core/project.js';
 import {
@@ -1572,15 +1572,22 @@ const situation: Command = {
 		// free-text title, and a scene called "The Place" would otherwise lose a
 		// word to the argument parser.
 		if (sub === 'new') {
-			const existing = context.project.vault.situations.length;
-			const id = `sit-${String(existing + 1).padStart(3, '0')}`;
-			const slug =
-				rest
-					.join('-')
-					.toLowerCase()
-					.replace(/[^a-z0-9-]/g, '') || 'untitled';
-			const file = resolve(context.root, VAULT.inbox, `${id}-${slug}.md`);
+			const taken = new Set(context.project.vault.situations.map(each => each.id));
+			// Counted past what is taken rather than from the length: a vault that
+			// has had a scene removed would otherwise mint an id that already
+			// exists, which is the failure this whole change is about.
+			let next = context.project.vault.situations.length + 1;
+			while (taken.has(`sit-${String(next).padStart(3, '0')}`)) {
+				next++;
+			}
+			const id = `sit-${String(next).padStart(3, '0')}`;
 
+			// The filename is the id, with nothing appended. A slug in the name
+			// made two files for one scene indistinguishable to everything that
+			// looks at names, and the title is in the frontmatter already.
+			const file = resolve(context.root, VAULT.situations, `${id}.md`);
+
+			await mkdir(resolve(context.root, VAULT.situations), {recursive: true});
 			await writeFile(
 				file,
 				stringifyDocument({
@@ -1726,40 +1733,33 @@ const situation: Command = {
 				return {lines: [error(`no situation '${id}'`)]};
 			}
 
-			// Locate the file by id rather than guessing its slug.
-			const inboxDirectory = resolve(context.root, VAULT.inbox);
-			const {default: fs} = await import('node:fs/promises');
-			const entries = await fs.readdir(inboxDirectory).catch(() => [] as string[]);
-			let source: string | undefined;
-			for (const entry of entries) {
-				const raw = await readFile(path.join(inboxDirectory, entry), 'utf8');
-				if (parseDocument(raw).data['id'] === id) {
-					source = path.join(inboxDirectory, entry);
-					break;
-				}
-			}
-			if (!source) {
-				return {lines: [error(`'${id}' is not in the inbox`)]};
+			const source = await findSituationFile(context.root, id);
+			if (source === undefined) {
+				return {lines: [error(`no file for situation '${id}'`)]};
 			}
 
-			const raw = await readFile(source, 'utf8');
-			const document = parseDocument(raw);
 			const orders = context.project.vault.situations
 				.filter(s => s.arc === arcId && s.order !== undefined)
 				.map(s => s.order as number);
+			const order = nextOrder(orders);
 
-			const updated = stringifyDocument({
-				data: {...document.data, arc: arcId, order: nextOrder(orders)},
-				// P6: the body is passed through untouched.
-				body: document.body,
-			});
-
-			const target = resolve(context.root, VAULT.situations, path.basename(source));
-			await writeFile(source, updated, 'utf8');
-			await rename(source, target);
+			// Placing sets `arc:` and nothing else. It used to also move the file
+			// out of `situations/inbox/`, which encoded in the filesystem what the
+			// frontmatter already said — and gave one scene two possible homes,
+			// which is how one came to exist in both at once.
+			const document = parseDocument(await readFile(source, 'utf8'));
+			await writeFile(
+				source,
+				stringifyDocument({
+					data: {...document.data, arc: arcId, order},
+					// P6: the body is passed through untouched.
+					body: document.body,
+				}),
+				'utf8',
+			);
 
 			return {
-				lines: [ok(`placed ${id} on ${arcId} at order ${nextOrder(orders)}`)],
+				lines: [ok(`placed ${id} on ${arcId} at order ${String(order)}`)],
 				dirty: true,
 			};
 		}

@@ -67,7 +67,8 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 		fields:
 			'id, title, arc (id), order (int), moment (id), characters (ids), ' +
 			'place (id), themes (sub-theme ids), events (ledger events). ' +
-			`A situation with no arc belongs in ${VAULT.inbox}/ instead`,
+			'A situation with no arc is unplaced, which is a normal state — leave ' +
+			'the field out rather than moving the file anywhere',
 	},
 	system: {
 		from: `${VAULT.raw}/systems`,
@@ -204,7 +205,11 @@ export async function buildIngest(
 	const instruction = [
 		`Ingest the author's ${kind} notes below into ${kind} pages.`,
 		'',
-		`Write each page to \`${spec.to}/<id>.md\`. Frontmatter fields: ${spec.fields}.`,
+		`Write each page to \`${spec.to}/<id>.md\` — the filename is the id, with`,
+		'nothing appended. One id means one file, and a page written anywhere else',
+		'or under any other name becomes a second copy nothing can reconcile.',
+		'',
+		`Frontmatter fields: ${spec.fields}.`,
 		'',
 		'One note may describe several — an ordered list of moments is a page each,',
 		'not one page. One note may also describe only part of something that',

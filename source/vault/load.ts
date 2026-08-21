@@ -34,6 +34,23 @@ export type LoadIssue = {
 	readonly message: string;
 };
 
+/**
+ * Where a loaded page came from.
+ *
+ * The schemas carry an id and nothing about the file, which is right until two
+ * files declare the same id — at which point every report the tool can make is
+ * "there are two of these somewhere". Naming them is the difference between a
+ * finding an author can act on and one they have to go hunting for.
+ */
+export type Source = {
+	/** Vault-relative, so it can be printed and proposed. */
+	readonly path: string;
+	readonly kind: string;
+	readonly id: string;
+	/** The filename without `.md`. Equal to `id` in a tidy vault. */
+	readonly stem: string;
+};
+
 export type Vault = {
 	readonly root: string;
 	/**
@@ -55,6 +72,8 @@ export type Vault = {
 	readonly artifacts: readonly Artifact[];
 	readonly themes: readonly Theme[];
 	readonly chapters: readonly Chapter[];
+	/** Where each page was read from, for reports that have to name a file. */
+	readonly sources: readonly Source[];
 	/** Malformed files are reported, never thrown — the author keeps working. */
 	readonly issues: readonly LoadIssue[];
 };
@@ -113,6 +132,7 @@ async function loadDirectory<T>(
 	directory: string,
 	schema: {parse: (value: unknown) => T},
 	issues: LoadIssue[],
+	track?: {readonly kind: string; readonly into: Source[]; readonly root: string},
 ): Promise<T[]> {
 	const loaded: T[] = [];
 	for (const file of await listMarkdown(directory)) {
@@ -120,6 +140,15 @@ async function loadDirectory<T>(
 		const one = await loadOne(file, schema, issues, stem);
 		if (one !== undefined) {
 			loaded.push(one);
+			if (track !== undefined) {
+				const id = (one as {id?: unknown}).id;
+				track.into.push({
+					path: path.relative(track.root, file).split(path.sep).join('/'),
+					kind: track.kind,
+					id: typeof id === 'string' ? id : stem,
+					stem,
+				});
+			}
 		}
 	}
 	return loaded;
@@ -167,6 +196,7 @@ async function loadSystems(
 
 export async function loadVault(root: string): Promise<Vault> {
 	const issues: LoadIssue[] = [];
+	const sources: Source[] = [];
 
 	// The legacy system is spread across four files so each is independently
 	// editable in Obsidian; they are merged into one SystemDef here.
@@ -223,6 +253,7 @@ export async function loadVault(root: string): Promise<Vault> {
 		resolve(root, VAULT.moments),
 		momentSchema,
 		issues,
+		{kind: 'moment', into: sources, root},
 	);
 	const known = new Set(moments.map(moment => moment.id));
 
@@ -249,15 +280,51 @@ export async function loadVault(root: string): Promise<Vault> {
 
 	const [arcs, characters, factions, places, artifacts, themes, placed, inbox, chapters] =
 		await Promise.all([
-			loadDirectory(resolve(root, VAULT.arcs), arcSchema, issues),
-			loadDirectory(resolve(root, VAULT.characters), characterSchema, issues),
-			loadDirectory(resolve(root, VAULT.factions), factionSchema, issues),
-			loadDirectory(resolve(root, VAULT.places), placeSchema, issues),
-			loadDirectory(resolve(root, VAULT.artifacts), artifactSchema, issues),
-			loadDirectory(resolve(root, VAULT.themes), themeSchema, issues),
-			loadDirectory(resolve(root, VAULT.situations), situationSchema, issues),
-			loadDirectory(resolve(root, VAULT.inbox), situationSchema, issues),
-			loadDirectory(resolve(root, VAULT.chapters), chapterSchema, issues),
+			loadDirectory(resolve(root, VAULT.arcs), arcSchema, issues, {
+				kind: 'arc',
+				into: sources,
+				root,
+			}),
+			loadDirectory(resolve(root, VAULT.characters), characterSchema, issues, {
+				kind: 'character',
+				into: sources,
+				root,
+			}),
+			loadDirectory(resolve(root, VAULT.factions), factionSchema, issues, {
+				kind: 'faction',
+				into: sources,
+				root,
+			}),
+			loadDirectory(resolve(root, VAULT.places), placeSchema, issues, {
+				kind: 'place',
+				into: sources,
+				root,
+			}),
+			loadDirectory(resolve(root, VAULT.artifacts), artifactSchema, issues, {
+				kind: 'artifact',
+				into: sources,
+				root,
+			}),
+			loadDirectory(resolve(root, VAULT.themes), themeSchema, issues, {
+				kind: 'theme',
+				into: sources,
+				root,
+			}),
+			loadDirectory(resolve(root, VAULT.situations), situationSchema, issues, {
+				kind: 'situation',
+				into: sources,
+				root,
+			}),
+			loadDirectory(resolve(root, VAULT.inbox), situationSchema, issues, {
+				kind: 'situation',
+				into: sources,
+				root,
+			}),
+			loadDirectory(resolve(root, VAULT.chapters), chapterSchema, issues, {
+				kind: 'chapter',
+				into: sources,
+				root,
+			}),
 		]);
 
 	return {
@@ -275,6 +342,7 @@ export async function loadVault(root: string): Promise<Vault> {
 		artifacts,
 		themes,
 		chapters,
+		sources,
 		issues,
 	};
 }

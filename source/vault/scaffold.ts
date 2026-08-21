@@ -178,7 +178,8 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 		body: '# The Commodification of Existence\n\nSituations tag sub-themes only. Coverage is informational and never blocks.\n',
 	});
 
-	files[`${VAULT.situations}/sit-001-the-arrival.md`] = stringifyDocument({
+	// The filename is the id, with nothing appended: one id, one file.
+	files[`${VAULT.situations}/sit-001.md`] = stringifyDocument({
 		data: {
 			id: 'sit-001',
 			title: 'The Arrival',
@@ -202,7 +203,7 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 			starts_at: 'sit-001',
 			example: true,
 		},
-		body: '\n# Chapter One\n\n> Scaffold example. Delete `example: true` once this is really your chapter.\n\nOpens on [[sit-001-the-arrival|sit-001]].\n',
+		body: '\n# Chapter One\n\n> Scaffold example. Delete `example: true` once this is really your chapter.\n\nOpens on [[sit-001]].\n',
 	});
 
 	files[VAULT.index] = [
@@ -240,7 +241,7 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 		'',
 		'## Situations',
 		'',
-		'- [[sit-001-the-arrival]]',
+		'- [[sit-001]]',
 		'',
 		'## Chapters',
 		'',

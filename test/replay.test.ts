@@ -221,6 +221,7 @@ describe('deterministic checks', () => {
 			characters: [carl],
 			factions: [],
 			places: [],
+			sources: [],
 			artifacts: [],
 			themes: [],
 			replay: replayResult,

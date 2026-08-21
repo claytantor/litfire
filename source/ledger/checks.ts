@@ -11,6 +11,7 @@ import type {
 } from '../domain/schema.js';
 import type {FormulaRunner} from '../system/sandbox.js';
 import {VAULT} from '../vault/paths.js';
+import type {Source} from '../vault/load.js';
 import {systemFor, type Finding, type LedgerState, type ReplayResult} from './replay.js';
 
 export type OpenQuestion = {
@@ -31,6 +32,8 @@ export type CheckInput = {
 	readonly characters: readonly Character[];
 	readonly factions: readonly Faction[];
 	readonly places: readonly Place[];
+	/** Where each page was read from, so a finding can name a file. */
+	readonly sources: readonly Source[];
 	readonly artifacts: readonly Artifact[];
 	readonly themes: readonly Theme[];
 	readonly replay: ReplayResult;
@@ -431,6 +434,48 @@ function factionGoals(input: CheckInput): Finding[] {
 }
 
 /**
+ * A file whose name is not its id.
+ *
+ * The id is the filename stem by convention, and the convention was only that:
+ * `loadOne` falls back to the stem when frontmatter omits an id, but a file
+ * saying one thing while being named another loaded happily. That is how one
+ * situation came to exist as both `situations/sit-001.md` and
+ * `situations/inbox/sit-001-inanna-hears-her-parents-argue.md` — nothing could
+ * see that the second was the same page, because nothing was looking at names.
+ *
+ * Reported rather than refused (P4). Renaming a file is the author's to do, and
+ * a vault that will not load because a slug drifted would be worse than one
+ * that says so.
+ */
+function misnamedFiles(input: CheckInput): Finding[] {
+	const findings: Finding[] = input.sources
+		.filter(source => source.stem !== source.id)
+		.map(source => ({
+			kind: 'file_name_not_id',
+			detail: `${source.path} declares id '${source.id}' — rename it to ${source.id}.md so one id means one file`,
+			where: source.id,
+		}));
+
+	/**
+	 * `situations/inbox/` is still read so existing vaults keep working, and
+	 * nothing writes there any more. It meant "no arc", which the frontmatter
+	 * already says — and having a second legal home for one id is how a scene
+	 * came to exist in both at once.
+	 */
+	for (const source of input.sources) {
+		if (source.path.startsWith(`${VAULT.inbox}/`)) {
+			findings.push({
+				kind: 'legacy_location',
+				detail: `${source.path} is in the old inbox — move it to ${VAULT.situations}/${source.id}.md; a scene with no arc is already unplaced`,
+				where: source.id,
+			});
+		}
+	}
+
+	return findings;
+}
+
+/**
  * Two pages claiming to be the same thing.
  *
  * Ids are the vault's primary key: they are the filename stem, the wikilink
@@ -469,9 +514,17 @@ function duplicates(input: CheckInput): Finding[] {
 		}
 		for (const [id, count] of byId) {
 			if (count > 1) {
+				// Named, not counted. "There are two of these somewhere" is a fact
+				// the author then has to go hunting for; the paths are the fix.
+				const where = input.sources
+					.filter(source => source.kind === kind && source.id === id)
+					.map(source => source.path);
 				findings.push({
 					kind: 'duplicate_id',
-					detail: `${String(count)} ${kind} pages declare id '${id}'; everything that resolves it sees only one of them`,
+					detail:
+						where.length > 0
+							? `${where.join(' and ')} both declare id '${id}'; only one is ever resolved`
+							: `${String(count)} ${kind} pages declare id '${id}'; everything that resolves it sees only one of them`,
 					where: id,
 				});
 			}
@@ -617,6 +670,7 @@ export function runChecks(input: CheckInput): OpenQuestion[] {
 		...unplaced(input),
 		...clockCollisions(input),
 		...duplicates(input),
+		...misnamedFiles(input),
 		...systemNames(input),
 		...factionGoals(input),
 		...artifactUse(input),

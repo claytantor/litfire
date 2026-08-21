@@ -531,3 +531,41 @@ record, not deriving from it.
 An empty directory is refused in the command, before any model call. There is
 nothing to think about, and a request that costs money should not be spent
 discovering there was no input.
+
+## D19 — One id, one file
+
+**Committed:** the filename is the id; `situations/inbox/` is no longer written
+to; a page whose stem is not its id is reported.
+
+A situation existed twice: `situations/sit-001.md` and
+`situations/inbox/sit-001-inanna-hears-her-parents-argue.md`, both declaring
+`id: sit-001`. Everything downstream resolved whichever loaded first, so a cast
+linked on one was invisible through the other.
+
+Two decisions made it possible, and both are gone.
+
+**A slug in the filename.** `/situation new` wrote `<id>-<slug>.md` while
+everything else wrote `<id>.md`, so nothing that looks at names could tell the
+two files were the same page — `findSituationFile` had to open every file and
+read its frontmatter to find one. The filename is now the id and nothing else.
+The title is in the frontmatter already.
+
+**A second legal home.** `situations/inbox/` meant "no arc", which
+`arc: undefined` already says; the loader literally forced it with
+`inbox.map(s => ({...s, arc: undefined}))`. Encoding the same fact twice gave
+one scene two valid locations, and placing it on an arc _moved the file_ —
+which is why the two copies could drift apart. Placing now sets `arc:` and
+touches nothing else.
+
+The inbox is still read, so existing vaults keep loading, and reported as
+`legacy_location` so it empties rather than persisting. The scaffold's own
+`sit-001-the-arrival.md` was renamed: the tool was shipping a violation of its
+own rule.
+
+`Vault.sources` records the file each page was read from. Without it every
+report was "there are two of these somewhere", which is a fact the author then
+has to go hunting for; `duplicate_id` now names both paths, and that is also
+what let ingest propose removing the lesser copy (D18).
+
+**Still open:** whether the corpus should be authored at all, or derived wholly
+from `raw/`. That is a larger question than this one and is not settled here.

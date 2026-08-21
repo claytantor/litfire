@@ -40,7 +40,7 @@ async function buildFixture(): Promise<void> {
 
 	await rm(resolve(root, VAULT.characters, 'protagonist.md'), {force: true});
 	await rm(resolve(root, VAULT.arcs, 'arc-01.md'), {force: true});
-	await rm(resolve(root, VAULT.situations, 'sit-001-the-arrival.md'), {force: true});
+	await rm(resolve(root, VAULT.situations, 'sit-001.md'), {force: true});
 	await rm(resolve(root, VAULT.themes, 'commodification.md'), {force: true});
 
 	await put(VAULT.skills, {
