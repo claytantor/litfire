@@ -62,7 +62,7 @@ describe('places are a primitive now', () => {
 
 	it('renames without touching the prose', async () => {
 		await run('/place new The Ledger Room');
-		const file = path.join(root, 'places', 'the-ledger-room.md');
+		const file = path.join(root, 'corpus', 'places', 'the-ledger-room.md');
 		const body = parseDocument(await readFile(file, 'utf8')).body;
 
 		await run('/place the-ledger-room name The Counting House');
@@ -86,7 +86,7 @@ describe('places are a primitive now', () => {
 		// place two ways and the command that refuses collisions never runs.
 		await run('/place new The Ledger Room');
 		await writeFile(
-			path.join(root, 'places', 'ledger-room.md'),
+			path.join(root, 'corpus', 'places', 'ledger-room.md'),
 			'---\nid: ledger-room\nname: The Ledger Room\n---\n\nProse.\n',
 			'utf8',
 		);
@@ -145,7 +145,7 @@ describe('the link to a situation', () => {
 		expect(page).toBeDefined();
 		// No page of its own, so it is titled by its id and says so.
 		expect(page?.title).toBe('the-undercroft');
-		expect(page?.body).toContain('No `places/the-undercroft.md` file yet');
+		expect(page?.body).toContain('No `corpus/places/the-undercroft.md` file yet');
 	});
 });
 

@@ -188,8 +188,8 @@ describe('grounding', () => {
 
 		// index.md is the cheapest map of what exists, so it leads.
 		expect(grounding.startsWith('## index.md')).toBe(true);
-		expect(grounding).toContain('system/idiom.md');
-		expect(grounding).toContain('system/formulas.md');
+		expect(grounding).toContain('setting/idiom.md');
+		expect(grounding).toContain('setting/formulas.md');
 	});
 
 	/**
@@ -209,7 +209,7 @@ describe('grounding', () => {
 		// files are still legitimately present.
 		expect(grounding).toContain('Not established');
 		expect(grounding).toContain('your protagonist');
-		expect(grounding).toContain('system/formulas.md');
+		expect(grounding).toContain('setting/formulas.md');
 	});
 
 	it('excludes placeholders from every interview kind', async () => {
@@ -225,7 +225,7 @@ describe('grounding', () => {
 	it('includes a page as soon as the author drops the example flag', async () => {
 		await scaffoldVault(root);
 		await writeFile(
-			path.join(root, 'characters', 'nyx.md'),
+			path.join(root, 'corpus', 'characters', 'nyx.md'),
 			'---\nid: nyx\nname: Nyx\n---\n\n# Nyx\n\nA real character.\n',
 			'utf8',
 		);
@@ -240,22 +240,22 @@ describe('grounding', () => {
 		await scaffoldVault(root);
 		// Author-written pages, so they are not filtered as placeholders.
 		await writeFile(
-			path.join(root, 'themes', 'debt.md'),
+			path.join(root, 'corpus', 'themes', 'debt.md'),
 			'---\nid: debt\n---\n\n# Debt\n',
 			'utf8',
 		);
 		await writeFile(
-			path.join(root, 'timeline', 'moments.md'),
-			'---\nworld_events: []\n---\n\n# Real events\n',
+			path.join(root, 'corpus', 'moments', 'real-event.md'),
+			'---\nid: real-event\nname: Real Event\n---\n\n# Real events\n',
 			'utf8',
 		);
 
 		const themes = await buildGrounding(root, 'themes');
 		const timeline = await buildGrounding(root, 'timeline');
 
-		expect(themes).toContain('themes/debt.md');
-		expect(timeline).toContain('timeline/moments.md');
-		expect(timeline).not.toContain('themes/debt.md');
+		expect(themes).toContain('corpus/themes/debt.md');
+		expect(timeline).toContain('corpus/moments/real-event.md');
+		expect(timeline).not.toContain('corpus/themes/debt.md');
 	});
 
 	it('narrows character grounding to the focused character', async () => {
@@ -269,7 +269,7 @@ describe('grounding', () => {
 	it('respects the character budget', async () => {
 		await scaffoldVault(root);
 		await writeFile(
-			path.join(root, 'system', 'lore.md'),
+			path.join(root, 'setting', 'lore.md'),
 			`---\ntitle: Lore\n---\n\n${'x'.repeat(5000)}\n`,
 			'utf8',
 		);

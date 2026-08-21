@@ -260,16 +260,13 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 		'\n> Scaffold example. Delete `example: true` once this is really your scene.\n\nProse body. The tool never edits this text.\n\nFeaturing [[protagonist]] in [[arc-01]], at [[we-001]].\n',
 	);
 
-	files[`${VAULT.chapters}/ch-01.md`] = stringifyDocument({
-		data: {
-			id: 'ch-01',
-			title: 'Chapter One',
-			order: 1,
-			starts_at: 'sit-001',
-			example: true,
-		},
-		body: '\n# Chapter One\n\n> Scaffold example. Delete `example: true` once this is really your chapter.\n\nOpens on [[sit-001]].\n',
-	});
+	authored(
+		files,
+		'chapter',
+		'ch-01',
+		{title: 'Chapter One', order: 1, starts_at: 'sit-001', example: true},
+		'\n# Chapter One\n\n> Scaffold example. Delete `example: true` once this is really your chapter.\n\nOpens on [[sit-001]].\n',
+	);
 
 	files[VAULT.index] = [
 		'---',
@@ -282,9 +279,9 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 		'',
 		GENERATED_BANNER,
 		'',
-		'## System',
+		'## Setting',
 		'',
-		'- [[system]]',
+		'- [[setting]]',
 		'- [[idiom]]',
 		'- [[system-01]]',
 		'- [[formulas]]',

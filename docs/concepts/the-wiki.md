@@ -31,7 +31,7 @@ transferred without consent produced **zero writes** — none of it is a stat, a
 skill, a curve, or a formula. The two halves of one feature disagreed: the
 interviewer asked for meaning and the extractor could only record mechanics.
 
-`system/system.md` is now the primary target for `/system`. Its body is the
+`setting/setting.md` is now the primary target for `/system`. Its body is the
 prose record of the System — purpose, cost, ceiling, exploit, who sees it, who
 runs it — and its frontmatter carries the three descriptors the base brief
 interviews for (`system_origin`, `system_visibility`, `system_agency`). Arc
@@ -40,13 +40,13 @@ plainly that returning nothing because nothing was numeric throws the author's
 work away, and told not to invent mechanics to fill a schema.
 
 It is also told to preserve the existing `idiom` value, since a whole-file
-rewrite of `system/system.md` would otherwise reset the vault's vocabulary.
+rewrite of `setting/setting.md` would otherwise reset the vault's vocabulary.
 
 ## And the wiki has to show it
 
 Writing prose to disk is only half the trip. The derived pages read the author's
-own body from the corpus file they annotate — `system/system.md`,
-`characters/<id>.md`, `timeline/arcs/<id>.md`, `themes/<id>.md` — and put it
+own body from the corpus file they annotate — `setting/setting.md`,
+`corpus/characters/<id>.md`, `corpus/arcs/<id>.md`, `corpus/themes/<id>.md` — and put it
 above the computed sections under a `## From <path>` heading.
 
 That was missing at first, and it produced the same symptom one layer along: an
@@ -69,7 +69,7 @@ interviews that produced nothing
     /system extract to re-run extraction
 ```
 
-**The signal is timestamps, not emptiness.** `/init` seeds `system/stats.md`
+**The signal is timestamps, not emptiness.** `/init` seeds `corpus/systems/<id>.md`
 from the profile's archetype stats, so "the corpus is empty" is never true in a
 scaffolded vault and a check built on it would never fire for anybody. What is
 true is that a successful extraction writes its target _after_ the interview

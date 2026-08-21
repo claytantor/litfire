@@ -84,7 +84,7 @@ describe('knowing what has already been said', () => {
 
 	it('reads provenance back off the corpus, not a cache', async () => {
 		await note(
-			'characters/inanna.md',
+			'corpus/characters/inanna.md',
 			'---\nid: inanna\nsource: raw/characters/inanna.md\nsource_hash: abc123abc123\n---\n\nProse.\n',
 		);
 
@@ -95,8 +95,11 @@ describe('knowing what has already been said', () => {
 	it('ignores a page that carries no provenance', async () => {
 		// Isolate from the scaffold's seeded characters/protagonist.md, which
 		// does carry provenance.
-		await rm(path.join(root, 'characters/protagonist.md'), {force: true});
-		await note('characters/hand-written.md', '---\nid: hand-written\n---\n\nProse.\n');
+		await rm(path.join(root, 'corpus/characters/protagonist.md'), {force: true});
+		await note(
+			'corpus/characters/hand-written.md',
+			'---\nid: hand-written\n---\n\nProse.\n',
+		);
 		expect(await readIngestState(root, 'character')).toEqual(new Map());
 	});
 
@@ -125,7 +128,7 @@ describe('stamping a page', () => {
 
 	it('round-trips into something the next ingest can read', async () => {
 		await note(
-			'characters/inanna.md',
+			'corpus/characters/inanna.md',
 			stampSource(
 				'---\nid: inanna\n---\n\nShe lied.\n',
 				'raw/characters/inanna.md',
@@ -147,7 +150,7 @@ describe('/ingest before it spends anything', () => {
 		await rm(path.join(root, 'raw/characters/protagonist.md'), {force: true});
 		await note('raw/characters/inanna.md', 'She lied.');
 		await note(
-			'characters/inanna.md',
+			'corpus/characters/inanna.md',
 			stampSource(
 				'---\nid: inanna\n---\n\nShe lied.\n',
 				'raw/characters/inanna.md',
@@ -186,7 +189,7 @@ describe('/ingest before it spends anything', () => {
 		await note('raw/characters/inanna.md', 'She lied.');
 		await note('raw/characters/carl.md', 'He did not.');
 		await note(
-			'characters/inanna.md',
+			'corpus/characters/inanna.md',
 			stampSource(
 				'---\nid: inanna\n---\n\nProse.\n',
 				'raw/characters/inanna.md',

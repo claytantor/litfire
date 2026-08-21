@@ -737,7 +737,7 @@ function buildSystemPage(
 		'The rules layer the `/system` interview produces (§3) — everything else in',
 		'this wiki is derived from play; this page is what play plays by.',
 		'',
-		authorSection(project.vault.root, VAULT.system, 'system', VAULT.settingFile),
+		authorSection(project.vault.root, VAULT.setting, 'setting', VAULT.settingFile),
 		'',
 		// Membership is the fact a multi-system vault most needs from this page:
 		// a stat means nothing until you know whose rules are counting it.

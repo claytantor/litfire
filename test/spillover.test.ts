@@ -67,12 +67,12 @@ function stub(
 
 describe('stub routing', () => {
 	it('sends each kind to its own domain', () => {
-		expect(stubPath('character', 'donut')).toBe('characters/donut.md');
-		expect(stubPath('place', 'rust-quarter')).toBe('places/rust-quarter.md');
-		expect(stubPath('faction', 'assessors')).toBe('factions/assessors.md');
-		expect(stubPath('theme', 'debt')).toBe('themes/debt.md');
-		expect(stubPath('arc', 'arc-quiet-year')).toBe('timeline/arcs/arc-quiet-year.md');
-		expect(stubPath('moment', 'quiet-year')).toBe('timeline/moments/quiet-year.md');
+		expect(stubPath('character', 'donut')).toBe('corpus/characters/donut.md');
+		expect(stubPath('place', 'rust-quarter')).toBe('corpus/places/rust-quarter.md');
+		expect(stubPath('faction', 'assessors')).toBe('corpus/factions/assessors.md');
+		expect(stubPath('theme', 'debt')).toBe('corpus/themes/debt.md');
+		expect(stubPath('arc', 'arc-quiet-year')).toBe('corpus/arcs/arc-quiet-year.md');
+		expect(stubPath('moment', 'quiet-year')).toBe('corpus/moments/quiet-year.md');
 	});
 
 	/**
@@ -81,7 +81,7 @@ describe('stub routing', () => {
 	 * the same fact twice and let one scene exist in two places at once.
 	 */
 	it('files a situation stub beside every other situation', () => {
-		expect(stubPath('situation', 'the-audit')).toBe('situations/the-audit.md');
+		expect(stubPath('situation', 'the-audit')).toBe('corpus/situations/the-audit.md');
 	});
 });
 
@@ -136,7 +136,7 @@ describe('planning', () => {
 	it('turns a stub into a low-confidence proposal at the right path', async () => {
 		const plan = await planSpillover([stub()], context());
 		expect(plan.proposals).toHaveLength(1);
-		expect(plan.proposals[0]?.path).toBe('factions/the-assessors.md');
+		expect(plan.proposals[0]?.path).toBe('corpus/factions/the-assessors.md');
 		expect(plan.proposals[0]?.confidence).toBe('low');
 		expect(plan.proposals[0]?.rationale).toContain('system interview');
 	});
@@ -161,7 +161,7 @@ describe('planning', () => {
 	it('stands down when the extraction already proposes that page', async () => {
 		const plan = await planSpillover(
 			[stub({kind: 'theme', id: 'debt', name: 'Debt'})],
-			context({taken: ['themes/debt.md']}),
+			context({taken: ['corpus/themes/debt.md']}),
 		);
 		expect(plan.proposals).toHaveLength(0);
 		expect(plan.dropped[0]?.reason).toContain('already proposes');
@@ -196,8 +196,8 @@ describe('moments', () => {
 		);
 
 		expect(plan.proposals.map(p => p.path).toSorted()).toEqual([
-			'timeline/moments/quiet-year.md',
-			'timeline/moments/the-recall.md',
+			'corpus/moments/quiet-year.md',
+			'corpus/moments/the-recall.md',
 		]);
 		const {data} = parseDocument(plan.proposals[0]?.contents ?? '');
 		expect(data).toMatchObject({id: 'quiet-year', stub: true});
@@ -330,7 +330,10 @@ describe('factions reach the corpus', () => {
 
 	it('lands where the wiki builder already publishes from', async () => {
 		await writeFaction();
-		const page = await readFile(path.join(root, 'factions/the-assessors.md'), 'utf8');
+		const page = await readFile(
+			path.join(root, 'corpus/factions/the-assessors.md'),
+			'utf8',
+		);
 		expect(page).toContain('The Assessors');
 	});
 
@@ -447,10 +450,10 @@ describe('sweeping several transcripts', () => {
 		);
 
 		const byPath = new Map(plan.proposals.map(p => [p.path, p.contents]));
-		expect(byPath.get('factions/the-assessors.md')).toContain(
+		expect(byPath.get('corpus/factions/the-assessors.md')).toContain(
 			'[[system-2026-01-01T00-00-00]]',
 		);
-		expect(byPath.get('places/rust-quarter.md')).toContain(
+		expect(byPath.get('corpus/places/rust-quarter.md')).toContain(
 			'[[system-2026-06-01T00-00-00]]',
 		);
 	});
@@ -477,10 +480,10 @@ describe('sweeping several transcripts', () => {
 		);
 
 		const byPath = new Map(plan.proposals.map(p => [p.path, p.contents]));
-		expect(byPath.get('timeline/moments/quiet-year.md')).toContain(
+		expect(byPath.get('corpus/moments/quiet-year.md')).toContain(
 			'[[system-2026-01-01T00-00-00]]',
 		);
-		expect(byPath.get('timeline/moments/the-recall.md')).toContain(
+		expect(byPath.get('corpus/moments/the-recall.md')).toContain(
 			'[[system-2026-06-01T00-00-00]]',
 		);
 	});

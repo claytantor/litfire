@@ -112,7 +112,7 @@ describe('setting the time', () => {
 		// Straight off the file, not the parsed model: the digits have to survive
 		// the round trip through YAML.
 		const raw = await readFile(
-			path.join(root, 'timeline', 'moments', 'the-breach.md'),
+			path.join(root, 'corpus', 'moments', 'the-breach.md'),
 			'utf8',
 		);
 		expect(raw).toContain('at: -26174880000000123');
@@ -181,7 +181,7 @@ describe('editing a moment', () => {
 	});
 
 	it('never rewrites the description when changing the time', async () => {
-		const file = path.join(root, 'timeline', 'moments', 'the-breach.md');
+		const file = path.join(root, 'corpus', 'moments', 'the-breach.md');
 		const before = await readFile(file, 'utf8');
 		const body = parseDocument(before).body;
 
@@ -203,8 +203,8 @@ describe('reading moments back', () => {
 	// The scaffold seeds we-001/we-002; both tests below assert on an exact
 	// moment list, so the seeded pair is removed to get a clean slate.
 	beforeEach(async () => {
-		await rm(path.join(root, 'timeline', 'moments', 'we-001.md'), {force: true});
-		await rm(path.join(root, 'timeline', 'moments', 'we-002.md'), {force: true});
+		await rm(path.join(root, 'corpus', 'moments', 'we-001.md'), {force: true});
+		await rm(path.join(root, 'corpus', 'moments', 'we-002.md'), {force: true});
 		context = {...context, project: await computeProject(root)};
 	});
 

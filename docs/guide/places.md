@@ -9,7 +9,7 @@ capture it.
 /place new The Ledger Room
 ```
 
-Writes `places/the-ledger-room.md`, slugging the name into the id, and opens the
+Writes `corpus/places/the-ledger-room.md`, slugging the name into the id, and opens the
 [buffer](./writing-a-scene.md) so you can describe it.
 
 | Form                      | Does                                    |

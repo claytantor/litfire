@@ -38,8 +38,8 @@ const CAUTION_RESERVE = 460;
  * after each interview's own corpus rather than crowding it out.
  */
 const RELEVANT: Readonly<Record<InterviewKind, readonly string[]>> = {
-	system: [VAULT.system, VAULT.systems, VAULT.artifacts, VAULT.factions],
-	timeline: [VAULT.timeline, VAULT.arcs, VAULT.factions, VAULT.places],
+	system: [VAULT.setting, VAULT.systems, VAULT.artifacts, VAULT.factions],
+	timeline: [VAULT.moments, VAULT.arcs, VAULT.factions, VAULT.places],
 	character: [
 		VAULT.characters,
 		VAULT.systems,

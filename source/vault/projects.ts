@@ -52,7 +52,9 @@ export async function inspectProject(root: string): Promise<ProjectState> {
 	// directory litfire has merely been run in as a vault. `system/` and
 	// `index.md` are written only by `/init`, and survive deleting the cache
 	// (DoD 11).
-	for (const marker of [VAULT.system, VAULT.index]) {
+	// `VAULT.legacySetting` is here for the same reason it is still read: a vault
+	// written before `setting/` must not stop being recognised as a vault.
+	for (const marker of [VAULT.setting, VAULT.legacySetting, VAULT.index]) {
 		if (await stat(path.join(root, marker)).catch(() => undefined)) {
 			return 'vault';
 		}

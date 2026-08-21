@@ -70,7 +70,7 @@ import {
 } from '../wiki/host.js';
 import {readConfig, recordConsent} from '../vault/config.js';
 import {parseDocument, stringifyDocument} from '../vault/frontmatter.js';
-import {resolve, VAULT} from '../vault/paths.js';
+import {LEGACY_DIRECTORIES, VAULT, resolve} from '../vault/paths.js';
 import {
 	displayPath,
 	inspectProject,
@@ -133,15 +133,12 @@ function nextOrder(existing: readonly number[]): number {
 const SOURCE_DIRECTORIES: readonly string[] = [
 	VAULT.meta,
 	VAULT.raw,
-	VAULT.system,
-	VAULT.timeline,
-	VAULT.characters,
-	VAULT.themes,
-	VAULT.places,
-	VAULT.factions,
-	VAULT.situations,
-	VAULT.chapters,
+	VAULT.setting,
+	VAULT.corpus,
 	VAULT.ledger,
+	// The pre-corpus/ homes, so an export cannot land on a vault that has not
+	// moved yet — the one case where writing over "somewhere old" is fatal.
+	...Object.keys(LEGACY_DIRECTORIES),
 ];
 
 const help: Command = {

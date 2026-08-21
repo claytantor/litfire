@@ -33,7 +33,7 @@ an engine feature that every profile gets.
 
 ## Setting descriptors
 
-Three fields on `system/system.md`, deliberately not a genre enum — they
+Three fields on `setting/setting.md`, deliberately not a genre enum — they
 describe the design space better than a binary would, and the interview branches
 on them:
 
@@ -112,7 +112,7 @@ data-only additions.
 ## Editing the lexicon
 
 `/idiom set <key> <term>` and `/idiom unset <key>` write the per-vault override
-at `system/idiom.md`, where author edits win over the shipped profile (§3.2):
+at `setting/idiom.md`, where author edits win over the shipped profile (§3.2):
 
 ```
 › /idiom set resource essence

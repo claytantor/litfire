@@ -56,7 +56,7 @@ exactly as broad as the clock.
 ## Calendars
 
 A calendar turns an instant into something readable, and sometimes back again.
-It is a presentation choice, held in `timeline/time.md`, and changing it never
+It is a presentation choice, held in `setting/time.md`, and changing it never
 rewrites a moment.
 
 ::: warning Naming an origin does not bind a calendar

@@ -36,7 +36,11 @@ async function readIfPresent(file: string): Promise<string | undefined> {
 export async function loadSetting(root: string): Promise<SettingContext> {
 	const issues: string[] = [];
 
-	const settingRaw = await readIfPresent(resolve(root, VAULT.settingFile));
+	// Both homes: `setting/` is where it lives now, `system/system.md` is where
+	// every vault written before the layout change still has it.
+	const settingRaw =
+		(await readIfPresent(resolve(root, VAULT.settingFile))) ??
+		(await readIfPresent(resolve(root, VAULT.legacySettingFile)));
 	let setting: Setting = settingSchema.parse({});
 	if (settingRaw !== undefined) {
 		const parsed = settingSchema.safeParse(parseDocument(settingRaw).data);
@@ -52,7 +56,9 @@ export async function loadSetting(root: string): Promise<SettingContext> {
 	const available = new Map<string, Profile>(BUILT_IN_PROFILES);
 	let overridden = false;
 
-	const idiomRaw = await readIfPresent(resolve(root, VAULT.idiom));
+	const idiomRaw =
+		(await readIfPresent(resolve(root, VAULT.idiom))) ??
+		(await readIfPresent(resolve(root, VAULT.legacyIdiom)));
 	if (idiomRaw !== undefined) {
 		const {data} = parseDocument(idiomRaw);
 		// `/init` ships this file with every key commented out, so its mere

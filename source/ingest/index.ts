@@ -29,6 +29,7 @@ export const INGEST_KINDS = [
 	'faction',
 	'artifact',
 	'theme',
+	'chapter',
 ] as const;
 
 export type IngestKind = (typeof INGEST_KINDS)[number];
@@ -101,6 +102,15 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 		from: `${VAULT.raw}/themes`,
 		to: VAULT.themes,
 		fields: 'id, name, subthemes (id, name, description, tension)',
+	},
+	chapter: {
+		from: `${VAULT.raw}/chapters`,
+		to: VAULT.chapters,
+		fields:
+			'id, title, order (int), starts_at (situation id). A chapter is a cut ' +
+			'in the replay sequence — it names where it begins and nothing else. ' +
+			'Which situations fall inside it is derived from the next cut, never ' +
+			'stored, so never list members',
 	},
 };
 

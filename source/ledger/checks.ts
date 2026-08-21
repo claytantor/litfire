@@ -10,7 +10,7 @@ import type {
 	Moment,
 } from '../domain/schema.js';
 import type {FormulaRunner} from '../system/sandbox.js';
-import {LEGACY_FILES, VAULT} from '../vault/paths.js';
+import {LEGACY_DIRECTORIES, LEGACY_FILES, VAULT} from '../vault/paths.js';
 import type {Source} from '../vault/load.js';
 import {systemFor, type Finding, type LedgerState, type ReplayResult} from './replay.js';
 
@@ -484,11 +484,15 @@ function misnamedFiles(input: CheckInput): Finding[] {
 	 * means one, and every stat on a sheet resolves against whichever the loader
 	 * picked.
 	 */
-	for (const file of input.legacy) {
+	for (const where of input.legacy) {
+		const now = LEGACY_FILES[where] ?? LEGACY_DIRECTORIES[where];
 		findings.push({
 			kind: 'legacy_location',
-			detail: `${file} is a superseded layout — its content now belongs in ${LEGACY_FILES[file] ?? 'the current layout'}`,
-			where: file,
+			detail:
+				now === undefined
+					? `${where} is a superseded layout`
+					: `${where} is a superseded layout — its content now belongs in ${now}${LEGACY_DIRECTORIES[where] === undefined ? '' : '/'}`,
+			where,
 		});
 	}
 
@@ -658,7 +662,7 @@ function formulaErrors(input: CheckInput): Finding[] {
 	return (input.formulas?.errors ?? []).map(error => ({
 		kind: 'formula_error',
 		detail: `formula '${error.id}' failed to compile: ${error.message}`,
-		where: 'system/formulas.md',
+		where: VAULT.formulas,
 	}));
 }
 

@@ -76,7 +76,7 @@ almost always why.
 /situation new The Ledger Room
 ```
 
-Scaffolds `situations/inbox/` and opens the [native buffer](./writing-a-scene.md)
+Scaffolds `corpus/situations/` and opens the [native buffer](./writing-a-scene.md)
 so you can write. Scenes start in the inbox: an unplaced situation is a valid
 permanent state, not a staging error.
 
@@ -86,7 +86,7 @@ permanent state, not a staging error.
 /place new The Ledger Room
 ```
 
-Writes `places/the-ledger-room.md` and opens the buffer. Places are almost all
+Writes `corpus/places/the-ledger-room.md` and opens the buffer. Places are almost all
 prose — what a room is like is writing, not data — so the schema is only an id
 and a name.
 
@@ -145,7 +145,7 @@ character state is one character at one moment, addressed as
 
 For a cast member to have state, three things must hold:
 
-1. **They have a character page** — `characters/<id>.md`. Casting someone
+1. **They have a character page** — `corpus/characters/<id>.md`. Casting someone
    without one links fine and reports the gap.
 2. **They are under a system** — `system:` on their page, or the vault has
    exactly one system and they resolve into it implicitly.

@@ -37,17 +37,18 @@ places with no situations produces an almost empty wiki — see
 
 ## What each one is
 
-| Primitive     | Is                                   | Lives in            |
-| ------------- | ------------------------------------ | ------------------- |
-| **system**    | What tracks a character's stats      | `systems/`          |
-| **moment**    | A point on the in-world clock        | `timeline/moments/` |
-| **arc**       | A span of narrative order            | `timeline/arcs/`    |
-| **situation** | A scene                              | `situations/`       |
-| **place**     | Somewhere a scene happens            | `places/`           |
-| **character** | A person the ledger tracks           | `characters/`       |
-| **faction**   | A group working toward a goal        | `factions/`         |
-| **artifact**  | Something used to achieve an outcome | `artifacts/`        |
-| **theme**     | What the book argues about           | `themes/`           |
+| Primitive     | Is                                   | Lives in             |
+| ------------- | ------------------------------------ | -------------------- |
+| **system**    | What tracks a character's stats      | `corpus/systems/`    |
+| **moment**    | A point on the in-world clock        | `corpus/moments/`    |
+| **arc**       | A span of narrative order            | `corpus/arcs/`       |
+| **situation** | A scene                              | `corpus/situations/` |
+| **place**     | Somewhere a scene happens            | `corpus/places/`     |
+| **character** | A person the ledger tracks           | `corpus/characters/` |
+| **faction**   | A group working toward a goal        | `corpus/factions/`   |
+| **artifact**  | Something used to achieve an outcome | `corpus/artifacts/`  |
+| **theme**     | What the book argues about           | `corpus/themes/`     |
+| **chapter**   | A cut in the replay sequence         | `corpus/chapters/`   |
 
 Two more have ids but no files of their own. **Skills** and **items** are
 declared by a system or named by ledger events, and their wiki pages are built
@@ -64,8 +65,8 @@ disk, so `/lint` reports:
 
 - **`file_name_not_id`** — a page whose filename does not match its id.
 - **`legacy_location`** — a file in a layout litfire has moved on from. A
-  situation in `situations/inbox/`, which was a second home for the same thing;
-  the `system/stats.md` + `skills.md` + `curves.md` trio, which `systems/<id>.md`
+  situation in `corpus/situations/`, which was a second home for the same thing;
+  the `corpus/systems/<id>.md` + `skills.md` + `curves.md` trio, which `corpus/systems/<id>.md`
   replaced; or `timeline/world-events.md`, from before moments were pages. All
   are still read, so no vault breaks — `/init` just stops creating them, and the
   finding names what now replaces each one.

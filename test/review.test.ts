@@ -80,7 +80,7 @@ describe('diff rendering', () => {
 		await scaffoldVault(root);
 		const batch = await ReviewBatch.create(root, [
 			proposal({
-				path: 'characters/protagonist.md',
+				path: 'corpus/characters/protagonist.md',
 				contents: '---\nid: carl\n---\n\n# Protagonist\n\nRewritten.\n',
 			}),
 		]);
@@ -250,21 +250,24 @@ describe('applying a batch', () => {
 
 	it('overwrites an existing file only once accepted', async () => {
 		await scaffoldVault(root);
-		const before = await readFile(path.join(root, 'characters/protagonist.md'), 'utf8');
+		const before = await readFile(
+			path.join(root, 'corpus/characters/protagonist.md'),
+			'utf8',
+		);
 		const batch = await ReviewBatch.create(root, [
-			proposal({path: 'characters/protagonist.md', contents: 'replaced\n'}),
+			proposal({path: 'corpus/characters/protagonist.md', contents: 'replaced\n'}),
 		]);
 
 		await batch.apply(); // still pending
-		expect(await readFile(path.join(root, 'characters/protagonist.md'), 'utf8')).toBe(
-			before,
-		);
+		expect(
+			await readFile(path.join(root, 'corpus/characters/protagonist.md'), 'utf8'),
+		).toBe(before);
 
 		batch.decide('accepted');
 		await batch.apply();
-		expect(await readFile(path.join(root, 'characters/protagonist.md'), 'utf8')).toBe(
-			'replaced\n',
-		);
+		expect(
+			await readFile(path.join(root, 'corpus/characters/protagonist.md'), 'utf8'),
+		).toBe('replaced\n');
 	});
 
 	it('shows the real prior contents in the diff when a file exists', async () => {

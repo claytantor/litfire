@@ -92,6 +92,7 @@ describe('findOrphanedInterviews', () => {
 
 	it('stays quiet once the corpus has the work', async () => {
 		await saveTranscript(root, transcript('system', 5, {startedAt: before()}));
+		await mkdir(resolve(root, VAULT.legacySetting), {recursive: true});
 		await writeFile(
 			resolve(root, VAULT.stats),
 			stringifyDocument({
@@ -184,6 +185,7 @@ describe('/system show', () => {
 		// Isolate the legacy system so it is the vault's only one — otherwise
 		// `/system show` with no id and two systems renders the summary list.
 		await rm(resolve(root, VAULT.systems, 'system-01.md'), {force: true});
+		await mkdir(resolve(root, VAULT.legacySetting), {recursive: true});
 		await writeFile(
 			resolve(root, VAULT.stats),
 			stringifyDocument({data: {stats: [{id: 'memory', default: 10}]}, body: '\n'}),

@@ -682,3 +682,52 @@ load, so no existing vault breaks. What changed is that `/init` stops creating
 them and `/lint` starts naming them. `Vault.legacy` records which legacy readers
 actually fired, because an absent file and an empty one are not the same fact
 and only one of them is worth reporting (P4).
+
+## D23 — Three directories, three owners
+
+**Committed:** the corpus moves under `corpus/`, the setting under `setting/`,
+and `chapters` becomes the tenth primitive. Every old path is still read.
+
+> Paths in decisions above this one are as they were when the decision was
+> taken. They are a record of what was decided, not a description of the
+> current layout — `docs/concepts/architecture.md` is that.
+
+The top level mixed four ownership classes with nothing to tell them apart:
+`raw/` beside `characters/` beside `ledger/` beside `system/`. The author read
+that tree twice and concluded the corpus was a redundant copy of `raw/` — which
+it is not, and could not be, since 25 of the 31 pages in the vault existed
+nowhere else. When the filesystem is the API, a reader drawing the wrong
+conclusion twice is the API failing, not the reader.
+
+So the names now carry the ownership. `raw/` is what you write. `corpus/` is
+what is derived from it. `setting/` is how the vault reads rather than what is
+in it. `ledger/` and `wiki/` are computed, and were already obvious.
+
+**`raw/` and `corpus/` mirror each other exactly** — one folder per primitive,
+the same name in both — so `raw/moments/the-breach.md` and
+`corpus/moments/the-breach.md` are visibly the same thing at two stages. That is
+also why `timeline/` went: `raw/moments/` opposite `timeline/moments/` hid a
+correspondence that `corpus/moments/` states.
+
+**`system/` became `setting/`.** It sat one letter from `systems/` and meant
+something entirely different — the setting descriptors and the idiom, not the
+character system. That collision had already cost something: the scaffold's own
+system had to be called `system-01`, because `[[system]]` was taken by the
+setting page (D22).
+
+**Chapters became the tenth primitive.** A chapter was the one authored thing
+with no `raw/` folder to be adopted into, which the flow diagram had to record
+as an open question. Giving it `raw/chapters/` and `corpus/chapters/` settles
+it, and means every author-owned file in a vault now has exactly one home.
+
+**Nothing was dropped from the loader.** `LEGACY_DIRECTORIES` maps each old home
+to its new one and `loadKind` walks the canonical home first, so the first file
+to claim an id wins: a page you have already moved beats the copy left behind,
+and a vault migrates one page at a time. Vault detection accepts `system/` as
+well as `setting/`, or a vault written last week would stop being recognised as
+one at all.
+
+`/lint` reports an old home **once per directory, not once per page**. A
+half-moved vault has both copies of everything by definition, so a
+`duplicate_id` per page would bury the single actionable fact under thirty
+repetitions of it.

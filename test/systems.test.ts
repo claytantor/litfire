@@ -86,7 +86,7 @@ describe('systems as a primitive', () => {
 		// A genuine pre-`systems/` vault: the split `system/*.md` trio, written
 		// directly rather than via the scaffold, which no longer produces this
 		// layout for a fresh vault.
-		await mkdir(path.join(root, VAULT.system), {recursive: true});
+		await mkdir(path.join(root, VAULT.legacySetting), {recursive: true});
 		await writeFile(
 			path.join(root, VAULT.stats),
 			stringifyDocument({
@@ -147,9 +147,9 @@ describe('formulas are scoped to their system', () => {
 
 	it('falls back to the shared file for a rule that really is universal', async () => {
 		await writeSystem('seed', SEED);
-		await mkdir(path.join(root, VAULT.system), {recursive: true});
+		await mkdir(path.join(root, VAULT.legacySetting), {recursive: true});
 		await writeFile(
-			path.join(root, VAULT.formulas),
+			path.join(root, VAULT.legacyFormulas),
 			'```js id=shared\n() => 7;\n```\n',
 			'utf8',
 		);

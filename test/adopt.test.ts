@@ -51,7 +51,7 @@ const find = (proposals: readonly Proposal[], wanted: string) =>
 /** A page the author typed directly, the way every pre-raw-first vault has. */
 async function authoredPage() {
 	await file(
-		'factions/the-gnostics.md',
+		'corpus/factions/the-gnostics.md',
 		'---\nid: the-gnostics\nname: The Gnostics\ngoal: Recover what was hidden\n---\n\nThey keep the older reading.\n',
 	);
 }
@@ -76,7 +76,7 @@ describe('what adoption is for', () => {
 		await authoredPage();
 		const plan = await planAdoption(root, ['faction']);
 
-		const page = find(plan.proposals, 'factions/the-gnostics.md');
+		const page = find(plan.proposals, 'corpus/factions/the-gnostics.md');
 		const {data} = parseDocument(page!.contents);
 
 		expect(data['source']).toBe('raw/factions/the-gnostics.md');
@@ -87,7 +87,7 @@ describe('what adoption is for', () => {
 		await authoredPage();
 		const plan = await planAdoption(root, ['faction']);
 
-		const page = find(plan.proposals, 'factions/the-gnostics.md');
+		const page = find(plan.proposals, 'corpus/factions/the-gnostics.md');
 		expect(parseDocument(page!.contents).body).toContain('They keep the older reading.');
 	});
 
@@ -117,7 +117,7 @@ describe('what adoption refuses to touch', () => {
 		const plan = await planAdoption(root, ['faction']);
 
 		expect(plan.proposals).toEqual([]);
-		expect(plan.skipped[0]?.page).toBe('factions/the-gnostics.md');
+		expect(plan.skipped[0]?.page).toBe('corpus/factions/the-gnostics.md');
 		expect(plan.skipped[0]?.reason).toContain('already exists');
 	});
 
@@ -166,7 +166,7 @@ describe('/ingest adopt', () => {
 
 	it('sweeps every kind when none is named', async () => {
 		await authoredPage();
-		await file('places/the-moon.md', '---\nid: the-moon\n---\n\nFar side.\n');
+		await file('corpus/places/the-moon.md', '---\nid: the-moon\n---\n\nFar side.\n');
 
 		const result = await run('/ingest adopt');
 		expect(result.adopt?.proposals).toHaveLength(4);

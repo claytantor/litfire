@@ -424,6 +424,7 @@ describe('the documented workflow', () => {
 	 * sheet resolves against whichever the loader picked.
 	 */
 	it('reports a superseded layout file, and says what replaces it', async () => {
+		await mkdir(resolve(root, VAULT.legacySetting), {recursive: true});
 		await writeFile(
 			resolve(root, VAULT.stats),
 			'---\nstats:\n  - id: grit\n    default: 10\n---\n\nLegacy.\n',

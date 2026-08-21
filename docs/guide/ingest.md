@@ -22,17 +22,17 @@ to change command to turn your notes into pages:
 
 One directory per kind, under `raw/`:
 
-| Kind        | Notes in          | Pages proposed to   |
-| ----------- | ----------------- | ------------------- |
-| `character` | `raw/characters/` | `characters/`       |
-| `moment`    | `raw/moments/`    | `timeline/moments/` |
-| `place`     | `raw/places/`     | `places/`           |
-| `situation` | `raw/situations/` | `situations/`       |
-| `system`    | `raw/systems/`    | `systems/`          |
-| `arc`       | `raw/arcs/`       | `timeline/arcs/`    |
-| `faction`   | `raw/factions/`   | `factions/`         |
-| `artifact`  | `raw/artifacts/`  | `artifacts/`        |
-| `theme`     | `raw/themes/`     | `themes/`           |
+| Kind        | Notes in          | Pages proposed to    |
+| ----------- | ----------------- | -------------------- |
+| `character` | `raw/characters/` | `corpus/characters/` |
+| `moment`    | `raw/moments/`    | `corpus/moments/`    |
+| `place`     | `raw/places/`     | `corpus/places/`     |
+| `situation` | `raw/situations/` | `corpus/situations/` |
+| `system`    | `raw/systems/`    | `corpus/systems/`    |
+| `arc`       | `raw/arcs/`       | `corpus/arcs/`       |
+| `faction`   | `raw/factions/`   | `corpus/factions/`   |
+| `artifact`  | `raw/artifacts/`  | `corpus/artifacts/`  |
+| `theme`     | `raw/themes/`     | `corpus/themes/`     |
 
 One more source is not a primitive folder:
 

@@ -38,12 +38,12 @@ describe('a fresh vault is already adopted', () => {
 		await scaffoldVault(root);
 
 		for (const [raw, page] of [
-			['raw/systems/system-01.md', 'systems/system-01.md'],
-			['raw/moments/we-001.md', 'timeline/moments/we-001.md'],
-			['raw/arcs/arc-01.md', 'timeline/arcs/arc-01.md'],
-			['raw/characters/protagonist.md', 'characters/protagonist.md'],
-			['raw/themes/commodification.md', 'themes/commodification.md'],
-			['raw/situations/sit-001.md', 'situations/sit-001.md'],
+			['raw/systems/system-01.md', 'corpus/systems/system-01.md'],
+			['raw/moments/we-001.md', 'corpus/moments/we-001.md'],
+			['raw/arcs/arc-01.md', 'corpus/arcs/arc-01.md'],
+			['raw/characters/protagonist.md', 'corpus/characters/protagonist.md'],
+			['raw/themes/commodification.md', 'corpus/themes/commodification.md'],
+			['raw/situations/sit-001.md', 'corpus/situations/sit-001.md'],
 		]) {
 			expect(await exists(raw!), raw).toBe(true);
 			expect(await exists(page!), page).toBe(true);
@@ -66,7 +66,7 @@ describe('a fresh vault is already adopted', () => {
 
 	it('points each page at the note it came from', async () => {
 		await scaffoldVault(root);
-		const {data} = parseDocument(await read('characters/protagonist.md'));
+		const {data} = parseDocument(await read('corpus/characters/protagonist.md'));
 
 		expect(data['source']).toBe('raw/characters/protagonist.md');
 		expect(data['source_hash']).toEqual(expect.any(String));

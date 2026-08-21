@@ -19,9 +19,8 @@ const DEFAULT_BUDGET = 24_000;
  * directory because they carry their own kind. */
 const CORPUS_DIRECTORIES: readonly {readonly directory: string; readonly kind: string}[] =
 	[
-		{directory: VAULT.system, kind: 'system'},
+		{directory: VAULT.setting, kind: 'system'},
 		{directory: VAULT.systems, kind: 'system'},
-		{directory: VAULT.timeline, kind: 'timeline'},
 		{directory: VAULT.moments, kind: 'moment'},
 		{directory: VAULT.arcs, kind: 'arc'},
 		{directory: VAULT.characters, kind: 'character'},
@@ -30,6 +29,20 @@ const CORPUS_DIRECTORIES: readonly {readonly directory: string; readonly kind: s
 		{directory: VAULT.factions, kind: 'faction'},
 		{directory: VAULT.artifacts, kind: 'artifact'},
 		{directory: VAULT.situations, kind: 'situation'},
+		{directory: VAULT.chapters, kind: 'chapter'},
+		// A vault that has not moved to corpus/ yet still has a corpus, and the
+		// reviewer must be able to read it or it would report an empty world.
+		{directory: VAULT.legacySetting, kind: 'system'},
+		{directory: 'systems', kind: 'system'},
+		{directory: 'timeline/moments', kind: 'moment'},
+		{directory: 'timeline/arcs', kind: 'arc'},
+		{directory: 'characters', kind: 'character'},
+		{directory: 'themes', kind: 'theme'},
+		{directory: 'places', kind: 'place'},
+		{directory: 'factions', kind: 'faction'},
+		{directory: 'artifacts', kind: 'artifact'},
+		{directory: 'situations', kind: 'situation'},
+		{directory: 'chapters', kind: 'chapter'},
 		{directory: VAULT.inbox, kind: 'situation'},
 	];
 

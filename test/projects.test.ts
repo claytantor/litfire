@@ -264,6 +264,7 @@ describe('startup resolution', () => {
 		const vault = path.join(home, 'emptied');
 		await scaffoldVault(vault, 'base');
 		await rememberProject(vault);
+		await rm(path.join(vault, 'setting'), {recursive: true, force: true});
 		await rm(path.join(vault, 'system'), {recursive: true, force: true});
 		await rm(path.join(vault, 'index.md'), {force: true});
 

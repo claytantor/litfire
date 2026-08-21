@@ -56,7 +56,7 @@ const said = (r: {lines: readonly {text: string}[]}) =>
 /** A vault written before raw-first: a corpus page and nothing in raw/. */
 async function legacyMoment() {
 	await file(
-		'timeline/moments/the-breach.md',
+		'corpus/moments/the-breach.md',
 		'---\nid: the-breach\nname: The Breach\n---\n\nWhat changed here.\n',
 	);
 	context = {...context, project: await computeProject(root)};
@@ -121,11 +121,11 @@ describe('the derived page keeps up', () => {
 
 	it('leaves the page’s prose exactly as it was', async () => {
 		await legacyMoment();
-		const before = parseDocument(await read('timeline/moments/the-breach.md')).body;
+		const before = parseDocument(await read('corpus/moments/the-breach.md')).body;
 
 		await run('/moment the-breach at 86400');
 
-		expect(parseDocument(await read('timeline/moments/the-breach.md')).body).toBe(before);
+		expect(parseDocument(await read('corpus/moments/the-breach.md')).body).toBe(before);
 	});
 
 	it('stamps provenance, so the next ingest skips it', async () => {
@@ -142,7 +142,7 @@ describe('the derived page keeps up', () => {
 
 describe('every kind takes the same path', () => {
 	it('places', async () => {
-		await file('places/oz-farm.md', '---\nid: oz-farm\n---\n\nTwelve acres.\n');
+		await file('corpus/places/oz-farm.md', '---\nid: oz-farm\n---\n\nTwelve acres.\n');
 		context = {...context, project: await computeProject(root)};
 
 		await run('/place oz-farm name The Farm');

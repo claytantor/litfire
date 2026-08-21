@@ -25,7 +25,7 @@ worth a different standing under different rules. All of it is reported as a
 `system_port` finding.
 
 Formulas defined in a system page's body are scoped to that system; the shared
-`system/formulas.md` stays global and is the fallback. This matters immediately,
+`setting/formulas.md` stays global and is the fallback. This matters immediately,
 because every system's curve defaults to the id `xp-for-level` — without scoping,
 two systems would silently level their characters by one curve.
 
@@ -34,8 +34,8 @@ it is required, and leaving it out raises `character_system_unset` rather than a
 guess: choosing a system for someone decides what every number on their sheet
 means.
 
-**Vaults written before this need no migration.** The original `system/stats.md`,
-`system/skills.md`, and `system/curves.md` load as one system with the id
+**Vaults written before this need no migration.** The original `corpus/systems/<id>.md`,
+`corpus/systems/<id>.md`, and `corpus/systems/<id>.md` load as one system with the id
 `system`, and a character that names none is placed in it.
 
 ## The two Kimi products are not interchangeable

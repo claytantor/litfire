@@ -26,7 +26,7 @@ import {
 import {extractFormulas} from '../system/formulas.js';
 import type {Formula} from '../system/sandbox.js';
 import {parseDocument} from './frontmatter.js';
-import {resolve, VAULT} from './paths.js';
+import {LEGACY_DIRECTORIES, VAULT, resolve} from './paths.js';
 import {timeSchema, type TimeBinding} from '../time/binding.js';
 
 export type LoadIssue = {
@@ -177,30 +177,101 @@ async function loadSystems(
 	const systems: SystemDef[] = [];
 	const formulas: Formula[] = [];
 
-	for (const file of await listMarkdown(resolve(root, VAULT.systems))) {
-		const raw = await readIfPresent(file);
-		if (raw === undefined) {
-			continue;
-		}
-
-		const {data, body} = parseDocument(raw);
-		data['id'] ??= path.basename(file, '.md');
-
-		try {
-			const system = systemSchema.parse(data);
-			systems.push(system);
-			for (const formula of extractFormulas(body)) {
-				formulas.push({...formula, system: system.id});
+	const seen = new Set<string>();
+	for (const home of homesOf(VAULT.systems)) {
+		for (const file of await listMarkdown(resolve(root, home))) {
+			const raw = await readIfPresent(file);
+			if (raw === undefined) {
+				continue;
 			}
-		} catch (caught) {
-			issues.push({
-				file,
-				message: caught instanceof Error ? caught.message : String(caught),
-			});
+
+			const {data, body} = parseDocument(raw);
+			data['id'] ??= path.basename(file, '.md');
+
+			try {
+				const system = systemSchema.parse(data);
+				// Canonical home first, so a system the author has already moved wins
+				// over the copy left behind in the old one.
+				if (!seen.has(system.id)) {
+					seen.add(system.id);
+					systems.push(system);
+					for (const formula of extractFormulas(body)) {
+						formulas.push({...formula, system: system.id});
+					}
+				}
+			} catch (caught) {
+				issues.push({
+					file,
+					message: caught instanceof Error ? caught.message : String(caught),
+				});
+			}
 		}
 	}
 
 	return {systems, formulas};
+}
+
+/**
+ * Every directory a kind's pages may be sitting in.
+ *
+ * The canonical one first, then any home a previous layout used. Order is the
+ * whole contract: the first file to claim an id wins, so a page the author has
+ * already moved beats the copy left behind, and a vault can be migrated one
+ * page at a time without the tool ever showing the stale one.
+ */
+function homesOf(canonical: string): string[] {
+	return [
+		canonical,
+		...Object.entries(LEGACY_DIRECTORIES)
+			.filter(([, to]) => to === canonical)
+			.map(([from]) => from),
+	];
+}
+
+/**
+ * Loads one kind from wherever its pages are, canonical home first.
+ *
+ * Duplicates across homes are dropped rather than reported here: two files with
+ * one id is `duplicate_id`'s job, and it names both paths because `sources`
+ * records every file that was read — including the ones this skipped.
+ */
+async function loadKind<T extends {id: string}>(
+	root: string,
+	canonical: string,
+	schema: {parse: (value: unknown) => T},
+	kind: string,
+	issues: LoadIssue[],
+	sources: Source[],
+	legacy: string[],
+): Promise<T[]> {
+	const loaded: T[] = [];
+	const claimed = new Set<string>();
+
+	for (const home of homesOf(canonical)) {
+		const found = await loadDirectory(resolve(root, home), schema, issues, {
+			kind,
+			into: sources,
+			root,
+		});
+		if (found.length > 0 && home !== canonical) {
+			legacy.push(home);
+		}
+
+		// Within one home everything loads, duplicates included. Two files
+		// declaring one id in a single directory is precisely what `duplicate_id`
+		// exists to report, and dropping one here would hide the check's whole
+		// reason for being — `claimed` is filled only after the filter, so both
+		// copies survive. What is skipped is a page a higher-priority home has
+		// already answered for, which is the ordinary state of a half-moved vault
+		// and is reported once, against the directory.
+		const fresh = found.filter(one => !claimed.has(one.id));
+		loaded.push(...fresh);
+		for (const one of fresh) {
+			claimed.add(one.id);
+		}
+	}
+
+	return loaded;
 }
 
 export async function loadVault(root: string): Promise<Vault> {
@@ -226,13 +297,27 @@ export async function loadVault(root: string): Promise<Vault> {
 		issues,
 	);
 
-	const time = await loadOne(resolve(root, VAULT.time), timeSchema, issues);
+	// The clock binding moved from timeline/ to setting/ with the layout; a vault
+	// that has not moved still has to be able to tell the time.
+	let time = await loadOne(resolve(root, VAULT.time), timeSchema, issues);
+	if (time === undefined) {
+		time = await loadOne(resolve(root, VAULT.legacyTime), timeSchema, issues);
+		if (time !== undefined) {
+			legacy.push(VAULT.legacyTime);
+		}
+	}
 
 	const {systems: named, formulas: scopedFormulas} = await loadSystems(root, issues);
 
 	// The shared file stays unscoped, so a formula in it is reachable from every
 	// system — the escape hatch for a rule that genuinely is universal.
-	const formulasRaw = await readIfPresent(resolve(root, VAULT.formulas));
+	let formulasRaw = await readIfPresent(resolve(root, VAULT.formulas));
+	if (formulasRaw === undefined) {
+		formulasRaw = await readIfPresent(resolve(root, VAULT.legacyFormulas));
+		if (formulasRaw !== undefined) {
+			legacy.push(VAULT.legacyFormulas);
+		}
+	}
 	const formulas: Formula[] = [
 		...(formulasRaw ? extractFormulas(formulasRaw) : []),
 		...scopedFormulas,
@@ -269,11 +354,14 @@ export async function loadVault(root: string): Promise<Vault> {
 
 	// A page each, plus whatever the pre-moments list file still holds. Pages win
 	// on a clash: an author who has split a moment out has said which they mean.
-	const moments: Moment[] = await loadDirectory(
-		resolve(root, VAULT.moments),
+	const moments: Moment[] = await loadKind(
+		root,
+		VAULT.moments,
 		momentSchema,
+		'moment',
 		issues,
-		{kind: 'moment', into: sources, root},
+		sources,
+		legacy,
 	);
 	const known = new Set(moments.map(moment => moment.id));
 
@@ -299,54 +387,61 @@ export async function loadVault(root: string): Promise<Vault> {
 	}
 	moments.sort((a, b) => a.id.localeCompare(b.id));
 
-	const [arcs, characters, factions, places, artifacts, themes, placed, inbox, chapters] =
+	const [arcs, characters, factions, places, artifacts, themes, situations, chapters] =
 		await Promise.all([
-			loadDirectory(resolve(root, VAULT.arcs), arcSchema, issues, {
-				kind: 'arc',
-				into: sources,
+			loadKind(root, VAULT.arcs, arcSchema, 'arc', issues, sources, legacy),
+			loadKind(
 				root,
-			}),
-			loadDirectory(resolve(root, VAULT.characters), characterSchema, issues, {
-				kind: 'character',
-				into: sources,
+				VAULT.characters,
+				characterSchema,
+				'character',
+				issues,
+				sources,
+				legacy,
+			),
+			loadKind(root, VAULT.factions, factionSchema, 'faction', issues, sources, legacy),
+			loadKind(root, VAULT.places, placeSchema, 'place', issues, sources, legacy),
+			loadKind(
 				root,
-			}),
-			loadDirectory(resolve(root, VAULT.factions), factionSchema, issues, {
-				kind: 'faction',
-				into: sources,
+				VAULT.artifacts,
+				artifactSchema,
+				'artifact',
+				issues,
+				sources,
+				legacy,
+			),
+			loadKind(root, VAULT.themes, themeSchema, 'theme', issues, sources, legacy),
+			loadKind(
 				root,
-			}),
-			loadDirectory(resolve(root, VAULT.places), placeSchema, issues, {
-				kind: 'place',
-				into: sources,
-				root,
-			}),
-			loadDirectory(resolve(root, VAULT.artifacts), artifactSchema, issues, {
-				kind: 'artifact',
-				into: sources,
-				root,
-			}),
-			loadDirectory(resolve(root, VAULT.themes), themeSchema, issues, {
-				kind: 'theme',
-				into: sources,
-				root,
-			}),
-			loadDirectory(resolve(root, VAULT.situations), situationSchema, issues, {
-				kind: 'situation',
-				into: sources,
-				root,
-			}),
-			loadDirectory(resolve(root, VAULT.inbox), situationSchema, issues, {
-				kind: 'situation',
-				into: sources,
-				root,
-			}),
-			loadDirectory(resolve(root, VAULT.chapters), chapterSchema, issues, {
-				kind: 'chapter',
-				into: sources,
-				root,
-			}),
+				VAULT.situations,
+				situationSchema,
+				'situation',
+				issues,
+				sources,
+				legacy,
+			),
+			loadKind(root, VAULT.chapters, chapterSchema, 'chapter', issues, sources, legacy),
 		]);
+
+	// A scene in the old inbox carried no arc by virtue of being there, and the
+	// loader has always forced that rather than trusting the frontmatter (§5).
+	//
+	// Only for the copy actually used, though. `sources` records every file read,
+	// including ones a higher-priority home outranked — so a scene the author has
+	// moved onto an arc, whose stale inbox copy is still on disk, would otherwise
+	// be unplaced by a file the loader had already discarded.
+	const situationSources = sources.filter(source => source.kind === 'situation');
+	const placedElsewhere = new Set(
+		situationSources
+			.filter(source => !source.path.startsWith(`${VAULT.inbox}/`))
+			.map(source => source.id),
+	);
+	const inboxIds = new Set(
+		situationSources
+			.filter(source => source.path.startsWith(`${VAULT.inbox}/`))
+			.map(source => source.id)
+			.filter(id => !placedElsewhere.has(id)),
+	);
 
 	return {
 		root,
@@ -355,8 +450,9 @@ export async function loadVault(root: string): Promise<Vault> {
 		moments,
 		time,
 		arcs,
-		// Inbox situations carry no arc, so they replay as unplaced (§5).
-		situations: [...placed, ...inbox.map(s => ({...s, arc: undefined}))],
+		situations: situations.map(situation =>
+			inboxIds.has(situation.id) ? {...situation, arc: undefined} : situation,
+		),
 		characters,
 		factions,
 		places,

@@ -1,6 +1,6 @@
 # The formula sandbox
 
-`system/formulas.md` holds fenced `js` blocks with an id:
+`setting/formulas.md` holds fenced `js` blocks with an id:
 
 ````markdown
 ```js id=xp-for-level

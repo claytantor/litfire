@@ -36,7 +36,7 @@ async function moment(id: string, data: Record<string, unknown> = {}) {
 }
 
 describe('removing a file through the gate', () => {
-	const target = 'timeline/moments/duplicate.md';
+	const target = 'corpus/moments/duplicate.md';
 
 	it('deletes it once accepted', async () => {
 		await moment('duplicate');

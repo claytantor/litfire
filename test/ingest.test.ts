@@ -108,7 +108,7 @@ describe('what the pass is asked to do', () => {
 		const {documents} = await readRaw(root, 'moment');
 		const {instruction} = await buildIngest(root, context.project!, 'moment', documents);
 
-		expect(instruction).toContain('timeline/moments/<id>.md');
+		expect(instruction).toContain('corpus/moments/<id>.md');
 		expect(instruction).toContain('whole seconds from the origin');
 	});
 
@@ -327,7 +327,7 @@ describe('interviews as a source', () => {
 	it('knows a transcript is already reflected, wherever its pages went', async () => {
 		await note('raw/interviews/system-2026-01-01.md', 'The Lathe.');
 		await note(
-			'characters/inanna.md',
+			'corpus/characters/inanna.md',
 			stampSource(
 				'---\nid: inanna\n---\n\nProse.\n',
 				'raw/interviews/system-2026-01-01.md',

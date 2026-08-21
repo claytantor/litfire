@@ -44,7 +44,7 @@ package "1 · You write" #FDF6F3 {
 }
 
 package "2 · The only thing you own" #FDF6F3 {
-  rectangle "**raw/<kind>/<id>.md**\nfreeform · the filename is the id" as raw #FFEDE5
+  rectangle "**raw/<kind>/<id>.md**\nten folders · freeform\n//the filename is the id//" as raw #FFEDE5
   rectangle "**raw/interviews/**\ntimestamped transcripts" as transcripts #FFEDE5
 }
 
@@ -61,7 +61,7 @@ package "4 · Nothing lands without a decision" #F3EDFB {
 }
 
 package "5 · Regenerated, never edited" #F2F5FB {
-  rectangle "**corpus**\ncharacters/ · places/ · factions/ · themes/\ntimeline/moments/ · timeline/arcs/ · situations/\n//every page cites the note it came from//" as corpus #E9F0FA
+  rectangle "**corpus/**\nthe same ten folders as raw/, derived\n//every page cites the note it came from//" as corpus #E9F0FA
   rectangle "**ledger/**\nreplay" as ledger #E3ECF8
   rectangle "**wiki/**\n/wiki build" as wiki #E3ECF8
   rectangle "**manuscript.md**\n/export" as manuscript #E3ECF8
@@ -103,6 +103,10 @@ note bottom of ledger
   **ledger/**, **raw/**, **manuscript.md** and **wiki/** are
   refused by path before their content is read, so
   nothing a model returns can land here at all.
+
+  //**setting/** is none of these three — it is how the//
+  //vault reads rather than what is in it, and you own//
+  //it outright.//
 
   //Hand edits are lost on the next recompute — which//
   //is the deal, not a defect.//
@@ -163,9 +167,8 @@ note bottom of corpus
   source. **/ingest adopt** gets a vault there;
   **/lint** says how far it has got.
 
-  //Still open: **/<kind> new** and **/chapter** write here//
-  //rather than raw/, and chapters have no raw/ folder//
-  //to write to. That is step 4 and an open question.//
+  //Still open: **/<kind> new** writes here rather than//
+  //raw/. That is step 4, and it is the last one.//
 end note
 
 @enduml

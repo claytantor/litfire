@@ -9,7 +9,7 @@ time.
 /moment new The Substrate Patch
 ```
 
-Slugs the name into an id, writes `timeline/moments/the-substrate-patch.md`, and
+Slugs the name into an id, writes `corpus/moments/the-substrate-patch.md`, and
 opens the [buffer](./writing-a-scene.md) so you can describe what changes there.
 
 It starts **undated** on purpose. A moment you have just thought of usually has
