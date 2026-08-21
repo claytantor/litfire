@@ -496,3 +496,38 @@ written from.
 
 `plan <instruction>` typed by the author still works. It is now one of two ways
 in rather than the only one.
+
+## D18 — Ingest is a plan over the author's notes
+
+**Committed:** `/ingest <kind> [<document>]`, built on the structural pass.
+
+The interviews go one way — ask, transcribe, extract. An author who already
+knows their world works the other way: they write it into `raw/characters/` and
+`raw/moments/` and want the corpus to catch up. There was no path from a page of
+notes to a page in the vault except describing it to the architect in
+conversation.
+
+Ingest is not a new agent. It builds an instruction and a context and hands them
+to `runPlan`, which already emits whole files, refuses paths outside the vault,
+can open a file it needs, and returns proposals to the review gate. Writing a
+second pass would have meant re-deriving all of that and then keeping the two in
+step.
+
+Three things the instruction is explicit about, each for a failure seen before:
+
+- **One note may hold several things.** `all_moments_ordered.md` is nine moments,
+  not one page.
+- **Update rather than duplicate.** Every existing page of the kind goes into
+  the context by id and name. Without it, ingesting notes about a character the
+  vault already knows produces `inanna-tran-weber` beside `inanna` — exactly the
+  `duplicate_name` finding D11 added a check for.
+- **Never invent.** A field the notes do not answer is left out for the checks
+  to raise.
+
+The raw directory is read and never written. `/architect` remains the one agent
+that may propose into `raw/` (D15), which is a different job: correcting the
+record, not deriving from it.
+
+An empty directory is refused in the command, before any model call. There is
+nothing to think about, and a request that costs money should not be spent
+discovering there was no input.

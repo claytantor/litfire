@@ -45,6 +45,8 @@
 | `/place [<id>]`                | Places, or one with the scenes there             |
 | `/place new <name>`            | Write a place and open the buffer                |
 | `/place <id> edit`             | Edit its description                             |
+| `/ingest <kind>`               | Turn notes in `raw/<kind>/` into typed pages     |
+| `/ingest <kind> <document>`    | Ingest one note                                  |
 | `/situation place <id> <arc>`  | Move a situation out of the inbox                |
 | `/help`, `/quit`               |                                                  |
 

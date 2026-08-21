@@ -1,4 +1,5 @@
 import type {Project} from '../core/project.js';
+import type {IngestKind} from '../ingest/index.js';
 
 export type Line = {
 	readonly text: string;
@@ -51,6 +52,17 @@ export type CommandResult = {
 	 * it proposes goes through the same review gate, one diff at a time.
 	 */
 	readonly architect?: boolean;
+	/**
+	 * Turns the author's notes in `raw/<kind>/` into typed pages.
+	 *
+	 * Runs a model pass, so App owns it: the command's job is to say which kind
+	 * and which document, having already checked there is something to read.
+	 */
+	readonly ingest?: {
+		readonly kind: IngestKind;
+		/** A filename stem in the raw directory; absent means all of them. */
+		readonly focus?: string | undefined;
+	};
 	/**
 	 * Opens a vault file in the native prose buffer, by absolute path.
 	 *

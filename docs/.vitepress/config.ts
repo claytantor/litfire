@@ -48,6 +48,7 @@ export default defineConfig({
 					{text: 'Moments', link: '/guide/moments'},
 					{text: 'Places', link: '/guide/places'},
 					{text: 'Interviews', link: '/guide/interviews'},
+					{text: 'Ingesting your notes', link: '/guide/ingest'},
 					{text: 'Review gate', link: '/guide/review-gate'},
 					{text: 'The reviewer', link: '/guide/reviewer'},
 					{text: 'Projects and vaults', link: '/guide/projects'},

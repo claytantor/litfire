@@ -87,6 +87,8 @@ Then, in the TUI:
 | `/place [<id>]`                | Places, or one with the scenes there             |
 | `/place new <name>`            | Write a place and open the buffer                |
 | `/place <id> edit`             | Edit its description                             |
+| `/ingest <kind>`               | Turn notes in `raw/<kind>/` into typed pages     |
+| `/ingest <kind> <document>`    | Ingest one note                                  |
 | `/situation place <id> <arc>`  | Move a situation out of the inbox                |
 | `/help`, `/quit`               |                                                  |
 
@@ -113,6 +115,7 @@ The README is the short version. Everything below lives on the
 | [Moments](https://claytantor.github.io/litfire/guide/moments)                               | Points on the clock: create, time, describe       |
 | [Places](https://claytantor.github.io/litfire/guide/places)                                 | Somewhere a scene happens                         |
 | [Interviews](https://claytantor.github.io/litfire/guide/interviews)                         | How the world gets built, and the interview agent |
+| [Ingesting your notes](https://claytantor.github.io/litfire/guide/ingest)                   | Turn raw/ notes into typed pages                  |
 | [Review gate](https://claytantor.github.io/litfire/guide/review-gate)                       | How a model-proposed write reaches disk           |
 | [The reviewer](https://claytantor.github.io/litfire/guide/reviewer)                         | A literary editor over the rendered corpus        |
 | [Projects and vaults](https://claytantor.github.io/litfire/guide/projects)                  | Switching vaults, and what a vault holds          |

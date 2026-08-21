@@ -40,6 +40,8 @@ import {
 } from './interview/index.js';
 import {loadProvider, type Provider} from './llm/index.js';
 import {ReviewBatch, type Proposal} from './review/index.js';
+import {buildIngest, readRaw, type IngestKind} from './ingest/index.js';
+import {runPlan} from './architect/index.js';
 import {editText, resolveEditor} from './vault/editor.js';
 import {
 	displayPath,
@@ -413,6 +415,66 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 	);
 
 	/**
+	 * Turns the author's notes into typed pages.
+	 *
+	 * Built on the structural pass rather than as its own agent: that pass
+	 * already emits whole files, refuses paths outside the vault, can open a
+	 * file it needs, and returns proposals to the review gate. An ingest is that
+	 * job with the material named for it, so it lands the same way — as diffs
+	 * the author accepts one at a time.
+	 */
+	const runIngest = useCallback(
+		async (kind: IngestKind, focus: string | undefined) => {
+			const resolved = await ensure();
+			if (!resolved) {
+				append([error('no vault loaded here — run /init first')]);
+				return;
+			}
+
+			const config = await readConfig(root);
+			const loaded = await loadProvider(
+				config.provider.id,
+				config.provider.model,
+				config.provider.baseUrl,
+			);
+			if ('error' in loaded) {
+				append([error(loaded.error)]);
+				return;
+			}
+
+			const {documents} = await readRaw(root, kind, focus);
+			if (documents.length === 0) {
+				append([error(`nothing to ingest for ${kind}`)]);
+				return;
+			}
+
+			const {profile} = await loadSetting(root);
+			const {instruction, context} = buildIngest(resolved, kind, documents);
+
+			setBusy(true);
+			setBusyLabel(`reading your ${kind} notes…`);
+			const controller = new AbortController();
+			try {
+				const outcome = await runPlan(
+					loaded.provider,
+					root,
+					instruction,
+					context,
+					profile.register ?? '',
+					controller.signal,
+				);
+				await handlePlanned(outcome);
+			} catch (caught) {
+				append([error(caught instanceof Error ? caught.message : String(caught))]);
+			} finally {
+				setBusy(false);
+				setBusyLabel(undefined);
+			}
+		},
+		[append, ensure, handlePlanned, root],
+	);
+
+	/**
 	 * Re-runs extraction over saved transcripts.
 	 *
 	 * The interview half is skipped entirely — the answers are already on disk in
@@ -689,6 +751,9 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 						);
 					} else if (result.architect) {
 						await openArchitect();
+					} else if (result.ingest) {
+						append(result.lines);
+						await runIngest(result.ingest.kind, result.ingest.focus);
 					} else if (result.reviewer) {
 						await startReviewer();
 					} else if (result.wizard) {
@@ -722,6 +787,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			root,
 			runExtract,
 			startReviewer,
+			runIngest,
 			openArchitect,
 			openAuthoring,
 			startInterview,

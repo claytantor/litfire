@@ -17,6 +17,7 @@ import {
 	readWhen,
 	timeSchema,
 } from '../time/index.js';
+import {INGEST_KINDS, isIngestKind, readRaw} from '../ingest/index.js';
 import {partitionChapters} from '../chapters/index.js';
 import {renderManuscript} from '../chapters/manuscript.js';
 import {
@@ -966,6 +967,77 @@ const time: Command = {
 		});
 		const lines = renderTime(context.project, calendar, note);
 		return {lines, paged: lines.length > 14, title: 'time'};
+	},
+};
+
+/**
+ * `/ingest` — the author's own notes, turned into typed pages.
+ *
+ * The interviews go one way: ask, transcribe, extract. This is the other way an
+ * author works — they already know their world, they write it into
+ * `raw/characters/` and `raw/moments/`, and what they want is for the corpus to
+ * catch up. There was no path from a page of notes to a page in the vault
+ * except describing it to the architect.
+ */
+const ingest: Command = {
+	name: 'ingest',
+	usage: '/ingest <kind> [<document>]',
+	summary: 'turn notes in raw/<kind>/ into typed pages, through the review gate',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
+		}
+
+		const [kind, ...rest] = args;
+		if (kind === undefined) {
+			return {
+				lines: [
+					error('usage: /ingest <kind> [<document>]'),
+					muted(`kinds: ${INGEST_KINDS.join(', ')}`),
+				],
+			};
+		}
+		if (!isIngestKind(kind)) {
+			return {
+				lines: [
+					error(`no kind '${kind}'`),
+					muted(`try one of: ${INGEST_KINDS.join(', ')}`),
+				],
+			};
+		}
+
+		const focus = rest.join(' ').trim();
+		const {documents, directory} = await readRaw(
+			context.root,
+			kind,
+			focus === '' ? undefined : focus,
+		);
+
+		// Checked here rather than after a model call: there is nothing to think
+		// about, and a request that costs money should not be sent to discover an
+		// empty directory.
+		if (documents.length === 0) {
+			return {
+				lines: [
+					error(
+						focus === ''
+							? `nothing to ingest — ${directory}/ has no markdown`
+							: `no document matching '${focus}' in ${directory}/`,
+					),
+					muted(`write your ${kind} notes there, then /ingest ${kind}`),
+				],
+			};
+		}
+
+		return {
+			lines: [
+				muted(
+					`ingesting ${String(documents.length)} document${documents.length === 1 ? '' : 's'} from ${directory}/`,
+				),
+				...documents.map(document => muted(`  ${document.path}`)),
+			],
+			ingest: {kind, ...(focus === '' ? {} : {focus})},
+		};
 	},
 };
 
@@ -2379,6 +2451,7 @@ export const commands: readonly Command[] = [
 	lint,
 	questions,
 	arc,
+	ingest,
 	moment,
 	place,
 	time,
