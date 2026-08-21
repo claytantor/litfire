@@ -64,12 +64,23 @@ different job, done deliberately, and still only as a diff you accept.
 
 ## When it goes wrong
 
-Ingest proposes; it does not verify. Read the diffs.
+Ingest proposes; it does not verify. Read the diffs, then run `/lint`.
 
-The failure worth watching for is a second page for something that already
-exists under a different id — `inanna-tran-weber` beside `inanna`. `/lint`
-reports that as `duplicate_name`, and `/architect` can propose the merge. Better
-is to catch it in the gate and reject the proposal.
+Two failures are worth watching for, and the checks catch both:
+
+- **A second page for something that already exists**, under a different id or
+  in a different directory. `/lint` reports `duplicate_id` when two files
+  declare one id and `duplicate_name` when two ids share a name. The pass is
+  shown every existing page _by path_ precisely so it can propose removing the
+  lesser copy rather than adding a third.
+- **A link to something that is not there.** Notes reference ids the corpus may
+  not have — `[[inanna-first-memory]]` where the vault settled on
+  `inannas-first-memory`, or a cast member whose page was never written. Ingest
+  copies what the notes say rather than guessing, and `broken_reference` names
+  each one.
+
+Neither is resolved for you. `/architect` can propose the merge or the rename;
+you accept it in the gate.
 
 If a proposal is nearly right, press `e` and fix it there rather than rejecting
 and re-running: the buffer edits what will be written.

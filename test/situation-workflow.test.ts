@@ -278,6 +278,22 @@ describe('the documented workflow', () => {
 		expect(noArc).toContain('/arc new');
 	});
 
+	/**
+	 * A typo in a cast list used to be silent: the scene named someone, the wiki
+	 * linked them, and nothing anywhere said who they were.
+	 */
+	it('reports a cast member with no character page', async () => {
+		await run('/situation new A Scene');
+		await refresh();
+		await run('/situation sit-002 cast nobody-wrote-them');
+
+		const finding = context.project!.questions.find(
+			q => q.kind === 'broken_reference' && q.detail.includes('nobody-wrote-them'),
+		);
+		expect(finding?.detail).toContain('casts');
+		expect(finding?.detail).toContain('no character page');
+	});
+
 	it('adds to a cast rather than replacing it', async () => {
 		await run('/situation new A Scene');
 		await refresh();

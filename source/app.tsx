@@ -449,7 +449,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			}
 
 			const {profile} = await loadSetting(root);
-			const {instruction, context} = buildIngest(resolved, kind, documents);
+			const {instruction, context} = await buildIngest(root, resolved, kind, documents);
 
 			setBusy(true);
 			setBusyLabel(`reading your ${kind} notes…`);

@@ -89,7 +89,7 @@ describe('what the pass is asked to do', () => {
 	it('names where pages go and what their frontmatter holds', async () => {
 		await note('raw/moments/ordered.md', '- The Breach — 32 kya');
 		const {documents} = await readRaw(root, 'moment');
-		const {instruction} = buildIngest(context.project!, 'moment', documents);
+		const {instruction} = await buildIngest(root, context.project!, 'moment', documents);
 
 		expect(instruction).toContain('timeline/moments/<id>.md');
 		expect(instruction).toContain('whole seconds from the origin');
@@ -104,7 +104,8 @@ describe('what the pass is asked to do', () => {
 		context = {...context, project: await computeProject(root)};
 
 		const {documents} = await readRaw(root, 'moment');
-		const {context: built, instruction} = buildIngest(
+		const {context: built, instruction} = await buildIngest(
+			root,
 			context.project!,
 			'moment',
 			documents,
@@ -118,7 +119,12 @@ describe('what the pass is asked to do', () => {
 	it('says plainly when nothing of that kind exists yet', async () => {
 		await note('raw/factions/notes.md', 'The Custodians want the substrate.');
 		const {documents} = await readRaw(root, 'faction');
-		const {context: built} = buildIngest(context.project!, 'faction', documents);
+		const {context: built} = await buildIngest(
+			root,
+			context.project!,
+			'faction',
+			documents,
+		);
 
 		expect(built).toContain('No faction pages exist yet');
 	});
@@ -126,7 +132,12 @@ describe('what the pass is asked to do', () => {
 	it('carries the author’s notes in verbatim', async () => {
 		await note('raw/places/oz-farm.md', 'Twelve acres, off-grid, one water tower.');
 		const {documents} = await readRaw(root, 'place');
-		const {context: built} = buildIngest(context.project!, 'place', documents);
+		const {context: built} = await buildIngest(
+			root,
+			context.project!,
+			'place',
+			documents,
+		);
 
 		expect(built).toContain('Twelve acres, off-grid, one water tower.');
 		expect(built).toContain('raw/places/oz-farm.md');
@@ -135,17 +146,17 @@ describe('what the pass is asked to do', () => {
 	it('tells it not to touch the notes themselves', async () => {
 		await note('raw/places/oz-farm.md', 'Twelve acres.');
 		const {documents} = await readRaw(root, 'place');
-		expect(buildIngest(context.project!, 'place', documents).instruction).toContain(
-			'Do not modify the raw notes',
-		);
+		expect(
+			(await buildIngest(root, context.project!, 'place', documents)).instruction,
+		).toContain('Do not modify the raw notes');
 	});
 
 	it('warns that one note may hold several things', async () => {
 		await note('raw/moments/ordered.md', '- one\n- two\n- three');
 		const {documents} = await readRaw(root, 'moment');
-		expect(buildIngest(context.project!, 'moment', documents).instruction).toContain(
-			'a page each',
-		);
+		expect(
+			(await buildIngest(root, context.project!, 'moment', documents)).instruction,
+		).toContain('a page each');
 	});
 });
 

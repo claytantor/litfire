@@ -244,6 +244,21 @@ function brokenReferences(input: CheckInput): Finding[] {
 			});
 		}
 
+		// A cast member with no page: the scene names them, the wiki links them,
+		// and nothing anywhere says who they are. Reported rather than refused,
+		// because naming someone before writing them up is a normal order to
+		// work in — but silence here is how a typo in a cast list survives.
+		for (const member of situation.characters) {
+			if (!characterIds.has(member)) {
+				findings.push({
+					kind: 'broken_reference',
+					detail: `situation '${situation.id}' casts '${member}', which has no character page`,
+					where: situation.id,
+					actor: member,
+				});
+			}
+		}
+
 		for (const theme of situation.themes) {
 			if (!subthemeIds.has(theme)) {
 				findings.push({
@@ -474,12 +489,15 @@ function duplicates(input: CheckInput): Finding[] {
 			byName.set(key, [...(byName.get(key) ?? []), page.id]);
 		}
 		for (const [, ids] of byName) {
-			if (ids.length > 1) {
-				const sorted = ids.toSorted();
+			const distinct = [...new Set(ids)].toSorted();
+			// Two pages under one id are already `duplicate_id`, and reporting them
+			// again here produced "situations sit-001, sit-001 share one name",
+			// which reads as a bug in the tool rather than a fact about the vault.
+			if (ids.length > 1 && distinct.length > 1) {
 				findings.push({
 					kind: 'duplicate_name',
-					detail: `${kind}s ${sorted.join(', ')} share one name — likely the same thing written twice`,
-					where: sorted[0] ?? kind,
+					detail: `${kind}s ${distinct.join(', ')} share one name — likely the same thing written twice`,
+					where: distinct[0] ?? kind,
 				});
 			}
 		}

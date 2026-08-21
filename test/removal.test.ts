@@ -204,6 +204,28 @@ describe('pages claiming to be the same thing', () => {
 		expect(finding?.detail).toContain('same thing written twice');
 	});
 
+	/**
+	 * Two files under one id are already `duplicate_id`. Reporting them again as
+	 * a name clash produced "situations sit-001, sit-001 share one name", which
+	 * reads as a bug in the tool rather than a fact about the vault.
+	 */
+	it('does not also report a shared name when the ids are the same', async () => {
+		await mkdir(resolve(root, VAULT.moments), {recursive: true});
+		for (const file of ['one.md', 'two.md']) {
+			await writeFile(
+				resolve(root, VAULT.moments, file),
+				'---\nid: the-breach\nname: The Breach\n---\n\nProse.\n',
+				'utf8',
+			);
+		}
+
+		const project = await computeProject(root);
+		const kinds = project.questions.map(q => q.kind);
+
+		expect(kinds).toContain('duplicate_id');
+		expect(kinds).not.toContain('duplicate_name');
+	});
+
 	it('matches names case-insensitively and ignoring surrounding space', async () => {
 		await moment('one', {name: 'The Breach'});
 		await moment('two', {name: '  the breach '});

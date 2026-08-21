@@ -2,6 +2,8 @@ import {readdir, readFile} from 'node:fs/promises';
 import path from 'node:path';
 import type {Project} from '../core/project.js';
 import {resolve, VAULT} from '../vault/paths.js';
+import {buildCorpusMap} from '../reviewer/corpus.js';
+import type {CorpusMap} from '../reviewer/types.js';
 
 /**
  * Turning the author's own notes into typed pages.
@@ -155,47 +157,31 @@ export async function readRaw(
 	return {documents, directory};
 }
 
-/** What the corpus already holds for this kind, so ingest updates rather than duplicates. */
-function existing(project: Project, kind: IngestKind): string {
-	const rows: {id: string; name: string}[] = (() => {
-		switch (kind) {
-			case 'character': {
-				return project.vault.characters.map(x => ({id: x.id, name: x.name ?? ''}));
-			}
-			case 'moment': {
-				return project.vault.moments.map(x => ({
-					id: x.id,
-					name: `${x.name ?? ''}${x.at === undefined ? ' (undated)' : ` (at ${x.at.toString()})`}`,
-				}));
-			}
-			case 'place': {
-				return project.vault.places.map(x => ({id: x.id, name: x.name ?? ''}));
-			}
-			case 'situation': {
-				return project.vault.situations.map(x => ({id: x.id, name: x.title ?? ''}));
-			}
-			case 'system': {
-				return project.vault.systems.map(x => ({id: x.id, name: x.name ?? ''}));
-			}
-			case 'arc': {
-				return project.vault.arcs.map(x => ({id: x.id, name: x.name ?? ''}));
-			}
-			case 'faction': {
-				return project.vault.factions.map(x => ({id: x.id, name: x.name ?? ''}));
-			}
-			case 'artifact': {
-				return project.vault.artifacts.map(x => ({id: x.id, name: x.name ?? ''}));
-			}
-			case 'theme': {
-				return project.vault.themes.map(x => ({id: x.id, name: x.name ?? ''}));
-			}
-		}
-	})();
+/**
+ * What the corpus already holds for this kind, by path.
+ *
+ * Read from the corpus map rather than from the loaded vault, because the map
+ * carries the file each page came from and the vault does not. That matters
+ * exactly when it is most needed: two files declaring one id load as two
+ * entries, and a list of ids and names renders them as the same row twice.
+ * An agent shown that correctly reported it could see a duplicate and could not
+ * act, having been given no second path to propose removing.
+ */
+function existing(map: CorpusMap, kind: IngestKind): string {
+	const rows = map.entries.filter(entry => entry.kind === kind);
 
 	return rows.length === 0
 		? `_No ${kind} pages exist yet._`
 		: rows
-				.map(row => `- \`${row.id}\`${row.name === '' ? '' : ` — ${row.name}`}`)
+				.map(entry =>
+					[
+						`- \`${entry.path}\``,
+						entry.id === undefined ? undefined : `id \`${entry.id}\``,
+						entry.title === undefined ? undefined : `"${entry.title}"`,
+					]
+						.filter(part => part !== undefined)
+						.join(' — '),
+				)
 				.join('\n');
 }
 
@@ -207,11 +193,12 @@ function existing(project: Project, kind: IngestKind): string {
  * and returns proposals to the review gate. An ingest is that job with the
  * material named for it.
  */
-export function buildIngest(
+export async function buildIngest(
+	root: string,
 	project: Project,
 	kind: IngestKind,
 	documents: readonly RawDocument[],
-): {instruction: string; context: string} {
+): Promise<{instruction: string; context: string}> {
 	const spec = INGEST[kind];
 
 	const instruction = [
@@ -228,6 +215,10 @@ export function buildIngest(
 		'its whole contents with the new material folded in. Never create a second',
 		'page for a thing that already has one under a different id.',
 		'',
+		'The existing pages are listed by path. If two of them declare the same id,',
+		'only one is ever resolved and the other is dead weight — propose removing',
+		'whichever is the lesser copy, by path, with "remove": true.',
+		'',
 		'The notes are the author’s own words. Their prose belongs in the body of',
 		'the page; the frontmatter is for what the schema asks for. Do not invent a',
 		'value the notes do not give — leave the field out and say so in notes, and',
@@ -239,7 +230,7 @@ export function buildIngest(
 	const context = [
 		`# ${kind} pages that already exist`,
 		'',
-		existing(project, kind),
+		existing(await buildCorpusMap(root, project), kind),
 		'',
 		`# The author's ${kind} notes`,
 		'',
