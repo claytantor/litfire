@@ -115,15 +115,43 @@ from interviewing about one — and lose only their interview directives.
 - **A window where both exist.** The old commands should keep working through a
   release rather than being cut the day the new one lands.
 
+## Decided
+
+**A kind with no gaps says so, and offers anyway.**
+
+```
+› /questions theme
+
+no open questions about themes.
+begin interview anyway? y/N
+```
+
+Not silence, and not an interview that starts without being asked for. The two
+sessions are genuinely different work — one fills gaps the checks found, the
+other goes deeper into a kind that is already consistent — and the prompt is
+what tells the author which one they are about to be in.
+
+The default is **no**. An interview costs a model session and an hour of the
+author's evening, so `return` declines. That also makes `/questions <kind>` safe
+to type when you only wanted to know whether anything was outstanding, which is
+most of the time.
+
+The asymmetry is deliberate: when there _are_ findings, it just begins. There is
+a reason to be asking and the author already knows what it is.
+
+**What this costs to build:** a shape the command layer does not have yet. Both
+existing confirms — the review gate's, and the buffer's discard — live inside a
+full-screen component that owns the keyboard. Nothing today lets a command
+return a question to the composer and resume on the answer. That is worth
+building properly rather than special-casing, because `/ingest adopt` sweeping
+25 pages and `/wiki serve` rebinding a busy port both want the same thing.
+
 ## Open questions
 
-1. **Does `/questions <kind>` with no gaps still interview?** A kind the checks
-   are happy with has no agenda — does the brief take over, or does it say
-   nothing to ask?
-2. **Do situations get interviewed at all?** A scene is written, not elicited.
+1. **Do situations get interviewed at all?** A scene is written, not elicited.
    Perhaps `/questions situation` asks about what a scene _needs_ — cast, place,
    moment — rather than about its content.
-3. **What happens to `/timeline` and `/themes` as views?** Keeping the name for
+2. **What happens to `/timeline` and `/themes` as views?** Keeping the name for
    the view while the interview moves is either obvious or confusing, and I do
    not know which until it is used.
 
