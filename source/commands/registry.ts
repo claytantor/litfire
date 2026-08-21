@@ -18,6 +18,7 @@ import {
 	timeSchema,
 } from '../time/index.js';
 import {INGEST_KINDS, isIngestKind, readRaw} from '../ingest/index.js';
+import {readIngestState, statusOf} from '../ingest/state.js';
 import {partitionChapters} from '../chapters/index.js';
 import {renderManuscript} from '../chapters/manuscript.js';
 import {
@@ -1029,12 +1030,36 @@ const ingest: Command = {
 			};
 		}
 
+		// Sorted here so the author sees the cost before it is spent: a note the
+		// corpus already reflects costs nothing, and saying which ones those are
+		// is the difference between a command that looks idle and one that is.
+		const state = await readIngestState(context.root, kind);
+		const sorted = documents.map(document => ({
+			document,
+			status: statusOf(state, document.path, document.contents),
+		}));
+		const pending = sorted.filter(entry => entry.status !== 'unchanged');
+
+		if (pending.length === 0) {
+			return {
+				lines: [
+					ok(`nothing to do — all ${String(documents.length)} up to date`),
+					muted(`edit a note in ${directory}/ and run this again`),
+				],
+			};
+		}
+
 		return {
 			lines: [
 				muted(
-					`ingesting ${String(documents.length)} document${documents.length === 1 ? '' : 's'} from ${directory}/`,
+					`ingesting ${String(pending.length)} of ${String(documents.length)} from ${directory}/`,
 				),
-				...documents.map(document => muted(`  ${document.path}`)),
+				...pending.map(entry =>
+					muted(`  ${entry.status.padEnd(9)} ${entry.document.path}`),
+				),
+				...(sorted.length === pending.length
+					? []
+					: [muted(`  ${String(sorted.length - pending.length)} unchanged, skipped`)]),
 			],
 			ingest: {kind, ...(focus === '' ? {} : {focus})},
 		};

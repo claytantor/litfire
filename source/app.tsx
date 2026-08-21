@@ -41,6 +41,7 @@ import {
 import {loadProvider, type Provider} from './llm/index.js';
 import {ReviewBatch, type Proposal} from './review/index.js';
 import {buildIngest, readRaw, type IngestKind} from './ingest/index.js';
+import {hashSource, readIngestState, stampSource, statusOf} from './ingest/state.js';
 import {runPlan} from './curator/index.js';
 import {editText, resolveEditor} from './vault/editor.js';
 import {
@@ -50,6 +51,7 @@ import {
 	type Startup,
 } from './vault/projects.js';
 import {readConfig, saveProvider} from './vault/config.js';
+import {appendLog} from './vault/log.js';
 import {parseDocument, stringifyDocument} from './vault/frontmatter.js';
 import {appendHistory, extendHistory, readHistory} from './vault/history.js';
 import {useProject} from './hooks/use-project.js';
@@ -449,21 +451,79 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			}
 
 			const {profile} = await loadSetting(root);
-			const {instruction, context} = await buildIngest(root, resolved, kind, documents);
+			const state = await readIngestState(root, kind);
+			const pending = documents.filter(
+				document => statusOf(state, document.path, document.contents) !== 'unchanged',
+			);
+			if (pending.length === 0) {
+				return;
+			}
 
 			setBusy(true);
-			setBusyLabel(`reading your ${kind} notes…`);
 			const controller = new AbortController();
+			const proposals: Proposal[] = [];
+			const notes: string[] = [];
+
 			try {
-				const outcome = await runPlan(
-					loaded.provider,
+				/**
+				 * One note per pass, rather than all of them in one context.
+				 *
+				 * Provenance needs it: a page has to record which note it came from,
+				 * and a single pass over four notes cannot say which of them produced
+				 * what. It is also better curation — four characters in one request
+				 * bleed into each other, and one at a time each gets the whole
+				 * instruction.
+				 *
+				 * The cost of doing it this way is paid once. An unchanged note never
+				 * reaches here at all.
+				 */
+				for (const [index, document] of pending.entries()) {
+					setBusyLabel(
+						`reading ${document.path} (${String(index + 1)}/${String(pending.length)})…`,
+					);
+
+					const {instruction, context} = await buildIngest(root, resolved, kind, [
+						document,
+					]);
+					const outcome = await runPlan(
+						loaded.provider,
+						root,
+						instruction,
+						context,
+						profile.register ?? '',
+						controller.signal,
+					);
+
+					if (outcome.error !== undefined) {
+						append([error(`${document.path}: ${outcome.error}`)]);
+						continue;
+					}
+					for (const refusal of outcome.refusals) {
+						append([error(`refused ${refusal.path}: ${refusal.reason}`)]);
+					}
+
+					// Stamped here, in code. The model cannot compute a digest, and a
+					// page carrying a plausible-looking one would be trusted by every
+					// later ingest.
+					const hash = hashSource(document.contents);
+					for (const proposal of outcome.proposals) {
+						proposals.push(
+							proposal.remove === true
+								? proposal
+								: {
+										...proposal,
+										contents: stampSource(proposal.contents, document.path, hash),
+									},
+						);
+					}
+					notes.push(...outcome.notes.map(note => `${document.path}: ${note}`));
+				}
+
+				await appendLog(
 					root,
-					instruction,
-					context,
-					profile.register ?? '',
-					controller.signal,
+					`/ingest ${kind}: read ${String(pending.length)} note(s), proposed ${String(proposals.length)} page(s)`,
 				);
-				await handlePlanned(outcome);
+				await handlePlanned({proposals, refusals: [], notes, error: undefined});
 			} catch (caught) {
 				append([error(caught instanceof Error ? caught.message : String(caught))]);
 			} finally {

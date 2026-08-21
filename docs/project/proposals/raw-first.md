@@ -221,19 +221,30 @@ instruction. Absent, nothing changes.
 | Author frontmatter and prose disagree       | Frontmatter wins, and the disagreement becomes an open question     |
 | Compendium sources produce unstable ids     | Prefer 1:1; splitting is offered explicitly                         |
 
-## Open questions
+## Decided
 
-1. **Does the gate stay for every ingest?** P3 says nothing lands without an
-   explicit decision. Idempotency makes the gate quiet, but a first adopt of 40
-   pages is 40 diffs. Batch-accept per kind?
-2. **Does `situations/` stay a corpus directory at all**, or do situations
-   become raw-only, with the ledger reading raw directly? They are the one
-   primitive that is mostly prose.
-3. **`raw/interviews/` is not a primitive folder.** Transcripts already ingest
-   via extraction. Do they stay a separate path, or become sources like any
-   other?
-4. **What owns `log.md`?** karpathy appends every ingest, query and lint. litfire
-   has the file and barely writes it.
+All four were settled by the author.
+
+**The gate stays, for every ingest.** All landing is reviewed. Idempotency is
+what keeps that bearable — an unchanged note produces no diffs at all — but
+volume is never a reason to skip the decision.
+
+**`situations/` does not stay a corpus directory.** Scenes are authored in
+`raw/situations/` and treated exactly like every other kind. This is the
+cleanest answer and it removes the special case the proposal was hedging around:
+there is no primitive that is "mostly prose and therefore different".
+
+**`raw/interviews/` is where interviews land**, timestamped, and it is not a
+primitive folder. `/ingest` reads a transcript and puts what it finds wherever
+it belongs — a character in `characters/`, a moment in `timeline/moments/`.
+That folds today's `/system extract`, `/timeline extract` and friends into one
+pass: a transcript is a source like any other, and the difference between it and
+a hand-written note is only that a transcript touches several kinds at once.
+
+**`log.md` is owned by `/ingest` and `/curator`.** They are the two passes that
+change the corpus on the author's behalf, so they are the two whose work is
+worth reconstructing later. Replay and the wiki build are pure functions of the
+corpus and leave nothing worth recording.
 
 ## Sequencing
 
@@ -242,7 +253,15 @@ instruction. Absent, nothing changes.
    before anything depends on it.
 3. Raw frontmatter, and the linking commands move to it.
 4. `/<kind> new` writes raw.
-5. Corpus becomes forbidden to author writes; `/ingest adopt` lands with it.
+5. Interviews become a source kind, and the per-kind `extract` commands fold
+   into `/ingest`.
+6. Corpus becomes forbidden to author writes; `/ingest adopt` lands with it.
 
-Each step is useful alone and the order never requires backing up. Step 5 is the
-irreversible one and should not be taken until 1–4 have been lived with.
+Each step is useful alone and the order never requires backing up. Step 6 is the
+irreversible one and should not be taken until the rest have been lived with.
+
+**Steps 1 and 2 are done.** `/init` creates the nine folders with a README
+apiece, and ingested pages carry `source` and `source_hash` — so an unchanged
+note costs nothing and `/ingest` reports what it will read before it reads it.
+`log.md` is written by `/ingest` and `/curator`, which settled question four
+early.

@@ -1,7 +1,7 @@
 import {readdir, readFile} from 'node:fs/promises';
 import path from 'node:path';
 import type {Project} from '../core/project.js';
-import {resolve, VAULT} from '../vault/paths.js';
+import {RAW_KINDS, resolve, VAULT} from '../vault/paths.js';
 import {buildCorpusMap} from '../reviewer/corpus.js';
 import type {CorpusMap} from '../reviewer/types.js';
 
@@ -103,6 +103,22 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 	},
 };
 
+/**
+ * Every ingest kind has a folder, and every folder has a kind.
+ *
+ * `paths.ts` declares the directories so `scaffold.ts` can create them without
+ * importing this module; this asserts the two agree, at load, rather than
+ * letting a kind quietly have nowhere to read from.
+ */
+const declared = new Set(RAW_KINDS.map(kind => `${VAULT.raw}/${kind}`));
+for (const [kind, spec] of Object.entries(INGEST)) {
+	if (!declared.has(spec.from)) {
+		throw new Error(
+			`ingest kind '${kind}' reads ${spec.from}, which /init does not create`,
+		);
+	}
+}
+
 export function isIngestKind(value: string): value is IngestKind {
 	return (INGEST_KINDS as readonly string[]).includes(value);
 }
@@ -132,7 +148,15 @@ export async function readRaw(
 	);
 
 	const names = entries
-		.filter(entry => entry.isFile() && entry.name.endsWith('.md'))
+		.filter(
+			entry =>
+				entry.isFile() &&
+				entry.name.endsWith('.md') &&
+				// `/init` puts a README in each folder saying what belongs there.
+				// It is signposting, not material, and ingesting it would propose a
+				// character page about how to write character pages.
+				entry.name.toLowerCase() !== 'readme.md',
+		)
 		.map(entry => entry.name)
 		.toSorted();
 

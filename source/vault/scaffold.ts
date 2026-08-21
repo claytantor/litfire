@@ -2,7 +2,7 @@ import {mkdir, writeFile} from 'node:fs/promises';
 import {BUILT_IN_PROFILES, resolveProfile} from '../genre/profiles.js';
 import type {ResolvedProfile} from '../genre/types.js';
 import {stringifyDocument} from './frontmatter.js';
-import {resolve, VAULT, VAULT_DIRECTORIES} from './paths.js';
+import {RAW_KINDS, resolve, VAULT, VAULT_DIRECTORIES} from './paths.js';
 
 export type ScaffoldResult = {
 	readonly created: readonly string[];
@@ -266,8 +266,37 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 		body: `# Open questions\n\n${GENERATED_BANNER}\n\nNothing recorded yet. Back to [[index]].\n`,
 	});
 
-	files[`${VAULT.raw}/README.md`] =
-		'# Raw\n\nDrop unstructured facts here. `/ingest <file>` turns them into corpus proposals.\nThe tool never edits files in this folder.\n';
+	files[`${VAULT.raw}/README.md`] = [
+		'# Raw',
+		'',
+		'What you write. One folder per primitive — put a note about a character in',
+		'`characters/`, a note about a place in `places/`, and so on.',
+		'',
+		'Notes are freeform: headings, bullets, a wall of prose. There is no format',
+		'to learn. Name the file after the thing it describes, because the filename',
+		'is the id the corpus page will carry.',
+		'',
+		'`/ingest <kind>` reads these and proposes the typed pages. Every proposal',
+		'reaches you as a diff you accept. The tool does not edit this folder —',
+		'only `/curator` may, and only when the error is in the record itself.',
+		'',
+		...RAW_KINDS.map(kind => `- \`${kind}/\``),
+		'',
+	].join('\n');
+
+	// A README per folder, so an empty vault says what belongs where rather
+	// than presenting nine directories with no explanation.
+	for (const kind of RAW_KINDS) {
+		files[`${VAULT.raw}/${kind}/README.md`] = [
+			`# raw/${kind}`,
+			'',
+			`Your notes about ${kind}. One file per thing, named for it:`,
+			`\`${VAULT.raw}/${kind}/<id>.md\` becomes that primitive's id.`,
+			'',
+			'Freeform. Write what you know.',
+			'',
+		].join('\n');
+	}
 
 	return files;
 }

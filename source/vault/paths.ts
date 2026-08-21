@@ -53,9 +53,33 @@ export const VAULT = {
 } as const;
 
 /** Directories `/init` creates. Order matters only for readable output. */
+/**
+ * The primitive folders under `raw/`, one per kind.
+ *
+ * Declared here rather than in `ingest/` so `scaffold.ts` can create them
+ * without importing the ingest module and everything it pulls in. `ingest/`
+ * asserts against this list, so the two cannot drift.
+ */
+export const RAW_KINDS: readonly string[] = [
+	'characters',
+	'moments',
+	'places',
+	'situations',
+	'systems',
+	'arcs',
+	'factions',
+	'artifacts',
+	'themes',
+];
+
+export const RAW_DIRECTORIES: readonly string[] = RAW_KINDS.map(
+	kind => `${VAULT.raw}/${kind}`,
+);
+
 export const VAULT_DIRECTORIES: readonly string[] = [
 	VAULT.meta,
 	VAULT.raw,
+	...RAW_DIRECTORIES,
 	VAULT.system,
 	VAULT.systems,
 	VAULT.timeline,

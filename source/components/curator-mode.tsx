@@ -6,6 +6,7 @@ import type {Project} from '../core/project.js';
 import type {Provider} from '../llm/index.js';
 import {buildRawContext, renderRawContext} from '../curator/raw.js';
 import {streamPainter} from '../hooks/use-stream-paint.js';
+import {appendLog} from '../vault/log.js';
 import {ConversationScreen} from './conversation-screen.js';
 
 type Props = {
@@ -105,6 +106,12 @@ export function CuratorMode({rows, columns, ...options}: Props) {
 							: `Plan failed: ${outcome.error}`,
 					);
 					setTurns(session.turns);
+					await appendLog(
+						root,
+						outcome.error === undefined
+							? `/curator: proposed ${String(outcome.proposals.length)} file(s) — ${instruction}`
+							: `/curator: plan failed — ${outcome.error}`,
+					);
 					onPlanned(outcome);
 				};
 
