@@ -3,11 +3,15 @@
 PlantUML sources, with a rendered SVG committed beside each so the docs
 site and GitHub can show them without a PlantUML install.
 
-| Diagram                                        | What it says                                                                                                                                                                      |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`authoring-flow.puml`](./authoring-flow.puml) | Where a fact goes from the moment you write it to the manuscript. Every arrow into the corpus passes through the review gate; everything below the corpus is regenerated from it. |
+## The authoring flow
 
-To re-render after an edit:
+Where a fact goes from the moment you write it to the manuscript. Every
+arrow into the corpus passes through the review gate; everything below
+the corpus is regenerated from it.
+
+![The authoring flow](./authoring-flow.svg)
+
+Source: `docs/diagrams/authoring-flow.puml`. To re-render after an edit:
 
 ```sh
 java -jar plantuml.jar -tsvg docs/diagrams/authoring-flow.puml
