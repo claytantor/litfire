@@ -34,6 +34,29 @@ const flush = async (ms = 150) => {
 	await new Promise(resolve => setTimeout(resolve, ms));
 };
 
+/**
+ * Polls rather than sleeping a fixed interval.
+ *
+ * Ink renders on its own schedule and these tests share a machine with fifty
+ * other files, so any single sleep long enough to be reliable under parallel
+ * load is far longer than the render actually takes. Waiting for the condition
+ * is both faster and not a coin flip.
+ */
+async function until(
+	predicate: () => boolean,
+	what: string,
+	timeout = 4000,
+): Promise<void> {
+	const deadline = Date.now() + timeout;
+	while (Date.now() < deadline) {
+		if (predicate()) {
+			return;
+		}
+		await new Promise(resolve => setTimeout(resolve, 20));
+	}
+	throw new Error(`timed out waiting for ${what}`);
+}
+
 async function type(stdin: {write: (data: string) => void}, value: string) {
 	stdin.write(value);
 	await flush(20);
@@ -52,19 +75,25 @@ describe('a command that asks before it acts', () => {
 		const {stdin, lastFrame} = mount();
 		await flush();
 		await type(stdin, '/questions theme');
+		await until(
+			() => (lastFrame() ?? '').includes('begin interview anyway?'),
+			'the prompt',
+		);
 
-		const frame = lastFrame() ?? '';
-		expect(frame).toContain('begin interview anyway?');
-		expect(frame).toContain('y/N');
+		expect(lastFrame() ?? '').toContain('y/N');
 	});
 
 	it('declines on anything that is not y, return included', async () => {
 		const {stdin, frames, lastFrame} = mount();
 		await flush();
 		await type(stdin, '/questions theme');
+		await until(
+			() => (lastFrame() ?? '').includes('begin interview anyway?'),
+			'the prompt',
+		);
 
 		stdin.write('\r');
-		await flush();
+		await until(() => frames.join('\n').includes('nothing to do'), 'the decline');
 
 		expect(frames.join('\n')).toContain('nothing to do');
 		// The prompt is gone, so the composer has the keyboard back.
@@ -72,12 +101,16 @@ describe('a command that asks before it acts', () => {
 	});
 
 	it('declines on n', async () => {
-		const {stdin, frames} = mount();
+		const {stdin, frames, lastFrame} = mount();
 		await flush();
 		await type(stdin, '/questions theme');
+		await until(
+			() => (lastFrame() ?? '').includes('begin interview anyway?'),
+			'the prompt',
+		);
 
 		stdin.write('n');
-		await flush();
+		await until(() => frames.join('\n').includes('nothing to do'), 'the decline');
 
 		expect(frames.join('\n')).toContain('nothing to do');
 	});
@@ -91,9 +124,16 @@ describe('a command that asks before it acts', () => {
 		const {stdin, lastFrame} = mount();
 		await flush();
 		await type(stdin, '/questions theme');
+		await until(
+			() => (lastFrame() ?? '').includes('begin interview anyway?'),
+			'the prompt',
+		);
 
 		stdin.write('k');
-		await flush();
+		await until(
+			() => !(lastFrame() ?? '').includes('begin interview anyway?'),
+			'the prompt to clear',
+		);
 
 		const frame = lastFrame() ?? '';
 		expect(frame).not.toContain('begin interview anyway?');
@@ -101,16 +141,23 @@ describe('a command that asks before it acts', () => {
 	});
 
 	it('acts on y', async () => {
-		const {stdin, frames} = mount();
+		const {stdin, frames, lastFrame} = mount();
 		await flush();
 		await type(stdin, '/questions theme');
+		await until(
+			() => (lastFrame() ?? '').includes('begin interview anyway?'),
+			'the prompt',
+		);
 
 		stdin.write('y');
-		await flush(300);
+		await until(
+			() => !(lastFrame() ?? '').includes('begin interview anyway?'),
+			'the prompt to clear',
+		);
 
 		const output = frames.join('\n');
 		// The interview needs a real provider, so it fails to open — which is
-		// itself the proof that saying yes dispatched `then` rather than
+		// itself the proof that saying yes dispatched `proceed` rather than
 		// declining. What must not appear is the decline.
 		expect(output).not.toContain('nothing to do');
 	});

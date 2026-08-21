@@ -12,6 +12,7 @@ import {
 	findResumable,
 	composeSystemPrompt,
 	extractJsonObject,
+	INTERVIEW_KINDS,
 	InterviewSession,
 	listTranscripts,
 	parseTranscript,
@@ -57,7 +58,13 @@ function scriptedProvider(replies: string[]): Provider & {seen: ChatMessage[][]}
 	};
 }
 
-const KINDS: InterviewKind[] = ['system', 'timeline', 'character', 'themes'];
+/**
+ * All ten, not a sample. Idiom neutrality is a property of every brief — a
+ * fantasy word in one of them primes an SF vault's interviewer toward a setting
+ * its author did not choose, and it does not matter which brief it is in. This
+ * caught `sword` and `spell` in the artifact brief on the day it was widened.
+ */
+const KINDS: InterviewKind[] = [...INTERVIEW_KINDS];
 
 async function drain(iterable: AsyncIterable<string>): Promise<string> {
 	let out = '';
@@ -80,11 +87,11 @@ describe('prompt composition', () => {
 
 	it('has a distinct brief for every interview', () => {
 		const briefs = KINDS.map(kind => BRIEFS[kind]);
-		expect(new Set(briefs).size).toBe(4);
+		expect(new Set(briefs).size).toBe(KINDS.length);
 	});
 
 	it('tells the interviewer the vault is empty rather than injecting nothing', () => {
-		expect(composeSystemPrompt('themes', '   ')).toContain('This vault is empty');
+		expect(composeSystemPrompt('theme', '   ')).toContain('This vault is empty');
 	});
 
 	it('never invites schema questions — that is the extractor’s job', () => {
@@ -250,12 +257,12 @@ describe('grounding', () => {
 			'utf8',
 		);
 
-		const themes = await buildGrounding(root, 'themes');
-		const timeline = await buildGrounding(root, 'timeline');
+		const theme = await buildGrounding(root, 'theme');
+		const moment = await buildGrounding(root, 'moment');
 
-		expect(themes).toContain('corpus/themes/debt.md');
-		expect(timeline).toContain('corpus/moments/real-event.md');
-		expect(timeline).not.toContain('corpus/themes/debt.md');
+		expect(theme).toContain('corpus/themes/debt.md');
+		expect(moment).toContain('corpus/moments/real-event.md');
+		expect(moment).not.toContain('corpus/themes/debt.md');
 	});
 
 	it('narrows character grounding to the focused character', async () => {
@@ -473,8 +480,8 @@ describe('transcripts', () => {
 
 describe('extraction', () => {
 	const transcript = {
-		id: 'themes-x',
-		kind: 'themes' as const,
+		id: 'theme-x',
+		kind: 'theme' as const,
 		startedAt: '',
 		status: 'complete' as const,
 		exchanges: [
@@ -602,7 +609,7 @@ describe('extraction', () => {
 
 		const sent = provider.seen[0]!;
 		expect(sent[0]?.role).toBe('system');
-		expect(sent[1]?.content).toContain('themes/<pillar-id>.md');
+		expect(sent[1]?.content).toContain('corpus/themes/<id>.md');
 		expect(sent[1]?.content).toContain('sold back to the people');
 	});
 });
@@ -637,8 +644,8 @@ describe('resuming an unfinished interview', () => {
 			exchanges: [{question: 'Q', answer: 'A'}],
 		});
 		await saveTranscript(root, {
-			id: 'themes-b',
-			kind: 'themes',
+			id: 'theme-b',
+			kind: 'theme',
 			startedAt: '2026-08-15T11:00:00Z',
 			status: 'in-progress',
 			exchanges: [{question: 'Q', answer: 'A'}],
@@ -652,7 +659,7 @@ describe('resuming an unfinished interview', () => {
 		});
 
 		expect((await findResumable(root, 'system'))?.id).toBe('system-a');
-		expect((await findResumable(root, 'themes'))?.id).toBe('themes-b');
+		expect((await findResumable(root, 'theme'))?.id).toBe('theme-b');
 		expect(await findResumable(root, 'character')).toBeUndefined();
 	});
 
@@ -808,7 +815,7 @@ describe('an explicit resume', () => {
 
 	it('still refuses when the kind has no transcript at all', async () => {
 		await saveOne('system-done', 'complete', '2026-08-15T11:00:00Z');
-		expect(await findForResume(root, 'themes')).toBeUndefined();
+		expect(await findForResume(root, 'theme')).toBeUndefined();
 	});
 
 	it('does not reopen a different character’s interview', async () => {
@@ -943,10 +950,15 @@ describe('extraction has somewhere to put meaning', () => {
 	});
 
 	it('gives an arc body somewhere to land too', () => {
-		const timeline = buildExtractionMessages(
+		// `arc` used to be folded into the retired `timeline` interview, whose
+		// bespoke hint named only the mechanical moment fields — an arc's meaning
+		// had no target file at all. Now arc is its own primitive with its own
+		// destination, so the guard is that the extractor is actually told where
+		// an arc page lands.
+		const arc = buildExtractionMessages(
 			{
-				id: 'timeline-x',
-				kind: 'timeline',
+				id: 'arc-x',
+				kind: 'arc',
 				startedAt: '2026-08-15T11:07:19.000Z',
 				focus: undefined,
 				status: 'complete',
@@ -957,6 +969,6 @@ describe('extraction has somewhere to put meaning', () => {
 			.map(message => message.content)
 			.join('\n');
 
-		expect(timeline).toContain('what the arc is *about*');
+		expect(arc).toContain('corpus/arcs/<id>.md');
 	});
 });

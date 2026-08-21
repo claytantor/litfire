@@ -620,9 +620,7 @@ export function renderLint(
 					`  ${subject} — ${orphan.exchanges} exchange${orphan.exchanges === 1 ? '' : 's'} saved, but ${orphan.detail}`,
 					{color: '#e0af68'},
 				),
-				muted(
-					`    /${orphan.kind}${orphan.focus === undefined ? '' : ` ${orphan.focus}`} extract to re-run extraction`,
-				),
+				muted('    /ingest interview files it, through the same review gate'),
 			);
 		}
 		lines.push(blank());

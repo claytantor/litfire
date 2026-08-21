@@ -26,10 +26,20 @@ begin interview anyway? y/N
 The default is no, so `return` declines — which makes `/questions <kind>` safe
 to type when you only wanted to know whether anything was outstanding.
 
-The older commands still work and do the same thing: `/system`,
-`/character <name>`, `/timeline interview` and `/themes interview` (bare
-`/timeline` and `/themes` keep their structural views). Each needs a provider —
-run `/provider` first.
+It needs a provider — run `/provider` first.
+
+`/system`, `/character <name>`, `/timeline` and `/themes` used to run the four
+interviews and are now views only: they render what is in the corpus, cost
+nothing, and need no provider. Anything that used to interview goes through
+`/questions`:
+
+| was                   | now                           |
+| --------------------- | ----------------------------- |
+| `/system`             | `/questions system`           |
+| `/character <name>`   | `/questions character <name>` |
+| `/timeline interview` | `/questions moment` · `arc`   |
+| `/themes interview`   | `/questions theme`            |
+| `/<kind> extract`     | `/ingest interview`           |
 
 The flow is interview → transcript → extraction → review gate → disk. The
 transcript is written to `raw/interviews/` **before** extraction runs, so a

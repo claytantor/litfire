@@ -58,8 +58,6 @@ const RELEVANT: Readonly<Record<InterviewKind, readonly string[]>> = {
 	artifact: [VAULT.artifacts, VAULT.systems, VAULT.characters],
 	theme: [VAULT.themes, VAULT.characters, VAULT.factions],
 	chapter: [VAULT.chapters, VAULT.situations, VAULT.arcs],
-	timeline: [VAULT.moments, VAULT.arcs, VAULT.factions, VAULT.places],
-	themes: [VAULT.themes, VAULT.characters, VAULT.factions],
 };
 
 async function readIfPresent(file: string): Promise<string | undefined> {

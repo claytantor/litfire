@@ -3,6 +3,7 @@ export {
 	BRIEFS,
 	KIND_SUMMARY,
 	composeSystemPrompt,
+	INTERVIEW_KINDS,
 	interviewKindSchema,
 	type InterviewKind,
 } from './prompts.js';

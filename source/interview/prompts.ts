@@ -1,16 +1,13 @@
 import {z} from 'zod';
 
 /**
- * Every kind an interview can be about.
+ * Every kind an interview can be about: the ten primitives, one brief each.
  *
- * The first ten are the primitives, one brief each, which is the shape this was
- * always going to end at — `/questions <kind>` needs a brief per folder under
- * `raw/`, not a separate vocabulary of its own.
- *
- * `timeline` and `themes` are the two names that never matched a primitive:
- * `timeline` covered moments *and* the arcs between them, and `themes` is
- * plural where the primitive is `theme`. They are kept only so `/timeline` and
- * `/themes` keep working, and they retire with those commands.
+ * This list and `INGEST_KINDS` are now the same list, which is the point. They
+ * were two vocabularies for one concept — an interview could be had about
+ * `timeline` and `themes`, neither of which was ever a folder under `raw/`,
+ * while `place`, `faction`, `artifact`, `situation` and `chapter` had no
+ * interview at all. Two lists of one thing is how they drift, and this one had.
  */
 export const interviewKindSchema = z.enum([
 	'system',
@@ -23,10 +20,11 @@ export const interviewKindSchema = z.enum([
 	'artifact',
 	'theme',
 	'chapter',
-	'timeline',
-	'themes',
 ]);
 export type InterviewKind = z.infer<typeof interviewKindSchema>;
+
+/** The same ten, as a list — for anything that has to walk every kind. */
+export const INTERVIEW_KINDS = interviewKindSchema.options;
 
 /**
  * The interviewer's craft, shared by all four interviews.
@@ -190,42 +188,6 @@ allows:
 Finish by asking: what is the one rule you would never break, even if the plot
 needed it? That answer is the spine of the whole system.`;
 
-const TIMELINE_BRIEF = `You are surfacing the backbone: the major moments the story hangs on, and
-the arcs between them.
-
-The author is building a partial order, not a plot. You need turning points
-that change the conditions of the world, not scenes. Keep pulling them up a
-level when they give you a scene.
-
-Territory:
-
-- The inciting event. What broke, and what was the last ordinary day before it?
-- Before. What was this world's normal, specifically enough that a reader would
-  miss it?
-- Turning points. Push for three to six events where the terms of survival
-  change — not battles, changes. The rules change, somewhere opens that was
-  closed, a faction collapses, whoever was watching loses interest. For each,
-  ask what becomes possible that was not before, and what becomes impossible.
-- Escalation logic. Why does each turning point follow from the last rather
-  than simply being next? If the answer is "it gets harder", press for the
-  mechanism.
-- The clock. Is anything counting down, and who set it?
-- Arc shape. Between each pair of turning points, what is the protagonist
-  trying to do, and what would failure look like — not death, but the
-  interesting failure.
-- Endings. What is the last event you can currently see? You do not need to
-  know how it resolves, only that it is there.
-
-Ask what each arc is about emotionally before you ask what it is about
-mechanically. Progression serves the arc; the arc is not a band of levels with
-a story draped over it. An arc plotted as "this is where they get stronger"
-sags in the middle, reliably.
-
-Then ask about power alongside story: at the end of each arc, is the
-protagonist meaningfully stronger, and stronger at what? Do not ask for
-numbers. Ask what they can do at the end of the arc that would have saved them
-at the start.`;
-
 const CHARACTER_BRIEF = `You are surfacing a character deeply enough that the author could write them
 into any scene without checking notes.
 
@@ -293,7 +255,7 @@ them back.`;
  * briefs never matched the count of primitives. These are that brief split
  * along the seam it always had: a moment is a point where the conditions
  * change, an arc is the span between two of them, and they are interviewed
- * about differently. `timeline` is kept until `/timeline` retires.
+ * about differently.
  */
 const MOMENT_BRIEF = `You are surfacing the turning points: the moments where the terms of the world
 change.
@@ -444,11 +406,12 @@ Territory:
 
 Ask what they were founded to do, and when they last did it.`;
 
-const ARTIFACT_BRIEF = `You are surfacing a thing people use to achieve an outcome — a spell, a rifle, a
-key, an instrument. The outcome is the defining fact and everything else is
-detail.
+const ARTIFACT_BRIEF = `You are surfacing a thing people use to achieve an outcome. What sort of thing
+that is depends entirely on the world, and you must not decide — a weapon, a
+tool, a document, an instrument, a technique. The outcome is the defining fact
+and everything else is detail.
 
-So ask what it does before what it is. "A sword" tells you nothing; "it settles
+So ask what it does before what it is. Naming the object tells you nothing; "it settles
 an argument permanently, and everyone within earshot knows an argument was
 settled" is a thing a story can use.
 
@@ -510,9 +473,6 @@ export const BRIEFS: Readonly<Record<InterviewKind, string>> = {
 	artifact: ARTIFACT_BRIEF,
 	theme: THEMES_BRIEF,
 	chapter: CHAPTER_BRIEF,
-	// Retiring with the commands that use them.
-	timeline: TIMELINE_BRIEF,
-	themes: THEMES_BRIEF,
 };
 
 /** One-line summaries for `/help` and the command log. */
@@ -527,8 +487,6 @@ export const KIND_SUMMARY: Readonly<Record<InterviewKind, string>> = {
 	artifact: 'what a thing achieves, and what using it costs',
 	theme: 'what the book is arguing about',
 	chapter: 'where the cuts go, for a reader coming fresh',
-	timeline: 'moments and the arcs between them',
-	themes: 'what the book is arguing about',
 };
 
 /**

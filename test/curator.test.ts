@@ -44,7 +44,7 @@ function scripted(replies: string[]): Provider & {seen: ChatMessage[][]} {
 	};
 }
 
-async function transcript(id: string, kind: 'system' | 'timeline', answer: string) {
+async function transcript(id: string, kind: 'system' | 'moment', answer: string) {
 	await saveTranscript(root, {
 		id,
 		kind,
@@ -57,16 +57,16 @@ async function transcript(id: string, kind: 'system' | 'timeline', answer: strin
 describe('what the curator can see of raw/', () => {
 	it('always inventories every transcript', async () => {
 		await transcript('system-a', 'system', 'The Seed and the Custodian.');
-		await transcript('timeline-b', 'timeline', 'It starts with the patch.');
+		await transcript('moment-b', 'moment', 'It starts with the patch.');
 
 		const rendered = renderRawContext(await buildRawContext(root, 'anything'));
 		expect(rendered).toContain('`system-a`');
-		expect(rendered).toContain('`timeline-b`');
+		expect(rendered).toContain('`moment-b`');
 	});
 
 	it('ships the full text of a transcript the question names', async () => {
 		await transcript('system-a', 'system', 'The Seed and the Custodian.');
-		await transcript('timeline-b', 'timeline', 'It starts with the patch.');
+		await transcript('moment-b', 'moment', 'It starts with the patch.');
 
 		const rendered = renderRawContext(
 			await buildRawContext(root, 'what did system-a establish?'),

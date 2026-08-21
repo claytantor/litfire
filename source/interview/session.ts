@@ -28,8 +28,6 @@ const MINIMUM_EXCHANGES: Readonly<Record<InterviewKind, number>> = {
 	artifact: 4,
 	theme: 5,
 	chapter: 4,
-	timeline: 6,
-	themes: 5,
 };
 
 /** The spec's "target 8–15 exchanges"; past this the UI nudges toward wrapping. */

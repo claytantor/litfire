@@ -8,6 +8,7 @@ import {computeProject} from '../source/core/project.js';
 import {agendaFor, BRIEF_FOR, renderAgenda} from '../source/interview/agenda.js';
 import {BRIEFS, composeSystemPrompt} from '../source/interview/prompts.js';
 import {INGEST_KINDS} from '../source/ingest/index.js';
+import {saveTranscript} from '../source/interview/index.js';
 import {saveProvider} from '../source/vault/config.js';
 import {VAULT} from '../source/vault/paths.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
@@ -273,5 +274,63 @@ describe('the agenda reaches the interviewer', () => {
 
 		expect(prompt).not.toContain('# Where to start');
 		expect(prompt).toContain('# This interview');
+	});
+});
+
+/**
+ * Two guarantees the four retired commands carried, which `/questions` has to
+ * carry now. Both were lost when they were removed and caught by the tests
+ * that went with them — a deletion is not proof a behaviour was unwanted.
+ */
+describe('what the retired commands were right about', () => {
+	it('offers an unfinished interview rather than silently starting over', async () => {
+		await saveTranscript(root, {
+			id: 'moment-x-2026-08-21T09-14-00',
+			kind: 'moment',
+			startedAt: '2026-08-21T09:14:00.000Z',
+			focus: undefined,
+			status: 'in-progress',
+			exchanges: [{question: 'What broke, and when?', answer: 'The lift.'}],
+		});
+		await refresh();
+
+		const result = await run('/questions moment');
+		const output = said(result);
+
+		expect(output).toContain('unfinished moment interview');
+		expect(output).toContain('1 exchange, started 2026-08-21 09:14');
+		expect(output).toContain('/questions moment resume');
+		expect(output).toContain('/questions moment new');
+		// Neither surprise: not resumed behind their back, not discarded either.
+		expect(result.interview).toBeUndefined();
+	});
+
+	it('starts over when asked to, and says the old one is kept', async () => {
+		await saveTranscript(root, {
+			id: 'moment-x-2026-08-21T09-14-00',
+			kind: 'moment',
+			startedAt: '2026-08-21T09:14:00.000Z',
+			focus: undefined,
+			status: 'in-progress',
+			exchanges: [{question: 'q', answer: 'a'}],
+		});
+		await refresh();
+
+		expect((await run('/questions moment new')).interview?.resume).toBeUndefined();
+	});
+
+	/**
+	 * One system is not a choice, and naming it anyway keeps every transcript in
+	 * the same namespace as a vault that has several.
+	 */
+	it('focuses the only system without being told to', async () => {
+		expect((await run('/questions system')).interview?.focus).toBe('system-01');
+	});
+
+	it('does not do the same for a lone character, which is not the same fact', async () => {
+		// A vault with one character is not a reason to refuse to talk about
+		// characters in general.
+		const result = await run('/questions character');
+		expect(result.confirm?.proceed.interview?.focus ?? undefined).toBeUndefined();
 	});
 });

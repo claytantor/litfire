@@ -65,8 +65,9 @@ author cancels the gate. All three used to be silent — the transcript sat in
 
 ```
 interviews that produced nothing
-  system — 5 exchanges saved, but nothing under system/ has changed since
-    /system extract to re-run extraction
+  system — 5 exchanges saved, but nothing under setting/ or
+           corpus/systems/ has changed since
+    /ingest interview files it, through the same review gate
 ```
 
 **The signal is timestamps, not emptiness.** `/init` seeds `corpus/systems/<id>.md`
@@ -76,10 +77,12 @@ true is that a successful extraction writes its target _after_ the interview
 that produced it, so a transcript newer than everything its kind writes to is an
 interview that went nowhere.
 
-`/<kind> extract` re-runs extraction over the saved transcript and sends
-proposals to the review gate — the interview half is skipped, since the answers
-already exist. The transcript is never rewritten, so a failed re-extract costs
-nothing and can be run again. It is deliberately not part of `/wiki build`:
+`/ingest interview` reads the saved transcript and sends proposals to the
+review gate — the interview half is skipped, since the answers already exist. A
+transcript is a source like any other, and it is the only one that can touch
+several kinds at once: a system interview establishes a system, and names three
+characters and a turning point on the way. The transcript is never rewritten, so
+a failed pass costs nothing and can be run again. It is deliberately not part of `/wiki build`:
 that command regenerates derived files and stays free, offline, and
 deterministic.
 

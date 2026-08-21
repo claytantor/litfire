@@ -38,12 +38,9 @@ function targetsFor(
 	kind: InterviewKind,
 	focus: string | undefined,
 ): {files: string[]; directories: string[]} {
-	// The two names that never matched a primitive, and so cannot be answered
-	// from the ingest spec: `timeline` covers two folders, and the legacy
-	// `system` interview wrote the pre-`systems/` trio.
-	if (kind === 'timeline') {
-		return {files: [], directories: [VAULT.moments, VAULT.arcs]};
-	}
+	// The one kind the ingest spec cannot answer for: a vault written before
+	// `systems/` kept its rules in four files under `system/`, and those are
+	// still read.
 	if (kind === 'system') {
 		return {
 			files: [VAULT.stats, VAULT.skills, VAULT.curves, VAULT.formulas],
@@ -54,7 +51,7 @@ function targetsFor(
 	// Everything else writes one folder, and a focused interview writes one page
 	// inside it. Taken from the ingest spec rather than listed again here, so a
 	// primitive cannot gain a folder and quietly stop being checked.
-	const directory = INGEST[kind === 'themes' ? 'theme' : kind].to;
+	const directory = INGEST[kind].to;
 	return focus === undefined
 		? {files: [], directories: [directory]}
 		: {files: [`${directory}/${focus}.md`], directories: []};
@@ -86,14 +83,11 @@ async function newestWrite(
 }
 
 function describe(kind: InterviewKind, focus: string | undefined): string {
-	if (kind === 'timeline') {
-		return 'nothing on the timeline has changed since';
-	}
 	if (kind === 'system') {
 		return 'nothing under setting/ or corpus/systems/ has changed since';
 	}
 
-	const directory = INGEST[kind === 'themes' ? 'theme' : kind].to;
+	const directory = INGEST[kind].to;
 	return focus === undefined
 		? `nothing under ${directory}/ has changed since`
 		: `${directory}/${focus}.md has not changed since`;

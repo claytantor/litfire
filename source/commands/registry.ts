@@ -1,6 +1,5 @@
 import {mkdir, readdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import type {Project} from '../core/project.js';
 import {
 	arcSchema,
 	chapterSchema,
@@ -58,14 +57,7 @@ import {
 	term,
 	writeLexiconTerm,
 } from '../genre/index.js';
-import {
-	KIND_SUMMARY,
-	findForResume,
-	type InterviewKind,
-	findOrphanedInterviews,
-	findResumable,
-	transcriptsForKind,
-} from '../interview/index.js';
+import {findOrphanedInterviews, findResumable} from '../interview/index.js';
 import {renderStatusBlock, writeStatusBlock} from '../system/status.js';
 import {buildWiki, writeWiki} from '../wiki/index.js';
 import {
@@ -758,13 +750,9 @@ const pacing: Command = {
 
 const timeline: Command = {
 	name: 'timeline',
-	usage: '/timeline [show|interview|resume|extract [all]]',
-	summary: 'structural view; same show/resume/extract as /system',
-	async run(args, context) {
-		const delegated = interviewDirective(args);
-		if (delegated) {
-			return timelineInterview.run(delegated, context);
-		}
+	usage: '/timeline',
+	summary: 'the sequence: moments, arcs, and what is unplaced',
+	async run(_args, context) {
 		if (!context.project) {
 			return needsProject();
 		}
@@ -775,13 +763,9 @@ const timeline: Command = {
 
 const themes: Command = {
 	name: 'themes',
-	usage: '/themes [show|interview|resume|extract [all]]',
-	summary: 'coverage view; same show/resume/extract as /system',
-	async run(args, context) {
-		const delegated = interviewDirective(args);
-		if (delegated) {
-			return themesInterview.run(delegated, context);
-		}
+	usage: '/themes',
+	summary: 'what the book argues about, and where it is carried',
+	async run(_args, context) {
 		if (!context.project) {
 			return needsProject();
 		}
@@ -821,7 +805,7 @@ const lint: Command = {
  */
 const questions: Command = {
 	name: 'questions',
-	usage: '/questions [<kind>] [<id>|resume]',
+	usage: '/questions [<kind>] [<id>] [resume|new]',
 	summary: 'what is unresolved — and, given a kind, an interview about it',
 	async run(args, context) {
 		if (!context.project) {
@@ -867,7 +851,20 @@ const questions: Command = {
 			};
 		}
 
-		const focus = rest.find(one => one !== 'resume');
+		const directives = new Set(['resume', 'new']);
+		let focus = rest.find(one => !directives.has(one));
+
+		// One system is not a choice, and naming it anyway keeps every transcript
+		// in the same namespace as a vault that has several. Only systems: a
+		// vault with one character is not a reason to refuse to talk about
+		// characters in general.
+		if (kind === 'system' && focus === undefined) {
+			const systems = context.project.vault.systems;
+			if (systems.length === 1) {
+				focus = systems[0]?.id;
+			}
+		}
+
 		const start: CommandResult = {
 			lines: [],
 			interview: {
@@ -879,6 +876,32 @@ const questions: Command = {
 
 		if (rest.includes('resume')) {
 			return start;
+		}
+
+		// An unfinished interview is offered rather than silently discarded or
+		// silently resumed — either would be a surprise, and one of them strands
+		// work the author can see on disk. Reported rather than prompted for
+		// because the answer is a choice between two things, not a yes and a no.
+		const unfinished = rest.includes('new')
+			? undefined
+			: await findResumable(context.root, brief, focus);
+		if (unfinished) {
+			const label = focus === undefined ? kind : `${kind} ${focus}`;
+			const when = unfinished.startedAt.slice(0, 16).replace('T', ' ');
+			return {
+				lines: [
+					heading(`unfinished ${label} interview`),
+					text(
+						`  ${String(unfinished.exchanges.length)} exchange${unfinished.exchanges.length === 1 ? '' : 's'}, started ${when}`,
+					),
+					muted(
+						`  last question: ${unfinished.exchanges.at(-1)?.question.slice(0, 90) ?? ''}`,
+					),
+					blank(),
+					text(`  /questions ${label} resume   continue where you left off`),
+					text(`  /questions ${label} new      start over (the old one is kept)`),
+				],
+			};
 		}
 
 		// Split, because the two halves have different destinations. A faction
@@ -2174,290 +2197,60 @@ const provider: Command = {
 };
 
 /**
- * The four interviews share one implementation — they differ only by the brief
- * composed into the system prompt (§9), so one factory covers all of them.
- */
-/**
- * The interview directives, for commands whose bare form is a view.
+ * `/system [<id>]` and `/character <name>` — the views, and only the views.
  *
- * `/timeline interview` is the original spelling and still works; the rest go
- * straight through so timeline and themes take the same `resume|show|extract`
- * as `/system`. Returns the args to forward, or undefined to render the view.
- */
-function interviewDirective(args: readonly string[]): readonly string[] | undefined {
-	const [head] = args;
-	if (head === 'interview') {
-		return args.slice(1);
-	}
-	return head !== undefined && ['resume', 'continue', 'new', 'extract'].includes(head)
-		? args
-		: undefined;
-}
-
-/** What `/<kind> show` renders — the corpus side of what that interview writes. */
-/**
- * How an interview refers to itself: "character carl", "the-lathe", "themes".
+ * These were the interviews, and their bare form now renders what is there. The
+ * interview moved to `/questions <kind>`, which is one verb over every
+ * primitive rather than four spellings over four of them, and which opens on
+ * what the checks actually found rather than on a fixed brief.
  *
- * The focus is dropped when it merely repeats the kind, which a single-system
- * vault produces constantly — its one system is called `system`, and "unfinished
- * system system interview" reads like a bug because it looks like one.
+ * A view costs nothing and needs no provider, which is why it stays here rather
+ * than being folded in too: an author who wants to see their system should not
+ * have to configure a model to look at it.
  */
-function interviewLabel(kind: InterviewKind, focus: string | undefined): string {
-	if (focus === undefined || focus === kind) {
-		return kind;
-	}
-	return kind === 'system' ? focus : `${kind} ${focus}`;
-}
-
-function interviewView(
-	kind: 'system' | 'timeline' | 'character' | 'themes',
-	project: Project,
-	focus: string | undefined,
-): Line[] {
-	switch (kind) {
-		case 'system': {
-			return renderSystem(project, focus);
+const system: Command = {
+	name: 'system',
+	usage: '/system [<id>]',
+	summary: 'the rules a character is tracked by',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
 		}
-		case 'timeline': {
-			return renderTimeline(project);
+
+		// `renderSystem` decides all three cases itself — several systems listed,
+		// one rendered in full, a named one that is not there — so this passes the
+		// focus straight through rather than reporting the same thing twice.
+		const lines = renderSystem(
+			context.project,
+			args.find(one => one !== 'show'),
+		);
+		return {lines, paged: lines.length > 14, title: 'system'};
+	},
+};
+
+const character: Command = {
+	name: 'character',
+	usage: '/character <name>',
+	summary: 'a character as the corpus has them',
+	async run(args, context) {
+		if (!context.project) {
+			return needsProject();
 		}
-		case 'themes': {
-			return renderThemes(project);
-		}
-		case 'character': {
-			return focus === undefined
-				? [error('usage: /character <name> show')]
-				: renderCharacter(project, focus);
-		}
-	}
-}
 
-function interviewCommand(
-	kind: 'system' | 'timeline' | 'character' | 'themes',
-	usage: string,
-): Command {
-	return {
-		name: kind,
-		usage,
-		summary: `interview — ${KIND_SUMMARY[kind]}`,
-		async run(args, context) {
-			if (!context.project) {
-				return needsProject();
-			}
-
-			// Directives, not a character name.
-			const directives = new Set(['resume', 'new', 'continue', 'extract', 'show', 'all']);
-			const positional = args.filter(argument => !directives.has(argument));
-			const wantsResume = args.includes('resume') || args.includes('continue');
-			const wantsNew = args.includes('new');
-
-			// `/character carl` and `/system the-lathe` both namespace by a
-			// positional id: transcripts, grounding, and extraction all narrow to it,
-			// so two systems are interviewed separately instead of over each other.
-			const named = kind === 'character' || kind === 'system' || kind === 'timeline';
-			let focus = named ? positional[0] : undefined;
-
-			if (kind === 'character' && focus === undefined) {
-				return {lines: [error('usage: /character <name> [show|resume|extract]')]};
-			}
-
-			if (kind === 'timeline') {
-				// A moment is the unit a timeline interview is about, so naming one
-				// targets the transcript, the grounding and the extraction at it.
-				// Bare `/timeline` still renders the whole sequence.
-				const moments = context.project.vault.moments;
-				if (
-					focus !== undefined &&
-					!moments.some(candidate => candidate.id === focus) &&
-					args.includes('show')
-				) {
-					return {lines: [error(`no moment '${focus}' in this vault`)]};
-				}
-			}
-
-			if (kind === 'system') {
-				const systems = context.project.vault.systems;
-				if (focus === undefined && systems.length === 1) {
-					// One system is not a choice. Naming it anyway keeps every
-					// transcript in the same namespace as a vault that has several.
-					focus = systems[0]?.id;
-				}
-				if (focus === undefined && !args.includes('show')) {
-					return {
-						lines: [
-							error(`this vault has ${String(systems.length)} systems — name one`),
-							...systems.map(system =>
-								muted(`  /system ${system.id} — ${system.name ?? '(unnamed)'}`),
-							),
-							muted('/system show lists them · /system <new-id> starts a new one'),
-						],
-					};
-				}
-				if (
-					focus !== undefined &&
-					!systems.some(system => system.id === focus) &&
-					(args.includes('show') || args.includes('extract'))
-				) {
-					return {
-						lines: [error(`no system '${focus}' in this vault`)],
-					};
-				}
-			}
-
-			// Ahead of the provider check: every `show` reads the corpus and needs
-			// no model at all. An author whose extraction failed should not have to
-			// configure a provider to find out what they still have.
-			if (args.includes('show')) {
-				const lines = interviewView(kind, context.project, focus);
-				return {lines, paged: lines.length > 14, title: kind};
-			}
-
-			const config = await readConfig(context.root);
-			if (config.provider.id === undefined || config.provider.model === undefined) {
-				return {
-					lines: [
-						error('no model provider configured'),
-						muted('run /provider to choose one — interviews need a model'),
-					],
-				};
-			}
-
-			// Re-runs extraction over a saved transcript. Deliberately its own
-			// directive rather than something a build does: it costs a request and
-			// it proposes corpus writes, and neither should be a side effect.
-			if (args.includes('extract')) {
-				// `extract all` sweeps every transcript of this kind. Worth its own
-				// word rather than a default: it is one model request per transcript,
-				// and the bare form is what an author wants nearly every time.
-				const sweep = args.includes('all');
-				const history = await transcriptsForKind(context.root, kind, focus);
-				const prior = sweep
-					? history.at(-1)
-					: (await findForResume(context.root, kind, focus))?.transcript;
-
-				if (!prior || prior.exchanges.length === 0) {
-					return {
-						lines: [
-							error(`no ${kind} transcript to extract from`),
-							muted(`/${interviewLabel(kind, focus)} runs the interview first`),
-						],
-					};
-				}
-
-				if (!sweep) {
-					const lines = [
-						muted(`re-extracting ${prior.exchanges.length} exchange(s) from ${prior.id}`),
-					];
-					// Only worth saying when there is something the bare form skips.
-					if (history.length > 1) {
-						lines.push(
-							muted(
-								`${history.length - 1} older ${kind} transcript(s) not touched — /${kind} extract all sweeps them`,
-							),
-						);
-					}
-					return {lines, extract: {kind, ...(focus === undefined ? {} : {focus})}};
-				}
-
-				const exchanges = history.reduce(
-					(total, transcript) => total + transcript.exchanges.length,
-					0,
-				);
-				return {
-					lines: [
-						muted(
-							`sweeping ${history.length} ${kind} transcript(s), ${exchanges} exchange(s) — one request each`,
-						),
-						muted(
-							`corpus writes come from ${prior.id} only; entities come from all of them`,
-						),
-					],
-					extract: {kind, all: true, ...(focus === undefined ? {} : {focus})},
-				};
-			}
-
-			const unfinished = await findResumable(context.root, kind, focus);
-
-			if (wantsResume) {
-				// Falls back to a completed transcript: an explicit `resume` means the
-				// author wants to keep talking, and refusing because the last session
-				// was wrapped up strands work they can see on disk.
-				const prior = await findForResume(context.root, kind, focus);
-				if (!prior) {
-					const state = await inspectProject(context.root);
-					const lines = [
-						error(`no ${kind} interview to resume in ${displayPath(context.root)}`),
-					];
-					// The commonest cause is standing in the wrong vault, so name it
-					// and offer the way out rather than only reporting the absence.
-					if (state !== 'vault') {
-						lines.push(
-							muted('this directory is not a vault — /init scaffolds one,'),
-							muted('or /project <path> switches to the one you meant'),
-						);
-					} else {
-						lines.push(
-							muted(`/${interviewLabel(kind, focus)} starts a new one,`),
-							muted('or /project to switch vaults'),
-						);
-					}
-					return {lines};
-				}
-				return {
-					lines: prior.reopened
-						? [
-								muted(
-									`reopening a wrapped-up interview — ${prior.transcript.exchanges.length} exchange${prior.transcript.exchanges.length === 1 ? '' : 's'} carried forward`,
-								),
-							]
-						: [],
-					interview: {kind, ...(focus === undefined ? {} : {focus}), resume: true},
-				};
-			}
-
-			// An unfinished interview is offered rather than silently discarded or
-			// silently resumed — either would be a surprise, and one of them loses
-			// work.
-			if (unfinished && !wantsNew) {
-				const when = unfinished.startedAt.slice(0, 16).replace('T', ' ');
-				const label = interviewLabel(kind, focus);
-				return {
-					lines: [
-						heading(`unfinished ${label} interview`),
-						text(
-							`  ${unfinished.exchanges.length} exchange${unfinished.exchanges.length === 1 ? '' : 's'}, started ${when}`,
-						),
-						muted(
-							`  last question: ${unfinished.exchanges.at(-1)?.question.slice(0, 90) ?? ''}`,
-						),
-						blank(),
-						text(`  /${label} resume   continue where you left off`),
-						text(`  /${label} new      start over (the old transcript is kept)`),
-					],
-				};
-			}
-
+		const focus = args.find(one => one !== 'show');
+		if (focus === undefined) {
 			return {
-				lines: [],
-				interview: {kind, ...(focus === undefined ? {} : {focus})},
+				lines: [
+					error('usage: /character <name>'),
+					muted('/questions character <name> interviews you about one'),
+				],
 			};
-		},
-	};
-}
+		}
 
-const systemInterview = interviewCommand(
-	'system',
-	'/system <id> [show|resume|extract [all]]',
-);
-const timelineInterview = interviewCommand(
-	'timeline',
-	'/timeline [<moment>] [show|resume|extract [all]]',
-);
-const characterInterview = interviewCommand(
-	'character',
-	'/character <name> [show|resume|extract [all]]',
-);
-const themesInterview = interviewCommand('themes', '/themes interview');
+		const lines = renderCharacter(context.project, focus);
+		return {lines, paged: lines.length > 14, title: 'character'};
+	},
+};
 
 /**
  * `/idiom set|unset` — the authorable half of the lexicon.
@@ -2707,8 +2500,8 @@ export const commands: readonly Command[] = [
 	provider,
 	project,
 	idiom,
-	systemInterview,
-	characterInterview,
+	system,
+	character,
 	quit,
 ];
 

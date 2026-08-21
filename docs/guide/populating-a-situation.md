@@ -38,11 +38,11 @@ The dependencies run one way, so this order never makes you back up.
 ```
 
 `/moment new` opens the buffer so you can describe what changes there; `at`
-takes whole seconds or a date, once a calendar is bound. The timeline interview
-produces them too:
+takes whole seconds or a date, once a calendar is bound. An interview produces
+them too, opening on the moments the checks found unresolved:
 
 ```
-/timeline interview
+/questions moment
 ```
 
 `/moment` lists what exists. See [the in-world clock](../reference/time.md) for
@@ -202,7 +202,7 @@ finished.
 ## The whole thing, once
 
 ```
-/timeline interview                     # produce moments
+/questions moment                       # produce moments
 /arc new The Long Descent
 /arc arc-02 after the-breach
 /situation new The Ledger Room          # opens the buffer; write the scene

@@ -36,20 +36,6 @@ export type CommandResult = {
 		readonly agenda?: string;
 	};
 	/**
-	 * Re-runs extraction over a saved interview transcript. Separate from
-	 * `interview` because nothing is asked — the answers already exist, and only
-	 * the corpus proposals are recomputed.
-	 */
-	readonly extract?: {
-		readonly kind: InterviewKind;
-		readonly focus?: string | undefined;
-		/**
-		 * Sweep every transcript of this kind rather than only the latest. Costs
-		 * one request per transcript, so it is never the default.
-		 */
-		readonly all?: boolean;
-	};
-	/**
 	 * Opens the reviewer over the whole rendered corpus. Unlike an interview,
 	 * the author drives — and the only writes it can propose are corrections.
 	 */

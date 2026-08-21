@@ -164,8 +164,7 @@ export type Extraction = z.infer<typeof extractionSchema>;
  * drift.
  */
 function specHint(kind: InterviewKind): string {
-	const spec =
-		INGEST[kind === 'themes' ? 'theme' : kind === 'timeline' ? 'moment' : kind];
+	const spec = INGEST[kind];
 	return [
 		'Target files.',
 		'',
@@ -227,37 +226,10 @@ const BESPOKE_HINT: Partial<Record<InterviewKind, string>> = {
 		'those are the old single-system layout, and writing one splits a vault that',
 		'has moved to systems/ into two systems that fight over the same characters.',
 	].join('\n'),
-	timeline: [
-		'Target files.',
-		'',
-		'A timeline is made of MOMENTS, one page each at timeline/moments/<id>.md,',
-		'with frontmatter {id, name, at, events} and the prose about that moment in',
-		'the body. A moment is a point where the terms of the world change — not a',
-		'scene, and not a stretch of time. `at` is a position on the in-world clock;',
-		'omit it entirely rather than guess one, and say in the body what the author',
-		'said about when it happened.',
-		'',
-		'Never write timeline/world-events.md. That is the single-file list moments',
-		'replaced; it still loads so old vaults keep working, but a write there puts',
-		'a moment somewhere the author can no longer interview it on its own.',
-		'',
-		'Arcs are the stretches between moments: timeline/arcs/<id>.md with keys',
-		'id, name, order, starts_after, ends_before, milestone. Ids are lowercase',
-		'kebab-case, and starts_after/ends_before name moment ids.',
-		'',
-		"An arc file's body is where what the arc is *about* goes — the pressure it",
-		'puts on the protagonist and what changes by its end. An interview that',
-		'established the shape of the story but no dates still writes those bodies.',
-	].join('\n'),
 	character: [
 		'Target file: characters/<id>.md with frontmatter {id, name, level, xp,',
 		'stats, skills} and the narrative in the body. Only set level/xp/stats if',
 		'the author stated numbers; otherwise omit them and list them as open fields.',
-	].join(' '),
-	themes: [
-		'Target files: themes/<pillar-id>.md with frontmatter {id, name, subthemes:',
-		'a list of {id, name, description, tension}}. `tension` is exactly two',
-		'strings — the two poles the theme lives between.',
 	].join(' '),
 };
 

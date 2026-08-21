@@ -31,13 +31,7 @@ import {
 	InterviewSession,
 	buildGrounding,
 	findForResume,
-	fromTranscript,
-	planSpillover,
-	runExtraction,
-	transcriptsForKind,
 	type InterviewKind,
-	type SourcedStub,
-	type Transcript,
 } from './interview/index.js';
 import {loadProvider, type Provider} from './llm/index.js';
 import {ReviewBatch, type Proposal} from './review/index.js';
@@ -583,145 +577,6 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 	);
 
 	/**
-	 * Re-runs extraction over saved transcripts.
-	 *
-	 * The interview half is skipped entirely — the answers are already on disk in
-	 * `raw/interviews/`, and this recomputes only what they imply for the corpus.
-	 * Transcripts are never rewritten, so a failed re-extract costs nothing and
-	 * can be run again.
-	 *
-	 * `sweep` runs every transcript of the kind instead of the latest, which is
-	 * what recovers entities from interviews that happened before spillover
-	 * existed. Only the newest transcript's corpus writes are proposed: an
-	 * extraction body *replaces* the file it targets, and every transcript in the
-	 * sweep is graded against the same on-disk corpus, so proposing all of them
-	 * would end with whichever finished last silently reverting the rest. Stubs
-	 * have no such problem — they only ever create pages that do not exist — so
-	 * they are taken from all of them.
-	 */
-	const runExtract = useCallback(
-		async (kind: InterviewKind, focus: string | undefined, sweep = false) => {
-			const resolved = await ensure();
-			if (!resolved) {
-				append([error('no vault loaded here — run /init first')]);
-				return;
-			}
-
-			const config = await readConfig(root);
-			const loaded = await loadProvider(
-				config.provider.id,
-				config.provider.model,
-				config.provider.baseUrl,
-			);
-			if ('error' in loaded) {
-				append([error(loaded.error)]);
-				return;
-			}
-
-			const transcripts = sweep
-				? await transcriptsForKind(root, kind, focus)
-				: [(await findForResume(root, kind, focus))?.transcript].filter(
-						(transcript): transcript is Transcript => transcript !== undefined,
-					);
-
-			const newest = transcripts.at(-1);
-			if (newest === undefined) {
-				append([error(`no ${kind} transcript to extract from`)]);
-				return;
-			}
-
-			const grounding = await buildGrounding(root, kind, {focus, project: resolved});
-			const swept =
-				transcripts.length === 1
-					? '1 transcript'
-					: `${String(transcripts.length)} transcripts`;
-			const summary: Line[] = [];
-			const writes: Proposal[] = [];
-			const stubs: SourcedStub[] = [];
-			const failed: string[] = [];
-
-			for (const [index, transcript] of transcripts.entries()) {
-				setBusyLabel(
-					transcripts.length === 1
-						? `extracting ${transcript.id}…`
-						: `extracting ${String(index + 1)} of ${String(transcripts.length)} · ${transcript.id}…`,
-				);
-				const result = await runExtraction(
-					loaded.provider,
-					transcript,
-					grounding,
-					new AbortController().signal,
-				);
-
-				if (!result.ok) {
-					// One bad transcript does not abandon the sweep — the others are
-					// independent, and re-running is free.
-					failed.push(`${transcript.id}: ${result.reason}`);
-					continue;
-				}
-
-				for (const field of result.extraction.open_fields) {
-					summary.push(muted(`? ${field.question}`));
-				}
-				for (const contradiction of result.extraction.contradictions) {
-					summary.push(text(`! ${contradiction.detail}`, {color: '#e0af68'}));
-				}
-
-				if (transcript.id === newest.id) {
-					writes.push(...result.extraction.writes);
-				}
-				stubs.push(...fromTranscript(result.extraction.stubs, transcript.id));
-			}
-
-			for (const reason of failed) {
-				summary.push(error(`extraction failed — ${reason}`));
-			}
-
-			if (failed.length === transcripts.length) {
-				append([
-					...summary,
-					muted('your transcripts are untouched — run it again when ready'),
-				]);
-				return;
-			}
-
-			// Planned once over the whole sweep, not per transcript: the timeline is
-			// a single file, so two independent merges of it would each be written
-			// against the same starting state and the second would drop the first.
-			const spillover = await planSpillover(stubs, {
-				root,
-				kind,
-				taken: writes.map(write => write.path),
-			});
-			for (const dropped of spillover.dropped) {
-				summary.push(muted(`~ stub ${dropped.stub.id} skipped — ${dropped.reason}`));
-			}
-
-			const proposals = [...writes, ...spillover.proposals];
-			if (proposals.length === 0) {
-				append([
-					...summary,
-					muted(`nothing proposed from ${swept} — the model found no corpus changes`),
-				]);
-				return;
-			}
-
-			const batch = await ReviewBatch.create(root, proposals);
-			for (const problem of batch.validatePaths()) {
-				summary.push(error(`unsafe proposal ${problem.path}: ${problem.reason}`));
-			}
-			append(summary);
-			setReview({
-				batch,
-				title: sweep
-					? `review — ${kind} sweep of ${swept}`
-					: `review — ${kind} re-extract`,
-			});
-		},
-		[append, ensure, root],
-	);
-
-	/**
 	 * Adoption arrives already decided — it is a copy of what a page says, not a
 	 * model's reading of it — so App only opens the gate.
 	 *
@@ -853,12 +708,6 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 					result.interview.resume ?? false,
 					result.interview.agenda,
 				);
-			} else if (result.extract) {
-				await runExtract(
-					result.extract.kind,
-					result.extract.focus,
-					result.extract.all ?? false,
-				);
 			} else if (result.curator) {
 				await openCurator();
 			} else if (result.adopt) {
@@ -890,7 +739,6 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			openAuthoring,
 			openCurator,
 			recompute,
-			runExtract,
 			runIngest,
 			startInterview,
 			startReviewer,

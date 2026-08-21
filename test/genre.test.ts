@@ -214,11 +214,11 @@ describe('interview overlays', () => {
 
 	it('only overlays the interview the profile targets', () => {
 		const tech = resolveProfile('technological', BUILT_IN_PROFILES);
-		const themes = overlayFor('themes', tech, setting, '');
+		const theme = overlayFor('theme', tech, setting, '');
 
-		expect(themes).not.toContain('who pays for its upkeep');
+		expect(theme).not.toContain('who pays for its upkeep');
 		// The register still applies to every interview.
-		expect(themes).toContain('Technical but not jargon-dense');
+		expect(theme).toContain('Technical but not jargon-dense');
 	});
 
 	it('tells the interviewer that a built System cannot answer "it just works"', () => {

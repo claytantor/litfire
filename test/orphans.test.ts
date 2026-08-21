@@ -5,7 +5,11 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {findCommand} from '../source/commands/registry.js';
 import type {CommandContext} from '../source/commands/types.js';
 import {computeProject} from '../source/core/project.js';
-import {findOrphanedInterviews, saveTranscript} from '../source/interview/index.js';
+import {
+	INTERVIEWS_DIR,
+	findOrphanedInterviews,
+	saveTranscript,
+} from '../source/interview/index.js';
 import {stringifyDocument} from '../source/vault/frontmatter.js';
 import {resolve, VAULT} from '../source/vault/paths.js';
 import {saveProvider} from '../source/vault/config.js';
@@ -29,7 +33,7 @@ const after = (offset = 0) => new Date(Date.now() + 60_000 + offset).toISOString
 const before = () => new Date(Date.now() - 60_000).toISOString();
 
 const transcript = (
-	kind: 'system' | 'timeline' | 'character' | 'themes',
+	kind: 'system' | 'moment' | 'character' | 'theme',
 	exchanges: number,
 	extra: {focus?: string; startedAt?: string} = {},
 ) => ({
@@ -151,7 +155,7 @@ describe('/lint surfaces it', () => {
 
 		expect(output).toContain('interviews that produced nothing');
 		expect(output).toContain('5 exchanges saved');
-		expect(output).toContain('/system extract');
+		expect(output).toContain('/ingest interview files it, through the same review gate');
 	});
 
 	it('says nothing when there is nothing to say', async () => {
@@ -206,19 +210,27 @@ describe('/system show', () => {
 	});
 });
 
-describe('/system extract', () => {
+/**
+ * `/system extract` retired along with the interview. Re-running extraction
+ * over a saved transcript is now `/ingest interview`, which reads every
+ * transcript under `raw/interviews/` the same way it reads any other kind's
+ * raw notes.
+ */
+describe('/ingest interview', () => {
 	it('refuses when there is no transcript to work from', async () => {
-		expect(said(await dispatch('/system extract'))).toContain('no system transcript');
+		expect(said(await dispatch('/ingest interview'))).toContain(
+			`nothing to ingest — ${INTERVIEWS_DIR}/ has no markdown`,
+		);
 	});
 
 	it('hands the transcript to the app rather than interviewing again', async () => {
 		await saveTranscript(root, transcript('system', 5));
 		await refresh();
 
-		const result = await dispatch('/system extract');
+		const result = await dispatch('/ingest interview');
 
-		expect(result.extract?.kind).toBe('system');
+		expect(result.ingest?.kind).toBe('interview');
 		expect(result.interview).toBeUndefined();
-		expect(said(result)).toContain('re-extracting 5 exchange(s)');
+		expect(said(result)).toContain(`ingesting 1 of 1 from ${INTERVIEWS_DIR}/`);
 	});
 });

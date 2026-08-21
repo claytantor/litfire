@@ -1,6 +1,6 @@
 # Proposal — one verb for asking
 
-**Status:** proposed, not accepted
+**Status:** accepted, and built
 **Follows:** [raw is the only thing you write](./raw-first.md)
 
 ## Summary
@@ -170,5 +170,13 @@ building properly rather than special-casing, because `/ingest adopt` sweeping
    author has not made reach it; a stat out of range or two files claiming one
    id is housekeeping, has an answer that is looked up rather than asked for,
    and goes to `/lint`.
-4. The four old commands are removed, and the two vestigial `InterviewKind`
-   members — `timeline` and `themes` — with them.
+4. ~~The four old commands are removed, and the two vestigial `InterviewKind`
+   members — `timeline` and `themes` — with them.~~ **Done.** They kept their
+   views: rendering what is in the corpus costs nothing and needs no provider,
+   and an author who wants to look at their system should not have to configure
+   a model to do it.
+
+**Accepted and built.** What remains open is only what this proposal recorded as
+open — whether a situation interview is the right shape, and whether keeping
+`/timeline` and `/themes` as view names is obvious or confusing. Both are
+questions about use, and neither can be settled from a document.

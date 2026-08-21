@@ -731,3 +731,43 @@ one at all.
 half-moved vault has both copies of everything by definition, so a
 `duplicate_id` per page would bury the single actionable fact under thirty
 repetitions of it.
+
+## D24 — One verb for asking
+
+**Committed:** `/questions <kind>` is how an interview is started, for all ten
+primitives. The four bespoke interview commands are views now, and
+`InterviewKind` is the same list as `INGEST_KINDS`.
+
+Four kinds had interviews — `system`, `timeline`, `character`, `themes` —
+because `interviewKindSchema` was a four-member enum. The other six had none,
+for no reason beyond the order things were built in: an author could be
+interviewed about their themes and not about their places. That asymmetry is
+gone, and with it three things that only existed to support it.
+
+**Two lists of one concept.** `InterviewKind` and `INGEST_KINDS` described the
+same thing and had already drifted — `timeline` and `themes` were never folders
+under `raw/`, while five folders had no interview. They are one list now, and a
+test walks `INGEST_KINDS` asserting every kind resolves to a brief, so a
+primitive added without one fails there rather than in front of an author.
+
+**The `show|resume|extract|all` directives**, written four times with four
+copies of transcript handling. `/questions <kind> [<id>|resume]` is the one
+implementation.
+
+**The extraction path.** `/<kind> extract` re-ran extraction over a saved
+transcript, and existed because `/ingest` did not. Now it does:
+`/ingest interview` reads `raw/interviews/` and files what it finds wherever it
+belongs, through the same gate. `CommandResult.extract` and App's `runExtract`
+are deleted. Extraction at the end of a live interview is untouched — the
+interview screen still runs it on `/done`.
+
+**The views stay, and stay free.** `/system`, `/character`, `/timeline` and
+`/themes` render what is in the corpus, cost nothing, and need no provider. An
+author who wants to look at their system should not have to configure a model
+to do it, which is also why the interview and the view were worth separating
+rather than collapsing together.
+
+`TIMELINE_BRIEF` is gone, split into `MOMENT_BRIEF` and `ARC_BRIEF` along the
+seam it always had (D-questions step 2). That split is what finally lined ten
+briefs up against ten folders — and the reason the count never matched before
+was that one brief had been quietly covering two kinds.

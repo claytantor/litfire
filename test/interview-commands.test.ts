@@ -3,7 +3,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {findCommand} from '../source/commands/registry.js';
-import type {CommandContext} from '../source/commands/types.js';
+import type {CommandContext, CommandResult} from '../source/commands/types.js';
 import {computeProject} from '../source/core/project.js';
 import {saveProvider} from '../source/vault/config.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
@@ -38,27 +38,57 @@ async function dispatch(line: string) {
 	return command.run(args, context);
 }
 
-describe('all four interview paths reach the interview', () => {
+/**
+ * `/questions <kind>` starts the interview directly when the checks have
+ * something open to ask about, and otherwise offers it behind a
+ * confirmation (§`/questions <kind>, with nothing to ask about` in
+ * `questions-command.test.ts`). Either way, this is the interview that would
+ * actually run — which is what these tests care about, not which of the two
+ * paths a freshly scaffolded vault happens to take for a given kind.
+ */
+const interviewOf = (result: CommandResult) =>
+	result.interview ?? result.confirm?.proceed.interview;
+
+/**
+ * `/system`, `/character`, `/timeline` and `/themes` used to be four separate
+ * interviews. `/questions <kind>` replaced all four with one entry point, so
+ * every case that used to dispatch a bespoke command now dispatches
+ * `/questions` with that kind instead — `timeline` becomes `moment` and
+ * `themes` becomes `theme`, since those are what the retired briefs split
+ * into.
+ */
+describe('every retired interview command routes through /questions now', () => {
 	const cases: [string, string, string | undefined][] = [
-		// A scaffolded vault has one system, id `system-01`, so a bare `/system`
-		// namespaces to it rather than staying unfocused — the same transcript
-		// namespace a vault with several would use.
-		['/system', 'system', 'system-01'],
-		['/system the-lathe', 'system', 'the-lathe'],
-		['/timeline interview', 'timeline', undefined],
-		['/character protagonist', 'character', 'protagonist'],
-		['/themes interview', 'themes', undefined],
+		// A lone system is focused without being asked, which the retired
+		// `/system` also did: one system is not a choice, and naming it keeps
+		// every transcript in the same namespace as a vault that has several.
+		['/questions system', 'system', 'system-01'],
+		['/questions system the-lathe', 'system', 'the-lathe'],
+		['/questions moment', 'moment', undefined],
+		['/questions character protagonist', 'character', 'protagonist'],
+		['/questions theme', 'theme', undefined],
 	];
 
 	for (const [line, kind, focus] of cases) {
 		it(`${line} → ${kind}`, async () => {
 			const result = await dispatch(line);
+			const interview = interviewOf(result);
 
-			expect(result.interview).toBeDefined();
-			expect(result.interview?.kind).toBe(kind);
-			expect(result.interview?.focus).toBe(focus);
+			expect(interview).toBeDefined();
+			expect(interview?.kind).toBe(kind);
+			expect(interview?.focus).toBe(focus);
 		});
 	}
+
+	/**
+	 * The one disambiguation the old `/character` command had to make that
+	 * `/questions character` still has to make: a bare directive is not a name.
+	 */
+	it('/questions character resume does not mistake resume for a character name', async () => {
+		const result = await dispatch('/questions character resume');
+
+		expect(result.interview).toEqual({kind: 'character', resume: true});
+	});
 });
 
 describe('the structural views are not shadowed', () => {
@@ -94,11 +124,12 @@ describe('interview preconditions', () => {
 			project: await computeProject(bare),
 		};
 
-		for (const line of ['/system', '/timeline interview', '/themes interview']) {
+		for (const line of ['/questions system', '/questions moment', '/questions theme']) {
 			const [head = '', ...args] = line.trim().split(/\s+/);
 			const result = await findCommand(head.replace(/^\//, ''))!.run(args, bareContext);
 
 			expect(result.interview).toBeUndefined();
+			expect(result.confirm).toBeUndefined();
 			expect(result.lines.map(l => l.text).join(' ')).toContain('/provider');
 		}
 
@@ -106,7 +137,7 @@ describe('interview preconditions', () => {
 	});
 
 	it('interviews refuse when there is no vault at all', async () => {
-		const result = await findCommand('system')!.run([], {
+		const result = await findCommand('questions')!.run(['system'], {
 			...context,
 			project: undefined,
 		});
@@ -124,157 +155,40 @@ describe('discoverability', () => {
 		expect(rendered).toContain('/character <name>');
 	});
 
-	/** All four take the same directives, and /help has to say so. */
-	it('/help shows the same show|resume|extract form on every interview', async () => {
+	/**
+	 * The four no longer share a directive form — two are plain views and two
+	 * are namespaced views — so there is nothing left to assert they agree on.
+	 * What replaced that guarantee is a single entry point for every kind, and
+	 * `/help` has to say so.
+	 */
+	it('/help shows the plain view usage for the four retired commands, and /questions as the one interview entry point', async () => {
 		const rendered = (await dispatch('/help')).lines.map(l => l.text).join('\n');
 
 		for (const line of [
-			'/system <id> [show|resume|extract [all]]',
-			'/timeline [show|interview|resume|extract [all]]',
-			'/themes [show|interview|resume|extract [all]]',
-			'/character <name> [show|resume|extract [all]]',
+			'/system [<id>]',
+			'/timeline',
+			'/themes',
+			'/character <name>',
+			'/questions [<kind>] [<id>] [resume|new]',
 		]) {
 			expect(rendered).toContain(line);
 		}
 	});
 });
 
-describe('resuming from the command layer', () => {
-	const unfinished = async (kind: 'system' | 'themes', focus?: string) => {
-		const {saveTranscript} = await import('../source/interview/index.js');
-		await saveTranscript(root, {
-			id: `${kind}-pending`,
-			kind,
-			startedAt: '2026-08-15T09:00:00Z',
-			...(focus === undefined ? {} : {focus}),
-			status: 'in-progress',
-			exchanges: [{question: 'Where was your protagonist?', answer: 'On the roof.'}],
-		});
-	};
-
-	it('offers to resume instead of silently discarding or restarting', async () => {
-		await unfinished('system');
-
-		const result = await dispatch('/system');
-
-		// Neither action is taken automatically: one would surprise, the other
-		// would lose work.
-		expect(result.interview).toBeUndefined();
-		const rendered = result.lines.map(l => l.text).join('\n');
-		expect(rendered).toContain('unfinished system-01 interview');
-		expect(rendered).toContain('1 exchange');
-		expect(rendered).toContain('/system-01 resume');
-		expect(rendered).toContain('/system-01 new');
-	});
-
-	it('/system resume continues it', async () => {
-		await unfinished('system');
-
-		const result = await dispatch('/system resume');
-
-		// The focus is the single system's id: a resumed interview stays in
-		// the same namespace a new one would use.
-		expect(result.interview).toEqual({
-			kind: 'system',
-			focus: 'system-01',
-			resume: true,
-		});
-	});
-
-	it('/system new starts fresh and keeps the old transcript', async () => {
-		await unfinished('system');
-
-		const result = await dispatch('/system new');
-
-		expect(result.interview).toEqual({kind: 'system', focus: 'system-01'});
-		const {listTranscripts} = await import('../source/interview/index.js');
-		expect(await listTranscripts(root)).toHaveLength(1);
-	});
-
-	it('resume with nothing to resume says so', async () => {
-		const result = await dispatch('/system resume');
-
-		expect(result.interview).toBeUndefined();
-		expect(result.lines[0]?.text).toContain('no system interview to resume');
-	});
-
-	it('/system resume reopens a wrapped-up interview', async () => {
-		const {saveTranscript} = await import('../source/interview/index.js');
-		await saveTranscript(root, {
-			id: 'system-sealed',
-			kind: 'system',
-			startedAt: '2026-08-15T09:00:00Z',
-			status: 'complete',
-			exchanges: [{question: 'Where was your protagonist?', answer: 'On the roof.'}],
-		});
-
-		const result = await dispatch('/system resume');
-
-		// The focus is the single system's id: a resumed interview stays in
-		// the same namespace a new one would use.
-		expect(result.interview).toEqual({
-			kind: 'system',
-			focus: 'system-01',
-			resume: true,
-		});
-		// Said out loud, because reopening something the author wrapped up is a
-		// surprise if it happens silently.
-		expect(result.lines.map(l => l.text).join('\n')).toContain('reopening');
-	});
-
-	it('a completed interview is reopened only when asked for by name', async () => {
-		const {saveTranscript} = await import('../source/interview/index.js');
-		await saveTranscript(root, {
-			id: 'system-sealed',
-			kind: 'system',
-			startedAt: '2026-08-15T09:00:00Z',
-			status: 'complete',
-			exchanges: [{question: 'Q', answer: 'A'}],
-		});
-
-		// A bare /system must not nag about work the author already finished.
-		const result = await dispatch('/system');
-		expect(result.interview).toEqual({kind: 'system', focus: 'system-01'});
-	});
-
-	it('starts normally when nothing is unfinished', async () => {
-		const result = await dispatch('/system');
-
-		expect(result.interview).toEqual({kind: 'system', focus: 'system-01'});
-	});
-
-	it('routes /themes interview resume too', async () => {
-		await unfinished('themes');
-
-		const result = await dispatch('/themes interview resume');
-
-		expect(result.interview).toEqual({kind: 'themes', resume: true});
-	});
-
-	it('does not mistake resume for a character name', async () => {
-		const result = await dispatch('/character resume');
-
-		// `resume` is a directive, so this is still a missing name.
-		expect(result.lines[0]?.text).toContain('usage: /character <name>');
-	});
-});
-
 /**
- * All four interviews take the same directives. `/timeline` and `/themes` show
- * their view as the bare command and `/system` and `/character` start an
- * interview — but `show`, `resume`, and `extract` mean the same thing on every
- * one of them.
+ * `/system`, `/timeline` and `/themes` all still tolerate a trailing `show` —
+ * ignored as a positional rather than treated as an id or an error — so a
+ * stray `show` from muscle memory still renders the view rather than erroring.
  */
-describe('the four interviews take the same directives', () => {
-	const said = (result: {lines: readonly {text: string}[]}) =>
-		result.lines.map(line => line.text).join('\n');
+describe('the retired commands still tolerate `show`', () => {
+	const said = (result: CommandResult) => result.lines.map(line => line.text).join('\n');
 
 	for (const line of ['/system show', '/timeline show', '/themes show']) {
 		it(`${line} renders a view instead of interviewing`, async () => {
 			const result = await dispatch(line);
 
 			expect(result.interview).toBeUndefined();
-			expect(result.extract).toBeUndefined();
 			expect(result.lines.length).toBeGreaterThan(0);
 		});
 	}
@@ -287,79 +201,6 @@ describe('the four interviews take the same directives', () => {
 
 	it('/character show without a name says so rather than guessing', async () => {
 		expect(said(await dispatch('/character show'))).toContain('usage: /character');
-	});
-
-	for (const [line, kind] of [
-		['/system resume', 'system'],
-		['/timeline resume', 'timeline'],
-		['/themes resume', 'themes'],
-		['/character carl resume', 'character'],
-	] as const) {
-		it(`${line} reaches the interview layer`, async () => {
-			// No transcript exists, so the interview layer is what refuses it — the
-			// view would have rendered instead and said nothing about resuming.
-			expect(said(await dispatch(line))).toContain(`no ${kind} interview to resume`);
-		});
-	}
-
-	for (const line of [
-		'/system extract',
-		'/timeline extract',
-		'/themes extract',
-		'/character carl extract',
-	]) {
-		it(`${line} reaches the extract layer`, async () => {
-			expect(said(await dispatch(line))).toContain('transcript to extract from');
-		});
-	}
-
-	for (const line of [
-		'/system extract all',
-		'/timeline extract all',
-		'/character carl extract all',
-	]) {
-		it(`${line} reaches the extract layer`, async () => {
-			expect(said(await dispatch(line))).toContain('transcript to extract from');
-		});
-	}
-
-	describe('extract all, with transcripts on disk', () => {
-		const save = async (id: string, at: string) => {
-			const {saveTranscript} = await import('../source/interview/index.js');
-			await saveTranscript(root, {
-				id,
-				kind: 'system',
-				startedAt: at,
-				status: 'complete',
-				exchanges: [{question: 'Who grades?', answer: 'The Assessors.'}],
-			});
-		};
-
-		beforeEach(async () => {
-			await save('system-2026-01-01T00-00-00', '2026-01-01T00:00:00.000Z');
-			await save('system-2026-06-01T00-00-00', '2026-06-01T00:00:00.000Z');
-		});
-
-		it('sweeps every transcript and says the writes come from the newest', async () => {
-			const result = await dispatch('/system extract all');
-
-			expect(result.extract).toEqual({kind: 'system', all: true, focus: 'system-01'});
-			expect(said(result)).toContain('sweeping 2 system transcript(s)');
-			expect(said(result)).toContain('corpus writes come from system-2026-06-01');
-		});
-
-		it('bare extract takes the newest, and points at the ones it skipped', async () => {
-			const result = await dispatch('/system extract');
-
-			expect(result.extract).toEqual({kind: 'system', focus: 'system-01'});
-			expect(said(result)).toContain('system-2026-06-01T00-00-00');
-			expect(said(result)).toContain('1 older system transcript(s) not touched');
-		});
-	});
-
-	/** The original spelling, kept working. */
-	it('/timeline interview still starts an interview', async () => {
-		expect((await dispatch('/timeline interview')).interview?.kind).toBe('timeline');
 	});
 
 	it('bare /timeline and /themes still render their view', async () => {

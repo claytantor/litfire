@@ -340,7 +340,7 @@ describe('factions reach the corpus', () => {
 	it('comes back to every interview, so the next one builds instead of re-asking', async () => {
 		await writeFaction();
 
-		for (const kind of ['system', 'timeline', 'character', 'themes'] as const) {
+		for (const kind of ['system', 'moment', 'character', 'theme'] as const) {
 			const grounding = await buildGrounding(root, kind);
 			expect(grounding, kind).toContain('factions/the-assessors.md');
 			expect(grounding, kind).toContain('The Assessors');

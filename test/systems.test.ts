@@ -470,34 +470,17 @@ describe('systems are namespaced by id', () => {
 		});
 	};
 
-	it('names the only system rather than staying unfocused', async () => {
-		await writeSystem('the-lathe', SEED);
-		const result = await dispatch('/system');
-
-		// One system is not a choice, but the transcript still lands in the same
-		// namespace a multi-system vault would use.
-		expect(result.interview).toEqual({kind: 'system', focus: 'the-lathe'});
-	});
-
-	it('refuses to guess when there are two, and lists them', async () => {
-		await writeSystem('seed', SEED);
-		await writeSystem('custodian', CUSTODIAN);
-		const rendered = said(await dispatch('/system'));
-
-		expect(rendered).toContain('this vault has 2 systems — name one');
-		expect(rendered).toContain('/system seed — The Seed');
-		expect(rendered).toContain('/system custodian — The Custodian');
-	});
-
-	it('interviews the one you name', async () => {
-		await writeSystem('seed', SEED);
-		await writeSystem('custodian', CUSTODIAN);
-
-		expect((await dispatch('/system custodian')).interview).toEqual({
-			kind: 'system',
-			focus: 'custodian',
-		});
-	});
+	// Three tests used to live here, pinning that `/system` — then an interview —
+	// auto-namespaced to the vault's one system, refused to guess between two and
+	// named both, and started an interview on whichever one you named. `/system`
+	// is a view only now, and interviewing moved to `/questions system <id>`,
+	// which always requires an explicit id: there is no auto-focus for a vault
+	// with exactly one, and no confirm-refusal for a vault with several. That
+	// convenience retired with the command; it is not offered under
+	// `/questions`, deliberately, so there is nothing to pin here.
+	//
+	// The two-systems listing survives as a *view* rather than a refusal, and is
+	// covered below by 'shows one system in full and all of them in a list'.
 
 	it('shows one system in full and all of them in a list', async () => {
 		await writeSystem('seed', SEED);
