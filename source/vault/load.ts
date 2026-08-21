@@ -26,7 +26,7 @@ import {
 import {extractFormulas} from '../system/formulas.js';
 import type {Formula} from '../system/sandbox.js';
 import {parseDocument} from './frontmatter.js';
-import {LEGACY_DIRECTORIES, VAULT, resolve} from './paths.js';
+import {homesOf, resolve, VAULT} from './paths.js';
 import {timeSchema, type TimeBinding} from '../time/binding.js';
 
 export type LoadIssue = {
@@ -209,23 +209,6 @@ async function loadSystems(
 	}
 
 	return {systems, formulas};
-}
-
-/**
- * Every directory a kind's pages may be sitting in.
- *
- * The canonical one first, then any home a previous layout used. Order is the
- * whole contract: the first file to claim an id wins, so a page the author has
- * already moved beats the copy left behind, and a vault can be migrated one
- * page at a time without the tool ever showing the stale one.
- */
-function homesOf(canonical: string): string[] {
-	return [
-		canonical,
-		...Object.entries(LEGACY_DIRECTORIES)
-			.filter(([, to]) => to === canonical)
-			.map(([from]) => from),
-	];
 }
 
 /**

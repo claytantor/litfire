@@ -190,6 +190,24 @@ export const LEGACY_FILES: Readonly<Record<string, string>> = {
 	'timeline/time.md': VAULT.time,
 };
 
+/**
+ * Every directory a kind's pages may be sitting in, canonical home first.
+ *
+ * Order is the contract: the first file to claim an id wins, so a page already
+ * moved beats the copy left behind. Lives here rather than in the loader
+ * because the loader is not the only thing that has to find a page — the wiki
+ * reads author prose straight off disk, and a reader that knows only the
+ * canonical home renders an empty page for every vault that has not migrated.
+ */
+export function homesOf(canonical: string): string[] {
+	return [
+		canonical,
+		...Object.entries(LEGACY_DIRECTORIES)
+			.filter(([, to]) => to === canonical)
+			.map(([from]) => from),
+	];
+}
+
 export function resolve(root: string, ...segments: string[]): string {
 	return path.join(root, ...segments);
 }

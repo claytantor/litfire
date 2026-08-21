@@ -5,6 +5,7 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {computeProject} from '../source/core/project.js';
 import {inspectProject} from '../source/vault/projects.js';
 import {VAULT} from '../source/vault/paths.js';
+import {buildWiki} from '../source/wiki/build.js';
 
 let root = '';
 
@@ -203,5 +204,68 @@ describe('a vault caught half-way', () => {
 			'corpus/characters/',
 		);
 		expect(project.questions.filter(q => q.kind === 'duplicate_id')).toEqual([]);
+	});
+});
+
+/**
+ * The wiki reads author prose straight off disk rather than through the
+ * loader, so it needed the same dual-read and did not get it — every page of a
+ * pre-move vault rendered "nothing written yet" while the corpus sat right
+ * there. Twenty-two blank sections in one real vault, and the wiki reporting
+ * the whole book as empty.
+ */
+describe('the wiki reads a pre-move vault too', () => {
+	it('renders author prose from an old home', async () => {
+		await preMoveVault();
+		const wiki = buildWiki(await computeProject(root));
+		const page = wiki.pages.find(one => one.path.endsWith('characters/carl.md'));
+
+		expect(page?.body).toContain('Him.');
+		expect(page?.body).not.toContain('_Nothing written in');
+	});
+
+	it('renders the setting from `system/system.md`', async () => {
+		// The rename changed the stem as well as the directory, so an id lookup
+		// tries `setting/setting.md` and `system/setting.md` and matches neither.
+		await preMoveVault();
+		await file('system/system.md', '---\nidiom: arcane\n---\n\nA world of rules.\n');
+
+		const wiki = buildWiki(await computeProject(root));
+		const page = wiki.pages.find(one => one.path.includes('systems/'));
+
+		expect(page?.body).toContain('A world of rules.');
+	});
+
+	it('prefers the moved copy when both are on disk', async () => {
+		await preMoveVault();
+		await file(`${VAULT.characters}/carl.md`, '---\nid: carl\n---\n\nThe moved one.\n');
+
+		const wiki = buildWiki(await computeProject(root));
+		const page = wiki.pages.find(one => one.path.endsWith('characters/carl.md'));
+
+		expect(page?.body).toContain('The moved one.');
+		expect(page?.body).not.toContain('Him.');
+	});
+});
+
+describe('a named system shows its own page', () => {
+	/**
+	 * It rendered the shared setting prose and nothing the system had written
+	 * about itself, so every system in a multi-system vault read identically —
+	 * and the summary block was simply never seen.
+	 */
+	it('renders the system’s body, not only the setting', async () => {
+		await preMoveVault();
+		await file(
+			'systems/the-lathe.md',
+			'---\nid: the-lathe\nname: The Lathe\n---\n\n<!-- litrpg:summary -->\n**Wants** — legibility.\n<!-- /litrpg:summary -->\n\nIt counts what it can see.\n',
+		);
+
+		const wiki = buildWiki(await computeProject(root));
+		const page = wiki.pages.find(one => one.path.endsWith('systems/the-lathe.md'));
+
+		expect(page?.body).toContain('It counts what it can see.');
+		expect(page?.body).toContain('## At a glance');
+		expect(page?.body).toContain('**Wants** — legibility.');
 	});
 });

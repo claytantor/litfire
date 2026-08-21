@@ -25,7 +25,7 @@ import {calendarFor} from '../time/binding.js';
 import {findBlocks} from '../vault/markers.js';
 import type {Calendar} from '../time/calendar.js';
 import {parseDocument} from '../vault/frontmatter.js';
-import {resolve, VAULT} from '../vault/paths.js';
+import {homesOf, resolve, VAULT} from '../vault/paths.js';
 import type {Wiki, WikiKind, WikiPage} from './types.js';
 
 /**
@@ -140,25 +140,44 @@ function readAuthorBody(root: string, directory: string, id: string): string | u
  * one page it most obviously belongs on.
  */
 function authorFiles(root: string, directory: string, id: string): string[] {
-	const direct = resolve(root, directory, `${id}.md`);
-	if (existsSync(direct)) {
-		return [direct];
+	// Every home, canonical first — the same order the loader reads in. A wiki
+	// that knew only the canonical directory rendered "nothing written yet" for
+	// every page of a vault that had not migrated: the whole corpus reporting
+	// itself empty while sitting right there on disk.
+	const homes = homesOf(directory);
+
+	for (const home of homes) {
+		const direct = resolve(root, home, `${id}.md`);
+		if (existsSync(direct)) {
+			return [direct];
+		}
 	}
 
-	try {
-		return readdirSync(resolve(root, directory), {withFileTypes: true})
-			.filter(entry => entry.isFile() && entry.name.endsWith('.md'))
-			.map(entry => resolve(root, directory, entry.name))
-			.filter(file => {
-				try {
-					return parseDocument(readFileSync(file, 'utf8')).data['id'] === id;
-				} catch {
-					return false;
-				}
-			});
-	} catch {
-		return [];
+	// No file named for the id, so fall back to reading each one and asking. A
+	// page whose filename is not its id is a `file_name_not_id` finding, not a
+	// reason to render it blank.
+	for (const home of homes) {
+		let found: string[] = [];
+		try {
+			found = readdirSync(resolve(root, home), {withFileTypes: true})
+				.filter(entry => entry.isFile() && entry.name.endsWith('.md'))
+				.map(entry => resolve(root, home, entry.name))
+				.filter(file => {
+					try {
+						return parseDocument(readFileSync(file, 'utf8')).data['id'] === id;
+					} catch {
+						return false;
+					}
+				});
+		} catch {
+			continue;
+		}
+		if (found.length > 0) {
+			return found;
+		}
 	}
+
+	return [];
 }
 
 /**
@@ -188,6 +207,33 @@ function splitSummary(body: string): {summary: string | undefined; prose: string
 	const prose = (body.slice(0, block.start) + body.slice(block.end)).trim();
 	const summary = block.content.trim();
 	return {summary: summary === '' ? undefined : summary, prose};
+}
+
+/**
+ * The setting's own prose, which is a named file rather than a page with an id.
+ *
+ * `authorFiles` resolves a kind and an id, and the setting is neither — the
+ * rename to `setting/` changed the stem as well as the directory, so a vault
+ * still holding `system/system.md` matches nothing an id lookup would try. Both
+ * spellings are read here for the same reason `genre/load.ts` reads both: a
+ * vault written last week must not lose its world description.
+ */
+function settingSection(root: string): string {
+	for (const file of [VAULT.settingFile, VAULT.legacySettingFile]) {
+		try {
+			const body = parseDocument(readFileSync(resolve(root, file), 'utf8')).body.trim();
+			if (body !== '') {
+				return [`## From \`${file}\``, '', body].join('\n');
+			}
+		} catch {
+			continue;
+		}
+	}
+	return [
+		`## From \`${VAULT.settingFile}\``,
+		'',
+		`_Nothing written in \`${VAULT.settingFile}\` yet._`,
+	].join('\n');
 }
 
 function authorSection(
@@ -766,7 +812,19 @@ function buildSystemPage(
 		'The rules layer the `/system` interview produces (§3) — everything else in',
 		'this wiki is derived from play; this page is what play plays by.',
 		'',
-		authorSection(project.vault.root, VAULT.setting, 'setting', VAULT.settingFile),
+		// This system's own page, which never used to be rendered at all: a named
+		// system showed the shared setting prose and nothing it had written about
+		// itself, so every system in a multi-system vault read identically.
+		authorSection(
+			project.vault.root,
+			VAULT.systems,
+			system.id,
+			`${VAULT.systems}/${system.id}.md`,
+		),
+		'',
+		// The setting is about the world rather than this system, and it is kept
+		// because the wiki builds no page of its own for it.
+		settingSection(project.vault.root),
 		'',
 		// Membership is the fact a multi-system vault most needs from this page:
 		// a stat means nothing until you know whose rules are counting it.
