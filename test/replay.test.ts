@@ -222,6 +222,7 @@ describe('deterministic checks', () => {
 			factions: [],
 			places: [],
 			sources: [],
+			legacy: [],
 			artifacts: [],
 			themes: [],
 			replay: replayResult,

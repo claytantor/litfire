@@ -10,6 +10,7 @@ import {
 import {computeProject} from '../source/core/project.js';
 import {replay, systemFor} from '../source/ledger/replay.js';
 import {FormulaRunner, formulaKey, hashFormulas} from '../source/system/sandbox.js';
+import {stringifyDocument} from '../source/vault/frontmatter.js';
 import {loadVault} from '../source/vault/load.js';
 import {VAULT} from '../source/vault/paths.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
@@ -82,12 +83,27 @@ describe('systems as a primitive', () => {
 	});
 
 	it('reads a legacy vault as the one system named `system`', async () => {
-		await scaffoldVault(root);
+		// A genuine pre-`systems/` vault: the split `system/*.md` trio, written
+		// directly rather than via the scaffold, which no longer produces this
+		// layout for a fresh vault.
+		await mkdir(path.join(root, VAULT.system), {recursive: true});
+		await writeFile(
+			path.join(root, VAULT.stats),
+			stringifyDocument({
+				data: {stats: [{id: 'vitality', default: 10, max: 20}]},
+				body: '\n',
+			}),
+			'utf8',
+		);
+		await writeFile(
+			path.join(root, VAULT.skills),
+			stringifyDocument({data: {skills: [{id: 'graft'}]}, body: '\n'}),
+			'utf8',
+		);
 		const vault = await loadVault(root);
 
 		expect(vault.systems).toHaveLength(1);
 		expect(vault.systems[0]?.id).toBe(DEFAULT_SYSTEM_ID);
-		// The scaffold seeds stats from the profile, so this is real content.
 		expect(vault.systems[0]?.stats.length).toBeGreaterThan(0);
 	});
 
@@ -283,7 +299,9 @@ describe('the wiki follows', () => {
 		await scaffoldVault(root);
 		const wiki = buildWiki(await computeProject(root));
 
-		expect(wiki.pages.some(p => p.path === `${VAULT.wiki}/systems/system.md`)).toBe(true);
+		expect(wiki.pages.some(p => p.path === `${VAULT.wiki}/systems/system-01.md`)).toBe(
+			true,
+		);
 		expect(wiki.pages.some(p => p.path === `${VAULT.wiki}/system.md`)).toBe(false);
 	});
 

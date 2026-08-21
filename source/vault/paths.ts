@@ -38,6 +38,11 @@ export const VAULT = {
 	/** Things characters use to achieve outcomes (§3): spells, rifles, instruments. */
 	artifacts: 'artifacts',
 	situations: 'situations',
+	/**
+	 * The pre-D19 home for a scene with no arc. Read, never written, and never
+	 * created: it encoded in the filesystem what `arc:` already says, and a
+	 * second legal home for one id is how one situation came to exist twice.
+	 */
 	inbox: 'situations/inbox',
 	/** Cuts in the replay sequence (§6 step 6); membership is derived, not stored. */
 	chapters: 'chapters',
@@ -91,11 +96,25 @@ export const VAULT_DIRECTORIES: readonly string[] = [
 	VAULT.factions,
 	VAULT.artifacts,
 	VAULT.situations,
-	VAULT.inbox,
 	VAULT.chapters,
 	VAULT.wiki,
 	VAULT.ledger,
 ];
+
+/**
+ * Files from a layout litfire has moved on from, still read so no vault breaks.
+ *
+ * Each has a modern equivalent that is now the only thing written: the split
+ * `system/*.md` trio became `systems/<id>.md`, and the single-file world-event
+ * list became a page per moment. Naming them here lets `/lint` report a vault
+ * that still has one without the checks having to know how the loader works.
+ */
+export const LEGACY_FILES: Readonly<Record<string, string>> = {
+	'system/stats.md': 'systems/<id>.md',
+	'system/skills.md': 'systems/<id>.md',
+	'system/curves.md': 'systems/<id>.md',
+	'timeline/world-events.md': 'timeline/moments/<id>.md',
+};
 
 export function resolve(root: string, ...segments: string[]): string {
 	return path.join(root, ...segments);

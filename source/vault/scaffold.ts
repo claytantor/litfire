@@ -1,6 +1,8 @@
 import {mkdir, writeFile} from 'node:fs/promises';
 import {BUILT_IN_PROFILES, resolveProfile} from '../genre/profiles.js';
 import type {ResolvedProfile} from '../genre/types.js';
+import {INGEST, type IngestKind} from '../ingest/index.js';
+import {hashSource, HASH_FIELD, SOURCE_FIELD} from '../ingest/state.js';
 import {stringifyDocument} from './frontmatter.js';
 import {RAW_KINDS, resolve, VAULT, VAULT_DIRECTORIES} from './paths.js';
 
@@ -17,6 +19,38 @@ const GENERATED_BANNER =
  * vault to open in Obsidian with a connected graph, which an empty scaffold
  * would fail. Every page below is reachable by wikilink from `index.md`.
  */
+/**
+ * A seed the author owns, written to both layers at once.
+ *
+ * `raw/<kind>/<id>.md` is the record; the corpus page is what the tool derives
+ * from it, carrying the note's path and hash. A fresh vault is therefore
+ * already adopted: `/ingest` reports every seed as unchanged, and the first
+ * command to edit one has nothing to migrate.
+ *
+ * Seeding *both* rather than only raw is deliberate. A vault whose corpus stayed
+ * empty until an ingest ran would need a configured model provider before it
+ * rendered anything at all, and `/init` has to produce a vault that opens in
+ * Obsidian with a connected graph (DoD 1). The pair is written the same way
+ * `setAuthored` writes it, so the scaffold demonstrates the loop rather than
+ * standing outside it.
+ */
+function authored(
+	files: Record<string, string>,
+	kind: IngestKind,
+	id: string,
+	data: Record<string, unknown>,
+	body: string,
+): void {
+	const from = `${INGEST[kind].from}/${id}.md`;
+	const note = stringifyDocument({data: {id, ...data}, body});
+
+	files[from] = note;
+	files[`${INGEST[kind].to}/${id}.md`] = stringifyDocument({
+		data: {id, ...data, [SOURCE_FIELD]: from, [HASH_FIELD]: hashSource(note)},
+		body,
+	});
+}
+
 function seedFiles(profile: ResolvedProfile): Record<string, string> {
 	const files: Record<string, string> = {};
 
@@ -75,8 +109,20 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 		2,
 	)}\n`;
 
-	files[VAULT.stats] = stringifyDocument({
-		data: {
+	// One page, where `system/stats.md` + `skills.md` + `curves.md` used to be
+	// three. Those still load, so no vault breaks — but seeding them meant every
+	// new vault started in the layout the loader itself calls legacy, with a
+	// third home for a stat once `raw/systems/` arrived.
+	//
+	// The id is not `system`: that is already the setting page's stem, and two
+	// files resolving one `[[system]]` is an ambiguity Obsidian would inherit.
+	// Nothing needs the name — a vault with one system resolves to it unnamed.
+	authored(
+		files,
+		'system',
+		'system-01',
+		{
+			example: true,
 			// Seeded from the profile's archetypes — data, not logic.
 			stats: profile.archetypes.stats.map(id => ({
 				id,
@@ -84,21 +130,23 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 				default: 10,
 				min: 0,
 			})),
-		},
-		body: '\n# Stats\n\nAuthor-owned. The tool proposes; you dispose.\n',
-	});
-
-	files[VAULT.curves] = stringifyDocument({
-		data: {xp_for_level: 'xp-for-level', max_level: 50},
-		body: `# Curves\n\n\`xp_for_level\` names a formula in [[formulas]] giving the cumulative XP\nrequired to *be* a level.\n`,
-	});
-
-	files[VAULT.skills] = stringifyDocument({
-		data: {
 			skills: [{id: 'first-ability', name: 'First Ability', requires_skills: []}],
+			curves: {xp_for_level: 'xp-for-level', max_level: 50},
 		},
-		body: '# Skills\n\nPrerequisites are checked deterministically against [[stats]].\n',
-	});
+		[
+			'',
+			'# The System',
+			'',
+			'> Scaffold example. Delete `example: true` once this is really your system.',
+			'',
+			'Stats, skills and curves are author-owned. `xp_for_level` names a formula',
+			'in [[formulas]] giving the cumulative XP required to *be* a level, and',
+			'prerequisites are checked deterministically against the stats above.',
+			'',
+			'Governs [[protagonist]].',
+			'',
+		].join('\n'),
+	);
 
 	files[VAULT.formulas] = [
 		'# Formulas',
@@ -115,20 +163,30 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 		'',
 	].join('\n');
 
-	files[VAULT.moments] = stringifyDocument({
-		data: {
-			example: true,
-			world_events: [
-				{id: 'we-001', name: 'The System Arrives', at: 0},
-				{id: 'we-002', name: 'The Third Floor Opens', at: 100},
-			],
-		},
-		body: '# Moments\n\nFixed anchors on the in-world clock. Referenced by [[arc-01]].\n',
-	});
+	// A page each. This was one file at `timeline/moments` — a path `/init` had
+	// already created as a directory, so the write threw EEXIST and was filed
+	// under `skipped`. The seed had never once been written.
+	authored(
+		files,
+		'moment',
+		'we-001',
+		{example: true, name: 'The System Arrives', at: 0},
+		'\n# The System Arrives\n\nSecond zero on the in-world clock: the origin every other moment is\nmeasured from. Opens [[arc-01]].\n',
+	);
 
-	files[`${VAULT.arcs}/arc-01.md`] = stringifyDocument({
-		data: {
-			id: 'arc-01',
+	authored(
+		files,
+		'moment',
+		'we-002',
+		{example: true, name: 'The Third Floor Opens', at: 100},
+		'\n# The Third Floor Opens\n\nA hundred seconds after the origin. Closes [[arc-01]].\n',
+	);
+
+	authored(
+		files,
+		'arc',
+		'arc-01',
+		{
 			name: 'Ground Floor',
 			order: 1,
 			starts_after: 'we-001',
@@ -136,12 +194,14 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 			example: true,
 			milestone: {protagonist: {level: 3, has_skills: []}},
 		},
-		body: '\n# Ground Floor\n\n> Scaffold example. Delete `example: true` once this is really your arc.\n\nSpans [[moments|we-001]] → we-002. Characters: [[protagonist]].\n',
-	});
+		'\n# Ground Floor\n\n> Scaffold example. Delete `example: true` once this is really your arc.\n\nSpans [[we-001]] → [[we-002]]. Characters: [[protagonist]].\n',
+	);
 
-	files[`${VAULT.characters}/protagonist.md`] = stringifyDocument({
-		data: {
-			id: 'protagonist',
+	authored(
+		files,
+		'character',
+		'protagonist',
+		{
 			// A placeholder, deliberately not a name. An interviewer that reads a
 			// seeded name treats it as the author's character and interviews them
 			// about someone they never invented.
@@ -152,12 +212,14 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 			stats: {strength: 10, constitution: 12, charisma: 8},
 			skills: [],
 		},
-		body: '\n# (unnamed protagonist)\n\n> Scaffold example. Rename the file and delete `example: true` once this\n> is really your character.\n\nStarting state above is author-owned. Narrative below is LLM-maintained.\n\nAppears in [[arc-01]].\n',
-	});
+		'\n# (unnamed protagonist)\n\n> Scaffold example. Rename the file and delete `example: true` once this\n> is really your character.\n\nStarting state above is author-owned. Narrative below is LLM-maintained.\n\nAppears in [[arc-01]], under [[system-01]].\n',
+	);
 
-	files[`${VAULT.themes}/commodification.md`] = stringifyDocument({
-		data: {
-			id: 'commodification',
+	authored(
+		files,
+		'theme',
+		'commodification',
+		{
 			example: true,
 			name: 'The Commodification of Existence',
 			subthemes: [
@@ -175,16 +237,19 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 				},
 			],
 		},
-		body: '# The Commodification of Existence\n\nSituations tag sub-themes only. Coverage is informational and never blocks.\n',
-	});
+		'# The Commodification of Existence\n\nSituations tag sub-themes only. Coverage is informational and never blocks.\n',
+	);
 
 	// The filename is the id, with nothing appended: one id, one file.
-	files[`${VAULT.situations}/sit-001.md`] = stringifyDocument({
-		data: {
-			id: 'sit-001',
+	authored(
+		files,
+		'situation',
+		'sit-001',
+		{
 			title: 'The Arrival',
 			arc: 'arc-01',
 			order: 10,
+			moment: 'we-001',
 			example: true,
 			characters: ['protagonist'],
 			themes: ['monetized-suffering'],
@@ -192,8 +257,8 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 				{actor: 'protagonist', type: 'xp', value: 450, note: 'survived the first hour'},
 			],
 		},
-		body: '\n> Scaffold example. Delete `example: true` once this is really your scene.\n\nProse body. The tool never edits this text.\n\nFeaturing [[protagonist]] in [[arc-01]].\n',
-	});
+		'\n> Scaffold example. Delete `example: true` once this is really your scene.\n\nProse body. The tool never edits this text.\n\nFeaturing [[protagonist]] in [[arc-01]], at [[we-001]].\n',
+	);
 
 	files[`${VAULT.chapters}/ch-01.md`] = stringifyDocument({
 		data: {
@@ -221,14 +286,13 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 		'',
 		'- [[system]]',
 		'- [[idiom]]',
-		'- [[stats]]',
-		'- [[curves]]',
-		'- [[skills]]',
+		'- [[system-01]]',
 		'- [[formulas]]',
 		'',
 		'## Timeline',
 		'',
-		'- [[moments]]',
+		'- [[we-001]]',
+		'- [[we-002]]',
 		'- [[arc-01]]',
 		'',
 		'## Characters',

@@ -306,6 +306,7 @@ describe('the anchor', () => {
 			factions: [],
 			places: [],
 			sources: [],
+			legacy: [],
 			artifacts: [],
 			themes: [],
 			replay: result,

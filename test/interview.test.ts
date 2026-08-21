@@ -188,7 +188,7 @@ describe('grounding', () => {
 
 		// index.md is the cheapest map of what exists, so it leads.
 		expect(grounding.startsWith('## index.md')).toBe(true);
-		expect(grounding).toContain('system/stats.md');
+		expect(grounding).toContain('system/idiom.md');
 		expect(grounding).toContain('system/formulas.md');
 	});
 
@@ -209,7 +209,7 @@ describe('grounding', () => {
 		// files are still legitimately present.
 		expect(grounding).toContain('Not established');
 		expect(grounding).toContain('your protagonist');
-		expect(grounding).toContain('system/stats.md');
+		expect(grounding).toContain('system/formulas.md');
 	});
 
 	it('excludes placeholders from every interview kind', async () => {

@@ -1,4 +1,4 @@
-import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
@@ -104,7 +104,7 @@ describe('scaffold + compute', () => {
 		for (const link of [
 			'[[protagonist]]',
 			'[[arc-01]]',
-			'[[stats]]',
+			'[[system-01]]',
 			'[[commodification]]',
 		]) {
 			expect(index).toContain(link);
@@ -156,6 +156,9 @@ describe('scaffold + compute', () => {
 	// DoD 4 — placed and unplaced coexist.
 	it('treats inbox situations as unplaced', async () => {
 		await scaffoldVault(root);
+		// `/init` no longer creates the inbox — only a vault written before D19
+		// has one, which is exactly what this asserts still loads.
+		await mkdir(path.join(root, VAULT.inbox), {recursive: true});
 		await writeFile(
 			path.join(root, VAULT.inbox, 'sit-900-loose.md'),
 			stringifyDocument({

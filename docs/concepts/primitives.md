@@ -63,8 +63,12 @@ resolve to whichever loads first, and the other becomes invisible while still on
 disk, so `/lint` reports:
 
 - **`file_name_not_id`** — a page whose filename does not match its id.
-- **`legacy_location`** — a situation still in `situations/inbox/`, which was a
-  second home for the same thing and is no longer written to.
+- **`legacy_location`** — a file in a layout litfire has moved on from. A
+  situation in `situations/inbox/`, which was a second home for the same thing;
+  the `system/stats.md` + `skills.md` + `curves.md` trio, which `systems/<id>.md`
+  replaced; or `timeline/world-events.md`, from before moments were pages. All
+  are still read, so no vault breaks — `/init` just stops creating them, and the
+  finding names what now replaces each one.
 - **`duplicate_id`** — two files declaring one id, named by path.
 
 A situation with no `arc:` is unplaced. That is a normal, permanent state and it

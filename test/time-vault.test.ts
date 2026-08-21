@@ -78,6 +78,10 @@ describe('the clock survives the round trip to disk', () => {
 	});
 
 	it('reports an instant past the supported range instead of loading it', async () => {
+		// Isolate the out-of-range moment: the scaffold's we-001/we-002 are valid
+		// and would otherwise still load, making the moments list non-empty.
+		await rm(resolve(root, VAULT.moments, 'we-001.md'), {force: true});
+		await rm(resolve(root, VAULT.moments, 'we-002.md'), {force: true});
 		await moment('too-far', '-31557600000000000001');
 
 		expect(context.project!.vault.issues).toHaveLength(1);

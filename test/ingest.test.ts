@@ -51,6 +51,8 @@ const said = (r: {lines: readonly {text: string}[]}) =>
 
 describe('finding the notes', () => {
 	it('reads every document in the directory', async () => {
+		// Isolate from the scaffold's seeded raw/characters/protagonist.md.
+		await rm(path.join(root, 'raw/characters/protagonist.md'), {force: true});
 		await note('raw/characters/sebastian-weber.md', 'A geneticist in Berlin.');
 		await note('raw/characters/linh-tran.md', 'A systems engineer.');
 
@@ -74,6 +76,9 @@ describe('finding the notes', () => {
 	});
 
 	it('skips an empty file rather than sending it to a model', async () => {
+		// Isolate from the scaffold's seeded raw/moments/we-001.md and we-002.md.
+		await rm(path.join(root, 'raw/moments/we-001.md'), {force: true});
+		await rm(path.join(root, 'raw/moments/we-002.md'), {force: true});
 		await note('raw/moments/blank.md', '   \n\n');
 		expect((await readRaw(root, 'moment')).documents).toHaveLength(0);
 	});
@@ -95,6 +100,10 @@ describe('finding the notes', () => {
 
 describe('what the pass is asked to do', () => {
 	it('names where pages go and what their frontmatter holds', async () => {
+		// Isolate from the scaffold's seeded raw/moments/we-001.md and we-002.md,
+		// whose `at:` field is a BigInt and is not what this test is about.
+		await rm(path.join(root, 'raw/moments/we-001.md'), {force: true});
+		await rm(path.join(root, 'raw/moments/we-002.md'), {force: true});
 		await note('raw/moments/ordered.md', '- The Breach — 32 kya');
 		const {documents} = await readRaw(root, 'moment');
 		const {instruction} = await buildIngest(root, context.project!, 'moment', documents);
@@ -104,6 +113,10 @@ describe('what the pass is asked to do', () => {
 	});
 
 	it('shows what already exists, so it updates rather than duplicating', async () => {
+		// Isolate from the scaffold's seeded raw/moments/we-001.md and we-002.md,
+		// whose `at:` field is a BigInt and is not what this test is about.
+		await rm(path.join(root, 'raw/moments/we-001.md'), {force: true});
+		await rm(path.join(root, 'raw/moments/we-002.md'), {force: true});
 		await note('raw/moments/ordered.md', '- The Breach — 32 kya');
 		await note(
 			'timeline/moments/the-breach.md',
@@ -160,6 +173,10 @@ describe('what the pass is asked to do', () => {
 	});
 
 	it('warns that one note may hold several things', async () => {
+		// Isolate from the scaffold's seeded raw/moments/we-001.md and we-002.md,
+		// whose `at:` field is a BigInt and is not what this test is about.
+		await rm(path.join(root, 'raw/moments/we-001.md'), {force: true});
+		await rm(path.join(root, 'raw/moments/we-002.md'), {force: true});
 		await note('raw/moments/ordered.md', '- one\n- two\n- three');
 		const {documents} = await readRaw(root, 'moment');
 		expect(
@@ -189,6 +206,9 @@ describe('/ingest', () => {
 
 	/** Nothing to think about, and a model call costs money. */
 	it('refuses an empty directory before calling anything', async () => {
+		// The scaffold seeds raw/characters/protagonist.md — a genuinely empty
+		// directory has to be built rather than relied on.
+		await rm(path.join(root, 'raw/characters/protagonist.md'), {force: true});
 		const result = await run('/ingest character');
 
 		expect(result.ingest).toBeUndefined();

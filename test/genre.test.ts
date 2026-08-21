@@ -259,7 +259,7 @@ describe('vault setting', () => {
 	it('seeds stats from the profile archetypes', async () => {
 		await scaffoldVault(root, 'technological');
 
-		const stats = await readFile(path.join(root, VAULT.stats), 'utf8');
+		const stats = await readFile(path.join(root, VAULT.systems, 'system-01.md'), 'utf8');
 		expect(stats).toContain('integrity');
 		expect(stats).toContain('bandwidth');
 		expect(stats).not.toContain('charisma');

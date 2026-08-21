@@ -631,3 +631,54 @@ digest.
 Every kind goes through one helper, so the layer a primitive is authored in is
 decided in exactly one place. A refused edit adopts nothing: a value that fails
 its schema must not leave a half-migrated page behind.
+
+## D22 — The scaffold demonstrates the loop
+
+**Committed:** `/init` seeds `raw/` and the corpus together, already stamped;
+the superseded system trio and the single-file moment list are no longer
+written, and are reported when read.
+
+Raw-first left `/init` pointing the wrong way. It wrote `characters/protagonist.md`,
+`themes/commodification.md`, `timeline/arcs/arc-01.md` and `situations/sit-001.md`
+straight into the corpus — so a fresh vault's example content was exactly what
+step 6 is about to forbid, with no note to regenerate it from. The tool was
+shipping a violation of its own model, in the first thing an author sees.
+
+**Both layers, not just raw.** The obvious fix — seed only `raw/` and let the
+first `/ingest` derive the corpus — is wrong. It would require a configured
+model provider before a new vault rendered anything at all, and `/init` has to
+produce a vault that opens in Obsidian with a connected graph. So each seed is
+written to both, the page carrying `source` and `source_hash` for the note
+beside it. A fresh vault is _already adopted_: `/ingest` reports every seed as
+unchanged, and the first command to edit one has nothing to migrate. One helper
+writes the pair, the same way `setAuthored` does (D21).
+
+**Three homes for one stat.** `system/stats.md`, `system/skills.md` and
+`system/curves.md` are the layout from before systems were a primitive. With
+`systems/<id>.md` and then `raw/systems/<id>.md`, a stat had three possible
+homes — and `/init` seeded the oldest, so every new vault started in the layout
+`load.ts` itself calls legacy. Worse, a vault holding both gets two systems
+where the author means one, and every number on a sheet resolves against
+whichever the loader picked. The seed is now one page at `systems/system-01.md`.
+
+The id is not `system`. That stem already belongs to the setting page, and two
+files answering one `[[system]]` is an ambiguity Obsidian inherits. Nothing
+needed the name: a vault with a single system resolves to it unnamed.
+`system/formulas.md` stays, and is not legacy — it is deliberately unscoped, the
+escape hatch for a rule that genuinely applies to every system.
+
+**A seed that had never been written.** `files[VAULT.moments]` targeted
+`timeline/moments` — a path `/init` creates as a _directory_ moments earlier.
+The write used `flag: 'wx'`, threw `EEXIST`, and the loop caught that and filed
+it under `skipped`. It had been reported as skipped rather than failed since the
+day it was written, which is why nobody noticed. It seeded the single-file
+world-event list, which is on this same list for retirement, so deleting it and
+seeding `timeline/moments/we-001.md` and `we-002.md` is one edit. `/init` now
+asserts it writes every file it means to.
+
+**Read, never created.** None of the retired paths is dropped from the loader:
+`situations/inbox/`, the system trio and `timeline/world-events.md` all still
+load, so no existing vault breaks. What changed is that `/init` stops creating
+them and `/lint` starts naming them. `Vault.legacy` records which legacy readers
+actually fired, because an absent file and an empty one are not the same fact
+and only one of them is worth reporting (P4).

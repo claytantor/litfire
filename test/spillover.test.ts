@@ -301,6 +301,7 @@ describe('unplaced corpus reaches the ledger as a question, not a crash', () => 
 			factions: [],
 			places: [],
 			sources: [],
+			legacy: [],
 			artifacts: [],
 			themes: [],
 			replay: replayResult,

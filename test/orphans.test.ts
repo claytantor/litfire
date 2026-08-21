@@ -169,8 +169,9 @@ describe('/system show', () => {
 	});
 
 	it('reports a genuinely empty System rather than starting an interview', async () => {
-		await rm(resolve(root, VAULT.stats), {force: true});
-		await rm(resolve(root, VAULT.skills), {force: true});
+		// The scaffold's system-01 is real content — a genuinely empty vault has
+		// no named system at all, only the always-present empty legacy fallback.
+		await rm(resolve(root, VAULT.systems, 'system-01.md'), {force: true});
 		await refresh();
 
 		const result = await dispatch('/system show');
@@ -180,6 +181,9 @@ describe('/system show', () => {
 	});
 
 	it('shows stats, skills, and curves once they exist', async () => {
+		// Isolate the legacy system so it is the vault's only one — otherwise
+		// `/system show` with no id and two systems renders the summary list.
+		await rm(resolve(root, VAULT.systems, 'system-01.md'), {force: true});
 		await writeFile(
 			resolve(root, VAULT.stats),
 			stringifyDocument({data: {stats: [{id: 'memory', default: 10}]}, body: '\n'}),

@@ -40,10 +40,10 @@ async function dispatch(line: string) {
 
 describe('all four interview paths reach the interview', () => {
 	const cases: [string, string, string | undefined][] = [
-		// A scaffolded vault has one system, id `system`, so a bare `/system`
+		// A scaffolded vault has one system, id `system-01`, so a bare `/system`
 		// namespaces to it rather than staying unfocused — the same transcript
 		// namespace a vault with several would use.
-		['/system', 'system', 'system'],
+		['/system', 'system', 'system-01'],
 		['/system the-lathe', 'system', 'the-lathe'],
 		['/timeline interview', 'timeline', undefined],
 		['/character protagonist', 'character', 'protagonist'],
@@ -161,10 +161,10 @@ describe('resuming from the command layer', () => {
 		// would lose work.
 		expect(result.interview).toBeUndefined();
 		const rendered = result.lines.map(l => l.text).join('\n');
-		expect(rendered).toContain('unfinished system interview');
+		expect(rendered).toContain('unfinished system-01 interview');
 		expect(rendered).toContain('1 exchange');
-		expect(rendered).toContain('/system resume');
-		expect(rendered).toContain('/system new');
+		expect(rendered).toContain('/system-01 resume');
+		expect(rendered).toContain('/system-01 new');
 	});
 
 	it('/system resume continues it', async () => {
@@ -176,7 +176,7 @@ describe('resuming from the command layer', () => {
 		// the same namespace a new one would use.
 		expect(result.interview).toEqual({
 			kind: 'system',
-			focus: 'system',
+			focus: 'system-01',
 			resume: true,
 		});
 	});
@@ -186,7 +186,7 @@ describe('resuming from the command layer', () => {
 
 		const result = await dispatch('/system new');
 
-		expect(result.interview).toEqual({kind: 'system', focus: 'system'});
+		expect(result.interview).toEqual({kind: 'system', focus: 'system-01'});
 		const {listTranscripts} = await import('../source/interview/index.js');
 		expect(await listTranscripts(root)).toHaveLength(1);
 	});
@@ -214,7 +214,7 @@ describe('resuming from the command layer', () => {
 		// the same namespace a new one would use.
 		expect(result.interview).toEqual({
 			kind: 'system',
-			focus: 'system',
+			focus: 'system-01',
 			resume: true,
 		});
 		// Said out loud, because reopening something the author wrapped up is a
@@ -234,13 +234,13 @@ describe('resuming from the command layer', () => {
 
 		// A bare /system must not nag about work the author already finished.
 		const result = await dispatch('/system');
-		expect(result.interview).toEqual({kind: 'system', focus: 'system'});
+		expect(result.interview).toEqual({kind: 'system', focus: 'system-01'});
 	});
 
 	it('starts normally when nothing is unfinished', async () => {
 		const result = await dispatch('/system');
 
-		expect(result.interview).toEqual({kind: 'system', focus: 'system'});
+		expect(result.interview).toEqual({kind: 'system', focus: 'system-01'});
 	});
 
 	it('routes /themes interview resume too', async () => {
@@ -343,7 +343,7 @@ describe('the four interviews take the same directives', () => {
 		it('sweeps every transcript and says the writes come from the newest', async () => {
 			const result = await dispatch('/system extract all');
 
-			expect(result.extract).toEqual({kind: 'system', all: true, focus: 'system'});
+			expect(result.extract).toEqual({kind: 'system', all: true, focus: 'system-01'});
 			expect(said(result)).toContain('sweeping 2 system transcript(s)');
 			expect(said(result)).toContain('corpus writes come from system-2026-06-01');
 		});
@@ -351,7 +351,7 @@ describe('the four interviews take the same directives', () => {
 		it('bare extract takes the newest, and points at the ones it skipped', async () => {
 			const result = await dispatch('/system extract');
 
-			expect(result.extract).toEqual({kind: 'system', focus: 'system'});
+			expect(result.extract).toEqual({kind: 'system', focus: 'system-01'});
 			expect(said(result)).toContain('system-2026-06-01T00-00-00');
 			expect(said(result)).toContain('1 older system transcript(s) not touched');
 		});

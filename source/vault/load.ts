@@ -74,6 +74,15 @@ export type Vault = {
 	readonly chapters: readonly Chapter[];
 	/** Where each page was read from, for reports that have to name a file. */
 	readonly sources: readonly Source[];
+	/**
+	 * Files read from a superseded layout, vault-relative. Empty in a tidy vault.
+	 *
+	 * Recorded here rather than discovered by the checks because only the loader
+	 * knows which legacy readers actually fired — an empty `system/stats.md` is
+	 * not the same as one holding stats, and only one of those is worth
+	 * reporting.
+	 */
+	readonly legacy: readonly string[];
 	/** Malformed files are reported, never thrown — the author keeps working. */
 	readonly issues: readonly LoadIssue[];
 };
@@ -197,6 +206,7 @@ async function loadSystems(
 export async function loadVault(root: string): Promise<Vault> {
 	const issues: LoadIssue[] = [];
 	const sources: Source[] = [];
+	const legacy: string[] = [];
 
 	// The legacy system is spread across four files so each is independently
 	// editable in Obsidian; they are merged into one SystemDef here.
@@ -232,7 +242,7 @@ export async function loadVault(root: string): Promise<Vault> {
 	// that has moved wholly to `systems/` is not haunted by an empty one. When
 	// nothing at all is defined, one empty system is still produced: downstream
 	// code should never have to ask whether a character has a system to be under.
-	const legacy = systemSchema.parse({
+	const legacySystem = systemSchema.parse({
 		id: DEFAULT_SYSTEM_ID,
 		stats: statsDocument?.stats ?? [],
 		skills: skillsDocument?.skills ?? [],
@@ -243,8 +253,18 @@ export async function loadVault(root: string): Promise<Vault> {
 		skillsDocument !== undefined ||
 		curvesDocument !== undefined;
 
+	if (statsDocument !== undefined) {
+		legacy.push(VAULT.stats);
+	}
+	if (skillsDocument !== undefined) {
+		legacy.push(VAULT.skills);
+	}
+	if (curvesDocument !== undefined) {
+		legacy.push(VAULT.curves);
+	}
+
 	const systems = (
-		legacyIsReal || named.length === 0 ? [legacy, ...named] : named
+		legacyIsReal || named.length === 0 ? [legacySystem, ...named] : named
 	).toSorted((a, b) => a.id.localeCompare(b.id));
 
 	// A page each, plus whatever the pre-moments list file still holds. Pages win
@@ -259,6 +279,7 @@ export async function loadVault(root: string): Promise<Vault> {
 
 	const legacyRaw = await readIfPresent(resolve(root, VAULT.legacyMoments));
 	if (legacyRaw) {
+		legacy.push(VAULT.legacyMoments);
 		const {data} = parseDocument(legacyRaw);
 		const list = Array.isArray(data['world_events']) ? data['world_events'] : [];
 		for (const entry of list) {
@@ -343,6 +364,7 @@ export async function loadVault(root: string): Promise<Vault> {
 		themes,
 		chapters,
 		sources,
+		legacy,
 		issues,
 	};
 }

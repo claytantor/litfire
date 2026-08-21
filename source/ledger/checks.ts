@@ -10,7 +10,7 @@ import type {
 	Moment,
 } from '../domain/schema.js';
 import type {FormulaRunner} from '../system/sandbox.js';
-import {VAULT} from '../vault/paths.js';
+import {LEGACY_FILES, VAULT} from '../vault/paths.js';
 import type {Source} from '../vault/load.js';
 import {systemFor, type Finding, type LedgerState, type ReplayResult} from './replay.js';
 
@@ -34,6 +34,8 @@ export type CheckInput = {
 	readonly places: readonly Place[];
 	/** Where each page was read from, so a finding can name a file. */
 	readonly sources: readonly Source[];
+	/** Superseded files the loader still read, vault-relative. */
+	readonly legacy: readonly string[];
 	readonly artifacts: readonly Artifact[];
 	readonly themes: readonly Theme[];
 	readonly replay: ReplayResult;
@@ -470,6 +472,24 @@ function misnamedFiles(input: CheckInput): Finding[] {
 				where: source.id,
 			});
 		}
+	}
+
+	/**
+	 * The same finding for the files that predate a primitive being a page. The
+	 * loader reports which ones it actually read, so an absent file is silent and
+	 * a present one is named alongside what now replaces it.
+	 *
+	 * Worth saying because these are not merely old: a vault holding both
+	 * `system/stats.md` and `systems/<id>.md` has two systems where the author
+	 * means one, and every stat on a sheet resolves against whichever the loader
+	 * picked.
+	 */
+	for (const file of input.legacy) {
+		findings.push({
+			kind: 'legacy_location',
+			detail: `${file} is a superseded layout — its content now belongs in ${LEGACY_FILES[file] ?? 'the current layout'}`,
+			where: file,
+		});
 	}
 
 	return findings;

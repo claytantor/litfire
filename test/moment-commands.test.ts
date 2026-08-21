@@ -200,6 +200,14 @@ describe('editing a moment', () => {
 });
 
 describe('reading moments back', () => {
+	// The scaffold seeds we-001/we-002; both tests below assert on an exact
+	// moment list, so the seeded pair is removed to get a clean slate.
+	beforeEach(async () => {
+		await rm(path.join(root, 'timeline', 'moments', 'we-001.md'), {force: true});
+		await rm(path.join(root, 'timeline', 'moments', 'we-002.md'), {force: true});
+		context = {...context, project: await computeProject(root)};
+	});
+
 	it('lists nothing helpfully when there are none', async () => {
 		expect(said(await run('/moment'))).toContain('/moment new');
 	});

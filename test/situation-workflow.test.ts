@@ -234,8 +234,11 @@ describe('the documented workflow', () => {
 	});
 
 	it('names the prerequisite when the step cannot be run yet', async () => {
-		// A fresh vault has an arc but no dated moments, so the moment step has
-		// to send the author to /moment first rather than to a refusal.
+		// The scaffold now seeds dated moments (we-001, we-002); remove them so
+		// the vault genuinely has none, and the moment step has to send the
+		// author to /moment first rather than to a refusal.
+		await rm(resolve(root, VAULT.moments, 'we-001.md'), {force: true});
+		await rm(resolve(root, VAULT.moments, 'we-002.md'), {force: true});
 		await run('/situation new A Bare Scene');
 		await refresh();
 
@@ -413,6 +416,33 @@ describe('the documented workflow', () => {
 		const finding = context.project!.questions.find(q => q.kind === 'legacy_location');
 		expect(finding?.detail).toContain('situations/inbox/sit-900.md');
 		expect(finding?.detail).toContain('already unplaced');
+	});
+
+	/**
+	 * The same finding, for the files that predate a primitive being a page. Two
+	 * homes for one system is the version that actually hurts: every stat on a
+	 * sheet resolves against whichever the loader picked.
+	 */
+	it('reports a superseded layout file, and says what replaces it', async () => {
+		await writeFile(
+			resolve(root, VAULT.stats),
+			'---\nstats:\n  - id: grit\n    default: 10\n---\n\nLegacy.\n',
+			'utf8',
+		);
+		await refresh();
+
+		const finding = context
+			.project!.questions.filter(q => q.kind === 'legacy_location')
+			.find(q => q.detail.includes(VAULT.stats));
+		expect(finding?.detail).toContain('systems/<id>.md');
+	});
+
+	it('says nothing about a legacy file that is not there', async () => {
+		await refresh();
+
+		expect(
+			context.project!.questions.filter(q => q.kind === 'legacy_location'),
+		).toHaveLength(0);
 	});
 
 	it('never rewrites the author body when linking', async () => {

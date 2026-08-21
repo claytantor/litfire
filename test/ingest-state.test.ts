@@ -63,6 +63,8 @@ describe('/init scaffolds the raw folders', () => {
 
 	/** Signposting, not material. Ingesting it would propose a page about pages. */
 	it('does not offer those READMEs as documents to ingest', async () => {
+		// Isolate from the scaffold's seeded raw/characters/protagonist.md.
+		await rm(path.join(root, 'raw/characters/protagonist.md'), {force: true});
 		expect((await readRaw(root, 'character')).documents).toEqual([]);
 
 		await note('raw/characters/inanna.md', 'She lied.');
@@ -91,6 +93,9 @@ describe('knowing what has already been said', () => {
 	});
 
 	it('ignores a page that carries no provenance', async () => {
+		// Isolate from the scaffold's seeded characters/protagonist.md, which
+		// does carry provenance.
+		await rm(path.join(root, 'characters/protagonist.md'), {force: true});
 		await note('characters/hand-written.md', '---\nid: hand-written\n---\n\nProse.\n');
 		expect(await readIngestState(root, 'character')).toEqual(new Map());
 	});
@@ -138,6 +143,8 @@ describe('stamping a page', () => {
 
 describe('/ingest before it spends anything', () => {
 	it('does nothing at all when every note is already reflected', async () => {
+		// Isolate from the scaffold's seeded raw/characters/protagonist.md.
+		await rm(path.join(root, 'raw/characters/protagonist.md'), {force: true});
 		await note('raw/characters/inanna.md', 'She lied.');
 		await note(
 			'characters/inanna.md',
@@ -174,6 +181,8 @@ describe('/ingest before it spends anything', () => {
 	});
 
 	it('says which notes it will read and how many it skipped', async () => {
+		// Isolate from the scaffold's seeded raw/characters/protagonist.md.
+		await rm(path.join(root, 'raw/characters/protagonist.md'), {force: true});
 		await note('raw/characters/inanna.md', 'She lied.');
 		await note('raw/characters/carl.md', 'He did not.');
 		await note(
