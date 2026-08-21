@@ -433,11 +433,21 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			if (outcome.error !== undefined) {
 				summary.push(error(`plan failed: ${outcome.error}`));
 			}
+			if (outcome.proposals.length === 0) {
+				// Said, rather than returning quietly. A pass that reads two notes,
+				// thinks for a minute and then proposes nothing is a legitimate
+				// outcome — but silence after a long wait is indistinguishable from
+				// a crash, and the author has no way to tell which they got.
+				summary.push(
+					outcome.error === undefined && outcome.refusals.length === 0
+						? muted('nothing proposed — the pass found no changes to make')
+						: muted('nothing proposed'),
+				);
+				append(summary);
+				return;
+			}
 			if (summary.length > 0) {
 				append(summary);
-			}
-			if (outcome.proposals.length === 0) {
-				return;
 			}
 
 			// The curator alone may propose changes to `raw/` (D15). Extraction
