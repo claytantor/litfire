@@ -16,8 +16,19 @@ import {
  */
 const MINIMUM_EXCHANGES: Readonly<Record<InterviewKind, number>> = {
 	system: 6,
-	timeline: 6,
 	character: 6,
+	moment: 6,
+	arc: 5,
+	place: 4,
+	// A scene needs a cast, a place, a moment and an arc. Four answers is a
+	// complete one, and pressing past that is where an interviewer starts
+	// asking the author to dictate prose it must not touch.
+	situation: 4,
+	faction: 5,
+	artifact: 4,
+	theme: 5,
+	chapter: 4,
+	timeline: 6,
 	themes: 5,
 };
 

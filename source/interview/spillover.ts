@@ -150,8 +150,16 @@ export function stubPath(kind: StubKind, id: string): string {
 
 const KIND_LABEL: Readonly<Record<InterviewKind, string>> = {
 	system: 'system',
-	timeline: 'timeline',
 	character: 'character',
+	moment: 'moment',
+	arc: 'arc',
+	place: 'place',
+	situation: 'situation',
+	faction: 'faction',
+	artifact: 'artifact',
+	theme: 'theme',
+	chapter: 'chapter',
+	timeline: 'timeline',
 	themes: 'themes',
 };
 

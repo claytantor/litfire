@@ -2,9 +2,34 @@
 
 ## Interviews
 
-`/system` and `/character <name>` run the interview; `/timeline interview` and
-`/themes interview` do the same for those (bare `/timeline` and `/themes` keep
-their structural views). Each needs a provider — run `/provider` first.
+`/questions <kind>` interviews you about any primitive — `moment`, `place`,
+`faction`, `artifact`, `situation`, `chapter`, `arc`, `character`, `system` or
+`theme`. Add an id to narrow it to one thing:
+
+```
+/questions faction              about your factions
+/questions place oz-farm        about that one place
+/questions moment resume        continue where you left off
+```
+
+It opens on whatever the deterministic checks found unresolved for that kind, so
+the interview starts where your vault is actually thin. When the checks are
+happy there is no agenda, and it says so and offers anyway rather than deciding
+for you:
+
+```
+› /questions theme
+no open questions about themes.
+begin interview anyway? y/N
+```
+
+The default is no, so `return` declines — which makes `/questions <kind>` safe
+to type when you only wanted to know whether anything was outstanding.
+
+The older commands still work and do the same thing: `/system`,
+`/character <name>`, `/timeline interview` and `/themes interview` (bare
+`/timeline` and `/themes` keep their structural views). Each needs a provider —
+run `/provider` first.
 
 The flow is interview → transcript → extraction → review gate → disk. The
 transcript is written to `raw/interviews/` **before** extraction runs, so a

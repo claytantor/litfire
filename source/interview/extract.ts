@@ -3,6 +3,7 @@ import {ProviderError, type ChatMessage, type Provider} from '../llm/index.js';
 import type {InterviewKind} from './prompts.js';
 import {proposedStubSchema} from './spillover.js';
 import type {Transcript} from './transcript.js';
+import {INGEST} from '../ingest/index.js';
 
 /**
  * The extraction prompt, verbatim from the spec.
@@ -152,7 +153,33 @@ export type Contradiction = z.infer<typeof contradictionSchema>;
 export type Extraction = z.infer<typeof extractionSchema>;
 
 /** Schema hints per interview, so proposals land on the right vault paths. */
-const TARGET_HINT: Readonly<Record<InterviewKind, string>> = {
+/**
+ * Where a kind's answers land, and what its frontmatter holds.
+ *
+ * The four written by hand encode judgment a field list cannot: how many system
+ * pages one apparatus is, what counts as a moment rather than a scene. The rest
+ * are generated from the ingest spec, which already states each kind's
+ * destination and fields — writing them out a second time here would be two
+ * descriptions of one thing, and two descriptions of one thing is how they
+ * drift.
+ */
+function specHint(kind: InterviewKind): string {
+	const spec =
+		INGEST[kind === 'themes' ? 'theme' : kind === 'timeline' ? 'moment' : kind];
+	return [
+		'Target files.',
+		'',
+		`Write one page per thing at ${spec.to}/<id>.md, where the id is the`,
+		'filename. Its frontmatter holds:',
+		'',
+		spec.fields,
+		'',
+		'Anything the author did not tell you is an open field, not a guess. Never',
+		'invent a proper noun, a number or a date to fill one.',
+	].join('\n');
+}
+
+const BESPOKE_HINT: Partial<Record<InterviewKind, string>> = {
 	system: [
 		'Target files.',
 		'',
@@ -253,7 +280,7 @@ export function buildExtractionMessages(
 				`Interview kind: ${transcript.kind}`,
 				transcript.focus === undefined ? '' : `Focus: ${transcript.focus}`,
 				'',
-				TARGET_HINT[transcript.kind],
+				BESPOKE_HINT[transcript.kind] ?? specHint(transcript.kind),
 				'',
 				'# Existing corpus',
 				'',

@@ -5,7 +5,9 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {findCommand} from '../source/commands/registry.js';
 import type {CommandContext} from '../source/commands/types.js';
 import {computeProject} from '../source/core/project.js';
-import {agendaFor} from '../source/interview/agenda.js';
+import {agendaFor, BRIEF_FOR} from '../source/interview/agenda.js';
+import {BRIEFS} from '../source/interview/prompts.js';
+import {INGEST_KINDS} from '../source/ingest/index.js';
 import {saveProvider} from '../source/vault/config.js';
 import {VAULT} from '../source/vault/paths.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
@@ -74,7 +76,7 @@ describe('/questions <kind>, with something to ask about', () => {
 		await undatedMoment();
 		const result = await run('/questions moment');
 
-		expect(result.interview?.kind).toBe('timeline');
+		expect(result.interview?.kind).toBe('moment');
 		expect(said(result)).toContain('open question');
 		expect(said(result)).toContain('the-threshold');
 	});
@@ -117,16 +119,31 @@ describe('/questions <kind>, with nothing to ask about', () => {
 		const result = await run('/questions theme');
 
 		expect(result.interview).toBeUndefined();
-		expect(result.confirm?.proceed.interview?.kind).toBe('themes');
+		expect(result.confirm?.proceed.interview?.kind).toBe('theme');
 	});
 });
 
-describe('what it will not do yet', () => {
-	it('says which kinds have a brief, rather than failing sideways', async () => {
-		const output = said(await run('/questions place'));
+describe('every primitive can be asked about', () => {
+	/**
+	 * The asymmetry this feature existed to remove. Four of the kinds had an
+	 * interview because `interviewKindSchema` had four members; the other six
+	 * had none, for no reason beyond the order things were built in. This is
+	 * the assertion that keeps it removed — a primitive added without a brief
+	 * fails here rather than in front of an author.
+	 */
+	it('has a brief for every ingest kind', () => {
+		for (const kind of INGEST_KINDS) {
+			expect(BRIEF_FOR[kind], kind).toBeDefined();
+			expect(BRIEFS[BRIEF_FOR[kind]!].length, kind).toBeGreaterThan(400);
+		}
+	});
 
-		expect(output).toContain('no interview brief for places yet');
-		expect(output).toContain('character');
+	it('opens an interview about a kind that never had one', async () => {
+		const result = await run('/questions place');
+
+		// `place` had no brief at all before this: writing notes by hand or
+		// describing them to the curator were the only ways in.
+		expect(result.confirm?.proceed.interview?.kind).toBe('place');
 	});
 
 	it('refuses a kind that is not a primitive', async () => {

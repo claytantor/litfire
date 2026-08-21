@@ -19,20 +19,29 @@ import type {InterviewKind} from './prompts.js';
 /**
  * Which brief covers a primitive. Absent means nobody has written one yet.
  *
- * Two of the four briefs never matched a primitive name, which is the clearest
- * sign the interview kinds were their own vocabulary rather than the vault's:
- * `timeline` covers moments *and* the arcs between them, and `themes` is plural
- * where the primitive is `theme`. Splitting the timeline brief in two is what
- * makes the nine names finally line up with the nine folders, and it is on the
- * list; until then both point at the one brief, which genuinely does cover
- * both.
+ * Every primitive has one now, so this map is the identity — which is the point.
+ * It stays as a map rather than being deleted because it is what enforces that:
+ * a primitive added without a brief is a hole `/questions` reports rather than
+ * a crash, and the entry is the one place someone has to look to see whether
+ * the writing was done.
+ *
+ * Two of the original four briefs never matched a primitive name — `timeline`
+ * covered moments *and* the arcs between them, and `themes` was plural where
+ * the primitive is `theme`. Splitting the timeline brief along that seam is
+ * what finally lined the names up with the folders. Both old names survive in
+ * `InterviewKind` only until `/timeline` and `/themes` retire.
  */
 export const BRIEF_FOR: Partial<Record<IngestKind, InterviewKind>> = {
 	system: 'system',
 	character: 'character',
-	moment: 'timeline',
-	arc: 'timeline',
-	theme: 'themes',
+	moment: 'moment',
+	arc: 'arc',
+	place: 'place',
+	situation: 'situation',
+	faction: 'faction',
+	artifact: 'artifact',
+	theme: 'theme',
+	chapter: 'chapter',
 };
 
 /** The kinds an interview can be had about today, in a readable order. */

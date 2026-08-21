@@ -1,6 +1,7 @@
 import {readdir, stat} from 'node:fs/promises';
 import type {InterviewKind} from './prompts.js';
 import {resolve, VAULT} from '../vault/paths.js';
+import {INGEST} from '../ingest/index.js';
 import {listTranscripts, type Transcript} from './transcript.js';
 
 /**
@@ -37,26 +38,26 @@ function targetsFor(
 	kind: InterviewKind,
 	focus: string | undefined,
 ): {files: string[]; directories: string[]} {
-	switch (kind) {
-		case 'system': {
-			return {
-				files: [VAULT.stats, VAULT.skills, VAULT.curves, VAULT.formulas],
-				directories: [],
-			};
-		}
-		case 'timeline': {
-			return {files: [VAULT.moments], directories: [VAULT.arcs]};
-		}
-		case 'character': {
-			return {
-				files: focus === undefined ? [] : [`${VAULT.characters}/${focus}.md`],
-				directories: focus === undefined ? [VAULT.characters] : [],
-			};
-		}
-		case 'themes': {
-			return {files: [], directories: [VAULT.themes]};
-		}
+	// The two names that never matched a primitive, and so cannot be answered
+	// from the ingest spec: `timeline` covers two folders, and the legacy
+	// `system` interview wrote the pre-`systems/` trio.
+	if (kind === 'timeline') {
+		return {files: [], directories: [VAULT.moments, VAULT.arcs]};
 	}
+	if (kind === 'system') {
+		return {
+			files: [VAULT.stats, VAULT.skills, VAULT.curves, VAULT.formulas],
+			directories: [VAULT.systems],
+		};
+	}
+
+	// Everything else writes one folder, and a focused interview writes one page
+	// inside it. Taken from the ingest spec rather than listed again here, so a
+	// primitive cannot gain a folder and quietly stop being checked.
+	const directory = INGEST[kind === 'themes' ? 'theme' : kind].to;
+	return focus === undefined
+		? {files: [], directories: [directory]}
+		: {files: [`${directory}/${focus}.md`], directories: []};
 }
 
 /** The most recent write to anything this interview should have produced. */
@@ -85,22 +86,17 @@ async function newestWrite(
 }
 
 function describe(kind: InterviewKind, focus: string | undefined): string {
-	switch (kind) {
-		case 'system': {
-			return 'nothing under system/ has changed since';
-		}
-		case 'timeline': {
-			return 'nothing on the timeline has changed since';
-		}
-		case 'character': {
-			return focus === undefined
-				? 'no character file has changed since'
-				: `characters/${focus}.md has not changed since`;
-		}
-		case 'themes': {
-			return 'nothing under themes/ has changed since';
-		}
+	if (kind === 'timeline') {
+		return 'nothing on the timeline has changed since';
 	}
+	if (kind === 'system') {
+		return 'nothing under setting/ or corpus/systems/ has changed since';
+	}
+
+	const directory = INGEST[kind === 'themes' ? 'theme' : kind].to;
+	return focus === undefined
+		? `nothing under ${directory}/ has changed since`
+		: `${directory}/${focus}.md has not changed since`;
 }
 
 /** Most recent first, so the reported exchange count is the freshest attempt. */

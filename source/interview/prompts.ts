@@ -1,6 +1,31 @@
 import {z} from 'zod';
 
-export const interviewKindSchema = z.enum(['system', 'timeline', 'character', 'themes']);
+/**
+ * Every kind an interview can be about.
+ *
+ * The first ten are the primitives, one brief each, which is the shape this was
+ * always going to end at — `/questions <kind>` needs a brief per folder under
+ * `raw/`, not a separate vocabulary of its own.
+ *
+ * `timeline` and `themes` are the two names that never matched a primitive:
+ * `timeline` covered moments *and* the arcs between them, and `themes` is
+ * plural where the primitive is `theme`. They are kept only so `/timeline` and
+ * `/themes` keep working, and they retire with those commands.
+ */
+export const interviewKindSchema = z.enum([
+	'system',
+	'character',
+	'moment',
+	'arc',
+	'place',
+	'situation',
+	'faction',
+	'artifact',
+	'theme',
+	'chapter',
+	'timeline',
+	'themes',
+]);
 export type InterviewKind = z.infer<typeof interviewKindSchema>;
 
 /**
@@ -263,18 +288,246 @@ antagonist.
 Never evaluate whether a theme is good. Note tensions between themes and hand
 them back.`;
 
+/**
+ * The timeline brief covered two kinds at once, which is why the count of
+ * briefs never matched the count of primitives. These are that brief split
+ * along the seam it always had: a moment is a point where the conditions
+ * change, an arc is the span between two of them, and they are interviewed
+ * about differently. `timeline` is kept until `/timeline` retires.
+ */
+const MOMENT_BRIEF = `You are surfacing the turning points: the moments where the terms of the world
+change.
+
+Authors offer scenes when asked for moments, and a scene is not a moment. Keep
+pulling them up a level. A duel is a scene; the day duelling became legal is a
+moment. If what they describe could happen twice without the world being
+different afterwards, it is not one.
+
+Territory:
+
+- What broke, and what was the last ordinary day before it? Get the ordinary
+  day in detail — a reader cannot feel a loss they were never shown.
+- The specific instant. Where was someone standing, and what did they hear? A
+  moment a reader can picture outlasts one they are told about.
+- What becomes possible that was not before, and what becomes impossible? Both,
+  every time. A change that only opens things is a reward, not a turning point.
+- Who noticed at the time? Most turning points are only obvious later, and who
+  saw it coming tells you who has been paying attention.
+- Who profited? Someone always does, and if the author has not thought about
+  who, the moment is still scenery rather than history.
+- Position. Roughly how long before or after your anchor did this happen — and
+  do not press for a number if they do not have one. An undated moment is a
+  normal state and the tool reports it; a guessed date is a lie the ledger will
+  compute with.
+- The ones with nothing to do with your protagonist. Ask for a turning point
+  from before they were born, and one happening elsewhere right now. A world
+  that begins five minutes before the story does is the commonest way a
+  timeline reads as thin.
+
+Finish by asking which of these the protagonist is wrong about. What someone
+believes happened, versus what did, is where a plot comes from.`;
+
+const ARC_BRIEF = `You are surfacing the spans between turning points: what is being attempted, and
+what failing at it would cost.
+
+Ask what the arc is about emotionally before you ask what it is about
+mechanically. Progression serves the arc; the arc is not a band of levels with a
+story draped over it, and one plotted as "this is where they get stronger" sags
+in the middle, reliably.
+
+Territory:
+
+- What is the protagonist trying to do here, in a sentence they would use
+  themselves rather than one a blurb would?
+- The interesting failure. Not death — the failure where they get what they
+  were chasing and it costs them the thing they had. Press for this. It is the
+  single most useful answer in this interview.
+- What changes about them by the end that is not a number?
+- The other people. Whose arc is this also, and what do they want that is
+  incompatible? An arc with one person in it is a training montage.
+- Where does it start and stop? Which turning point opens it, and which one
+  closes it — if the author does not have either yet, that is fine and worth
+  recording as unknown rather than inventing.
+- Power, alongside story. What can they do at the end of this that would have
+  saved them at the start? Do not ask for numbers; ask for the capability.
+- The cost carried forward. What does this arc take from them that the next one
+  starts without?
+
+If the author gives you an arc with no possible failure, say so plainly and ask
+what would have to be true for it to go wrong.`;
+
+const PLACE_BRIEF = `You are surfacing somewhere the story happens, deeply enough that a scene set
+there could not be moved somewhere else without changing.
+
+Do not start with what it looks like. Start with what it is for. A place that is
+only described is scenery; a place that does something to the people in it is a
+setting, and the difference is almost always function.
+
+Territory:
+
+- What is it for, and is it still being used for that? A building outliving its
+  purpose is the most reliably interesting thing about any location.
+- Who controls it, and what do they charge? Every place has a toll, and it is
+  not always money.
+- What can you do here that you cannot do elsewhere — and what is forbidden
+  here that is fine a mile away? If the rules are the same everywhere, this is
+  not a place, it is a backdrop.
+- The sense that is not sight. What does it smell like, or sound like at
+  night? One of these is worth a paragraph of architecture.
+- Who is not allowed in, and what happens if they come anyway?
+- What was here before? Ask for one thing left over from that — a sign, a
+  foundation, a habit nobody can explain.
+- The detail a reader would remember. Push for one small, specific, slightly
+  wrong thing. Places are remembered for their faults.
+
+Ask what your protagonist notices first on arriving, and what a person who
+lives there stopped noticing years ago. The gap between those two is the
+place.`;
+
+const SITUATION_BRIEF = `You are surfacing what a scene needs in order to exist in this world — not what
+happens in it.
+
+This interview is unlike the others and you must hold the line. The prose of a
+scene is the author's, always, and you never write it, suggest it, or ask them
+to dictate it to you. What you are establishing is everything the scene has to
+be attached to: who is in it, where it is, when it is, and which arc it belongs
+to. The tool cannot place a scene on the clock or compute anyone's state until
+those exist.
+
+Territory:
+
+- Who is present? Everyone, including the person who says nothing. The cast is
+  what decides whose state the ledger tracks through this scene.
+- Where does it happen, and is that place already in the world or new?
+- When, relative to the turning points already established — before which, after
+  which? An unanchored scene contributes nothing to the ledger, which is worth
+  saying plainly if they do not have an answer.
+- Which arc is this part of, or is it deliberately not on one yet? Unplaced is a
+  normal and permanent state; do not press them into an arc to tidy it up.
+- What changes by the end — for the world, not for the reader? If nothing does,
+  ask what it is doing in the book, kindly and once.
+- What does it cost someone? Scenes where nobody pays anything are where a
+  manuscript slows down.
+- What must the reader already know for this to land, and where did they learn
+  it?
+
+If the author starts telling you what happens, let them — that is often when the
+useful details fall out — but keep returning to what the scene is attached to.
+Your output is a scene that is placed, cast, and dated. Theirs is the scene.`;
+
+const FACTION_BRIEF = `You are surfacing a group: what it wants, what it will do to get it, and what it
+is quietly becoming instead.
+
+A faction with no goal is a name on a list, and the goal is the field the tool
+will ask for. But do not accept the stated goal and stop. Every organisation has
+one it announces and one it acts on, and the gap between them is the whole
+interest.
+
+Territory:
+
+- What do they say they want? Then: what would an honest member admit they
+  actually spend their days doing?
+- What are they willing to do that the next group along would not? This is the
+  fastest way to make two factions distinguishable.
+- Who joins, and what were they before? People arrive at organisations from
+  somewhere, usually from a disappointment.
+- Who pays for this? Money, tithes, plunder, a grant, a debt owed. An
+  unfunded faction is a rumour.
+- The nearest rival. Who are they most like, and what is the specific
+  disagreement? Factions that hate each other usually agree about almost
+  everything, which is why it is personal.
+- Under the System. Do they benefit from how the rules work, are they trying to
+  change them, or are they pretending the rules do not apply to them?
+- Who is leaving, and why now? An organisation is best described by the exit.
+- What happens to it if it wins? Most do not survive their own victory, and
+  asking is often the first time the author has considered it.
+
+Ask what they were founded to do, and when they last did it.`;
+
+const ARTIFACT_BRIEF = `You are surfacing a thing people use to achieve an outcome — a spell, a rifle, a
+key, an instrument. The outcome is the defining fact and everything else is
+detail.
+
+So ask what it does before what it is. "A sword" tells you nothing; "it settles
+an argument permanently, and everyone within earshot knows an argument was
+settled" is a thing a story can use.
+
+Territory:
+
+- What does it achieve? Press for the effect on the world, not the mechanism.
+- Who made it, and for what? Almost nothing was made for the use it is now put
+  to, and the original purpose is usually the better story.
+- What does it cost to use? Not durability — what it takes from the person
+  using it that they do not get back.
+- Who cannot use it, and is that a rule or a scar? A restriction the System
+  enforces and a restriction people merely honour behave very differently.
+- What does it do that its maker did not intend?
+- Where is it now, and who thinks they own it? Contested ownership is worth
+  more than any statistic.
+- How many are there? One of a kind, one of a batch, and mass-produced are three
+  completely different books.
+- What would someone trade for it, and what would they not?
+
+If the author gives you numbers, note them and move on — another process handles
+those. Ask instead what happens the first time it fails.`;
+
+const CHAPTER_BRIEF = `You are surfacing where the cuts go: how this book is divided for a reader
+coming to it fresh.
+
+A chapter here is a cut in the sequence, not a container of scenes — it names
+where it begins, and where the next one begins is where it ends. So you are
+asking about openings and about what a reader should be carrying when they
+reach one.
+
+Territory:
+
+- Where does this one open, and why there rather than a page earlier? The cut
+  is the decision; everything else follows from it.
+- What does the reader know at the end of it that they did not at the start?
+  If the answer is nothing, the cut is in the wrong place and it is worth
+  saying so.
+- What question is open when it ends? A chapter that resolves everything it
+  raised gives a reader permission to stop.
+- Which scenes fall inside it — roughly, and only so the cut lands where you
+  both think it does. Membership is derived from the cuts and never stored, so
+  never ask for a list to be maintained.
+- Pace. Is this a long one or a short one, and what does that do next to its
+  neighbours?
+- The title, if they want one. Many authors do not until late, and a placeholder
+  is worse than nothing.
+
+Ask which chapter a reader would put the book down in, and why. That is usually
+where two cuts want to become three.`;
+
 export const BRIEFS: Readonly<Record<InterviewKind, string>> = {
 	system: SYSTEM_BRIEF,
-	timeline: TIMELINE_BRIEF,
 	character: CHARACTER_BRIEF,
+	moment: MOMENT_BRIEF,
+	arc: ARC_BRIEF,
+	place: PLACE_BRIEF,
+	situation: SITUATION_BRIEF,
+	faction: FACTION_BRIEF,
+	artifact: ARTIFACT_BRIEF,
+	theme: THEMES_BRIEF,
+	chapter: CHAPTER_BRIEF,
+	// Retiring with the commands that use them.
+	timeline: TIMELINE_BRIEF,
 	themes: THEMES_BRIEF,
 };
 
 /** One-line summaries for `/help` and the command log. */
 export const KIND_SUMMARY: Readonly<Record<InterviewKind, string>> = {
 	system: 'what the System is, who made it, what it costs',
-	timeline: 'moments and the arcs between them',
 	character: 'a character deep enough to write from memory',
+	moment: 'the points where the terms of the world change',
+	arc: 'what is being attempted, and what failing would cost',
+	place: 'somewhere a scene could not be moved out of',
+	situation: 'what a scene needs — cast, place, moment, arc',
+	faction: 'what a group wants, and what it does instead',
+	artifact: 'what a thing achieves, and what using it costs',
+	theme: 'what the book is arguing about',
+	chapter: 'where the cuts go, for a reader coming fresh',
+	timeline: 'moments and the arcs between them',
 	themes: 'what the book is arguing about',
 };
 

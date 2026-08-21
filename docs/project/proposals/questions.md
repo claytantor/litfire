@@ -157,8 +157,14 @@ building properly rather than special-casing, because `/ingest adopt` sweeping
 
 ## Sequencing
 
-1. `/questions <kind>` alongside the existing commands, for the four kinds that
-   already have briefs. Nothing retires; both work.
-2. Briefs for the remaining five.
-3. The check queue narrows the brief — the loop closes.
-4. The four old commands are removed, and `InterviewKind` with them.
+1. ~~`/questions <kind>` alongside the existing commands, for the four kinds
+   that already have briefs. Nothing retires; both work.~~ **Done.**
+2. ~~Briefs for the remaining five.~~ **Done** — seven in the end, not five.
+   `place`, `situation`, `faction`, `artifact` and `chapter` had nothing, and
+   the `timeline` brief split along the seam it always had into `moment` and
+   `arc`. Every primitive has one, and a test asserts it, so a kind added
+   without a brief fails there rather than in front of an author.
+3. The check queue narrows the brief — the loop closes. Today `/questions <kind>`
+   opens on the agenda and reports it; the brief does not yet know what is on it.
+4. The four old commands are removed, and the two vestigial `InterviewKind`
+   members — `timeline` and `themes` — with them.

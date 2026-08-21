@@ -1,5 +1,6 @@
 import type {Project} from '../core/project.js';
 import type {SourceKind} from '../ingest/index.js';
+import type {InterviewKind} from '../interview/prompts.js';
 import type {Proposal} from '../review/types.js';
 
 export type Line = {
@@ -23,7 +24,7 @@ export type CommandResult = {
 	readonly wizard?: 'provider';
 	/** Starts a conversational interview (§9) on this vault. */
 	readonly interview?: {
-		readonly kind: 'system' | 'timeline' | 'character' | 'themes';
+		readonly kind: InterviewKind;
 		readonly focus?: string | undefined;
 		/** Continue the most recent unfinished interview of this kind. */
 		readonly resume?: boolean;
@@ -34,7 +35,7 @@ export type CommandResult = {
 	 * the corpus proposals are recomputed.
 	 */
 	readonly extract?: {
-		readonly kind: 'system' | 'timeline' | 'character' | 'themes';
+		readonly kind: InterviewKind;
 		readonly focus?: string | undefined;
 		/**
 		 * Sweep every transcript of this kind rather than only the latest. Costs

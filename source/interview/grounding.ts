@@ -39,7 +39,6 @@ const CAUTION_RESERVE = 460;
  */
 const RELEVANT: Readonly<Record<InterviewKind, readonly string[]>> = {
 	system: [VAULT.setting, VAULT.systems, VAULT.artifacts, VAULT.factions],
-	timeline: [VAULT.moments, VAULT.arcs, VAULT.factions, VAULT.places],
 	character: [
 		VAULT.characters,
 		VAULT.systems,
@@ -47,6 +46,19 @@ const RELEVANT: Readonly<Record<InterviewKind, readonly string[]>> = {
 		VAULT.factions,
 		VAULT.places,
 	],
+	// A moment is defined by what it changed, so the pages that record
+	// consequences come before the ones that record structure.
+	moment: [VAULT.moments, VAULT.arcs, VAULT.factions, VAULT.places],
+	arc: [VAULT.arcs, VAULT.moments, VAULT.characters, VAULT.situations],
+	place: [VAULT.places, VAULT.situations, VAULT.factions],
+	// A scene is placed by its cast, its where and its when — which is exactly
+	// what this interview is for, so those three come first.
+	situation: [VAULT.situations, VAULT.characters, VAULT.places, VAULT.moments],
+	faction: [VAULT.factions, VAULT.characters, VAULT.places, VAULT.themes],
+	artifact: [VAULT.artifacts, VAULT.systems, VAULT.characters],
+	theme: [VAULT.themes, VAULT.characters, VAULT.factions],
+	chapter: [VAULT.chapters, VAULT.situations, VAULT.arcs],
+	timeline: [VAULT.moments, VAULT.arcs, VAULT.factions, VAULT.places],
 	themes: [VAULT.themes, VAULT.characters, VAULT.factions],
 };
 

@@ -87,7 +87,7 @@ describe('findOrphanedInterviews', () => {
 		expect(orphans).toHaveLength(1);
 		expect(orphans[0]?.kind).toBe('system');
 		expect(orphans[0]?.exchanges).toBe(5);
-		expect(orphans[0]?.detail).toContain('system/');
+		expect(orphans[0]?.detail).toContain('corpus/systems/');
 	});
 
 	it('stays quiet once the corpus has the work', async () => {
