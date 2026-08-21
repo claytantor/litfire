@@ -539,11 +539,19 @@ export const KIND_SUMMARY: Readonly<Record<InterviewKind, string>> = {
  * which is what keeps one engine viable across idioms instead of forking the
  * prompt text per genre. Grounding stays last, because the persona's closing
  * section refers forward to "the existing corpus below".
+ *
+ * The agenda sits between them, and its position is the argument. After the
+ * brief, because it narrows the brief rather than replacing it — an interview
+ * that only ever asked about known gaps would never discover anything, and
+ * discovering things is the job. Before the grounding, because the gaps are
+ * only legible against what is already established: "this faction has no goal"
+ * means little until you can see the four that do.
  */
 export function composeSystemPrompt(
 	kind: InterviewKind,
 	grounding: string,
 	overlay = '',
+	agenda = '',
 ): string {
 	return [
 		BASE_PERSONA,
@@ -556,6 +564,9 @@ export function composeSystemPrompt(
 		...(overlay.trim() === ''
 			? []
 			: ['', '---', '', '# This setting', '', overlay.trim()]),
+		...(agenda.trim() === ''
+			? []
+			: ['', '---', '', '# Where to start', '', agenda.trim()]),
 		'',
 		'---',
 		'',

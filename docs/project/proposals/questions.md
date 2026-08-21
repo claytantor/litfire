@@ -164,7 +164,11 @@ building properly rather than special-casing, because `/ingest adopt` sweeping
    the `timeline` brief split along the seam it always had into `moment` and
    `arc`. Every primitive has one, and a test asserts it, so a kind added
    without a brief fails there rather than in front of an author.
-3. The check queue narrows the brief — the loop closes. Today `/questions <kind>`
-   opens on the agenda and reports it; the brief does not yet know what is on it.
+3. ~~The check queue narrows the brief — the loop closes.~~ **Done.** The
+   agenda is a layer in the system prompt, between the brief it narrows and the
+   grounding that makes it legible. Only findings representing a decision the
+   author has not made reach it; a stat out of range or two files claiming one
+   id is housekeeping, has an answer that is looked up rather than asked for,
+   and goes to `/lint`.
 4. The four old commands are removed, and the two vestigial `InterviewKind`
    members — `timeline` and `themes` — with them.

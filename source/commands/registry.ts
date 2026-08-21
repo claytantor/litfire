@@ -25,7 +25,13 @@ import {
 	type IngestKind,
 } from '../ingest/index.js';
 import {planAdoption} from '../ingest/adopt.js';
-import {agendaFor, BRIEF_FOR, INTERVIEWABLE} from '../interview/agenda.js';
+import {
+	agendaFor,
+	askable,
+	BRIEF_FOR,
+	INTERVIEWABLE,
+	renderAgenda,
+} from '../interview/agenda.js';
 import {readIngestState, statusOf} from '../ingest/state.js';
 import {authoredFile, setAuthored} from '../ingest/authoring.js';
 import {partitionChapters} from '../chapters/index.js';
@@ -875,14 +881,34 @@ const questions: Command = {
 			return start;
 		}
 
-		const agenda = agendaFor(context.project, kind);
+		// Split, because the two halves have different destinations. A faction
+		// with no goal is a decision the author has not made, and the interviewer
+		// should open on it. Two files claiming one id is housekeeping: it has an
+		// answer that is looked up rather than asked for, and putting it to an
+		// interviewer would produce the interrogation this command exists not to
+		// be. The author sees both counts either way.
+		const found = agendaFor(context.project, kind);
+		const agenda = askable(found);
+		const housekeeping = found.length - agenda.length;
+		const alsoSee =
+			housekeeping === 0
+				? []
+				: [
+						muted(
+							`  ${String(housekeeping)} more ${housekeeping === 1 ? 'is' : 'are'} housekeeping — /lint has ${housekeeping === 1 ? 'it' : 'those'}`,
+						),
+					];
+
 		if (agenda.length === 0) {
 			// The checks are happy, so there is no agenda and no reason to have
 			// been asked for. Offering rather than starting is what tells the
 			// author which of two quite different sessions they are about to be in:
 			// filling gaps, or going deeper into something already consistent.
 			return {
-				lines: [ok(`no open questions about ${kind}s.`)],
+				lines: [
+					ok(`nothing outstanding about ${kind}s that an interview can settle.`),
+					...alsoSee,
+				],
 				confirm: {
 					question: 'begin interview anyway?',
 					proceed: start,
@@ -893,12 +919,19 @@ const questions: Command = {
 
 		return {
 			...start,
+			interview: {...start.interview!, agenda: renderAgenda(agenda)},
 			lines: [
 				heading(
 					`${String(agenda.length)} open question${agenda.length === 1 ? '' : 's'} about ${kind}s`,
 				),
 				...agenda.slice(0, 6).map(one => muted(`  ${one.where} — ${one.detail}`)),
 				...(agenda.length > 6 ? [muted(`  …and ${String(agenda.length - 6)} more`)] : []),
+				...alsoSee,
+				blank(),
+				// Said because the alternative reads as a promise to work the list,
+				// and it is not one: the interviewer opens here and follows whatever
+				// turns out to be worth following.
+				muted('the interview opens here — it will not work down the list'),
 			],
 		};
 	},

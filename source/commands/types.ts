@@ -28,6 +28,12 @@ export type CommandResult = {
 		readonly focus?: string | undefined;
 		/** Continue the most recent unfinished interview of this kind. */
 		readonly resume?: boolean;
+		/**
+		 * What the checks found unresolved for this kind, already rendered for
+		 * the model. Computed by the command because that is what holds the
+		 * project; App only carries it to the session.
+		 */
+		readonly agenda?: string;
 	};
 	/**
 	 * Re-runs extraction over a saved interview transcript. Separate from

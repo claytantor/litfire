@@ -50,6 +50,13 @@ export type SessionOptions = {
 	readonly kind: InterviewKind;
 	readonly provider: Provider;
 	readonly grounding: string;
+	/**
+	 * What the deterministic checks found unresolved for this kind, already
+	 * rendered. Empty when there is nothing outstanding, which is a complete
+	 * interview rather than a degraded one — the brief is the fallback and was
+	 * always meant to be.
+	 */
+	readonly agenda?: string | undefined;
 	readonly focus?: string | undefined;
 	/** Profile overlay appended to the base brief (multi-genre §5). */
 	readonly overlay?: string;
@@ -120,6 +127,7 @@ export class InterviewSession {
 			options.kind,
 			options.grounding,
 			options.overlay ?? '',
+			options.agenda ?? '',
 		);
 	}
 

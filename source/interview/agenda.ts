@@ -50,6 +50,84 @@ export const INTERVIEWABLE: readonly IngestKind[] = Object.keys(
 ) as IngestKind[];
 
 /**
+ * The findings worth putting to a person.
+ *
+ * A check fires for two quite different reasons. Some report a decision the
+ * author has not made — a faction with no goal, an artifact whose outcome is
+ * unstated, a scene naming someone who does not exist. Those are interview
+ * material, and the tool is forbidden to settle them itself (P5).
+ *
+ * The rest report a mechanical inconsistency: a stat out of range, a formula
+ * that will not compile, two files claiming one id. Those have answers that are
+ * looked up rather than asked for, and the persona is explicit that the
+ * interviewer never raises numbers, formulas or schema. Putting them in front
+ * of it would produce exactly the interrogation this command exists not to be.
+ *
+ * So the author sees every finding — `/questions` and `/lint` both list the
+ * lot — and only these reach the interviewer.
+ */
+const ASKABLE: ReadonlySet<string> = new Set([
+	'faction_goal_unknown',
+	'artifact_outcome_unknown',
+	'system_unnamed',
+	'moment_undated',
+	'broken_reference',
+	'arc_unordered',
+	// Two pages with one name is nearly always one thing written twice, and
+	// which of them is real — or whether they are genuinely different — is the
+	// author's to say and nobody else's.
+	'duplicate_name',
+]);
+
+export function askable(questions: readonly OpenQuestion[]): OpenQuestion[] {
+	return questions.filter(question => ASKABLE.has(question.kind));
+}
+
+/**
+ * The agenda, as the interviewer should receive it.
+ *
+ * This is the most dangerous text in the feature. A bare list of gaps in a
+ * prompt produces a model that works down it, announces how many there are, and
+ * calls that an interview — which is the form this tool exists to be better
+ * than, arrived at from the inside. So the framing does most of the work and
+ * the list is deliberately given as *where to start*, not as what to cover.
+ *
+ * Kept next to `ASKABLE` rather than in `prompts.ts` because the two have to
+ * agree: the instructions describe a list this function produced, and a change
+ * to one is a lie about the other.
+ */
+export function renderAgenda(questions: readonly OpenQuestion[]): string {
+	if (questions.length === 0) {
+		return '';
+	}
+
+	return [
+		'The deterministic checks have found gaps in this part of the vault. They',
+		'are where this conversation should start — not what it has to cover.',
+		'',
+		...questions.map(question => `- ${question.where}: ${question.detail}`),
+		'',
+		'How to use that list:',
+		'',
+		'Open on ONE of them. Pick the one you think will produce the best answer,',
+		'not the first one written down. Ask about it the way you would ask about',
+		'anything else — the specific, the concrete, the particular instance.',
+		'',
+		'Never show the author this list, never say how many items are on it, and',
+		'never work down it in order. They know what is unresolved; they have a',
+		'command that tells them. What they came here for is to be asked well',
+		'about one of them.',
+		'',
+		'Abandon it the moment the conversation is better elsewhere. If an answer',
+		'opens onto something that is not on the list at all, that is the more',
+		'valuable thing and you follow it. A gap filled as a side effect of a good',
+		'conversation is worth more than one closed by asking directly, and an',
+		'interview that closes every item and discovers nothing has failed at the',
+		'only thing it was for.',
+	].join('\n');
+}
+
+/**
  * Every id of one kind currently in the vault.
  *
  * A finding names *where* it is — an id — and not what kind of thing that is,

@@ -239,7 +239,12 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 
 	/** Resolves the provider, grounds on the corpus, and opens the interview. */
 	const startInterview = useCallback(
-		async (kind: InterviewKind, focus: string | undefined, resume = false) => {
+		async (
+			kind: InterviewKind,
+			focus: string | undefined,
+			resume = false,
+			agenda?: string,
+		) => {
 			const config = await readConfig(root);
 			const loaded = await loadProvider(
 				config.provider.id,
@@ -287,6 +292,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 					grounding,
 					overlay,
 					focus,
+					...(agenda === undefined ? {} : {agenda}),
 					...(prior === undefined ? {} : {resumeFrom: prior}),
 				}),
 				provider: loaded.provider,
@@ -845,6 +851,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 					result.interview.kind,
 					result.interview.focus,
 					result.interview.resume ?? false,
+					result.interview.agenda,
 				);
 			} else if (result.extract) {
 				await runExtract(

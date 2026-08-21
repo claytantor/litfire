@@ -5,8 +5,8 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {findCommand} from '../source/commands/registry.js';
 import type {CommandContext} from '../source/commands/types.js';
 import {computeProject} from '../source/core/project.js';
-import {agendaFor, BRIEF_FOR} from '../source/interview/agenda.js';
-import {BRIEFS} from '../source/interview/prompts.js';
+import {agendaFor, BRIEF_FOR, renderAgenda} from '../source/interview/agenda.js';
+import {BRIEFS, composeSystemPrompt} from '../source/interview/prompts.js';
 import {INGEST_KINDS} from '../source/ingest/index.js';
 import {saveProvider} from '../source/vault/config.js';
 import {VAULT} from '../source/vault/paths.js';
@@ -86,6 +86,34 @@ describe('/questions <kind>, with something to ask about', () => {
 		expect((await run('/questions moment')).confirm).toBeUndefined();
 	});
 
+	/**
+	 * A check fires for two different reasons and only one is worth a question.
+	 * A faction with no goal is a decision nobody has made; two files claiming
+	 * one id has an answer that is looked up. Putting the second to an
+	 * interviewer produces the interrogation this command exists not to be.
+	 */
+	it('keeps housekeeping out of the interviewer’s hands', async () => {
+		await file(`${VAULT.moments}/one.md`, '---\nid: dup\nname: A\nat: 5\n---\n\nOne.\n');
+		await file(`${VAULT.moments}/two.md`, '---\nid: dup\nname: A\nat: 5\n---\n\nTwo.\n');
+		await refresh();
+
+		const result = await run('/questions moment');
+
+		expect(said(result)).toContain('housekeeping');
+		expect(result.interview?.agenda ?? '').not.toContain('duplicate');
+	});
+
+	it('hands the interviewer the agenda, framed as where to start', async () => {
+		await undatedMoment();
+		const agenda = (await run('/questions moment')).interview?.agenda ?? '';
+
+		expect(agenda).toContain('the-threshold');
+		// The framing is the feature. A bare list produces a model that works
+		// down it and calls that an interview.
+		expect(agenda).toContain('Open on ONE of them');
+		expect(agenda).toContain('never work down it in order');
+	});
+
 	it('narrows to one thing when told to', async () => {
 		await undatedMoment();
 		expect((await run('/questions moment the-threshold')).interview?.focus).toBe(
@@ -111,7 +139,7 @@ describe('/questions <kind>, with nothing to ask about', () => {
 	it('says so, and offers anyway', async () => {
 		const result = await run('/questions theme');
 
-		expect(said(result)).toContain('no open questions about themes');
+		expect(said(result)).toContain('nothing outstanding about themes');
 		expect(result.confirm?.question).toBe('begin interview anyway?');
 	});
 
@@ -192,5 +220,58 @@ describe('the agenda', () => {
 		expect(agendaFor(context.project!, 'situation').map(q => q.where)).toContain(
 			'sit-900',
 		);
+	});
+});
+
+/**
+ * Step 3: the agenda has to reach the model, not just the author's screen.
+ * Before this, `/questions moment` printed what was unresolved and then opened
+ * an interview that knew nothing about it — the checks were the command's
+ * preamble rather than the interview's agenda.
+ */
+describe('the agenda reaches the interviewer', () => {
+	it('lands in the composed system prompt', async () => {
+		await undatedMoment();
+		const agenda = (await run('/questions moment')).interview?.agenda ?? '';
+
+		const prompt = composeSystemPrompt('moment', 'existing corpus here', '', agenda);
+
+		expect(prompt).toContain('the-threshold');
+		expect(prompt).toContain('# Where to start');
+	});
+
+	it('sits after the brief and before the corpus', () => {
+		// Position is the argument. After the brief because it narrows it rather
+		// than replacing it; before the grounding because a gap is only legible
+		// against what is already established.
+		const prompt = composeSystemPrompt(
+			'faction',
+			'GROUNDING_MARKER',
+			'',
+			renderAgenda([
+				{
+					id: 'oq-001',
+					kind: 'faction_goal_unknown',
+					detail: 'faction has no goal',
+					where: 'the-sufi',
+					source: 'deterministic',
+					status: 'open',
+				},
+			]),
+		);
+
+		expect(prompt.indexOf('# This interview')).toBeLessThan(
+			prompt.indexOf('# Where to start'),
+		);
+		expect(prompt.indexOf('# Where to start')).toBeLessThan(
+			prompt.indexOf('GROUNDING_MARKER'),
+		);
+	});
+
+	it('composes without one, which is a whole interview and not a lesser one', () => {
+		const prompt = composeSystemPrompt('place', 'corpus', '');
+
+		expect(prompt).not.toContain('# Where to start');
+		expect(prompt).toContain('# This interview');
 	});
 });
