@@ -1,6 +1,7 @@
 import {readdir, readFile} from 'node:fs/promises';
 import path from 'node:path';
 import type {Project} from '../core/project.js';
+import {parseDocument} from '../vault/frontmatter.js';
 import {RAW_KINDS, resolve, VAULT} from '../vault/paths.js';
 import {buildCorpusMap} from '../reviewer/corpus.js';
 import type {CorpusMap} from '../reviewer/types.js';
@@ -126,7 +127,19 @@ export function isIngestKind(value: string): value is IngestKind {
 export type RawDocument = {
 	/** Vault-relative, so a proposal can cite where a fact came from. */
 	readonly path: string;
+	/** The whole file. What the hash is taken over. */
 	readonly contents: string;
+	/**
+	 * The author's own structured assertions, if they wrote any.
+	 *
+	 * A note may carry frontmatter — `moment:`, `cast:`, `place:` — and when it
+	 * does, those are decisions rather than inferences. The author already did
+	 * this informally, as `Moment:` and `Cast:` lines at the top of their prose;
+	 * making it YAML costs nothing and makes it machine-readable.
+	 */
+	readonly data: Readonly<Record<string, unknown>>;
+	/** The prose, without the frontmatter. */
+	readonly body: string;
 };
 
 /**
@@ -175,7 +188,8 @@ export async function readRaw(
 			() => undefined,
 		);
 		if (contents !== undefined && contents.trim() !== '') {
-			documents.push({path: `${directory}/${name}`, contents});
+			const {data, body} = parseDocument(contents);
+			documents.push({path: `${directory}/${name}`, contents, data, body});
 		}
 	}
 
@@ -253,6 +267,12 @@ export async function buildIngest(
 		'value the notes do not give — leave the field out and say so in notes, and',
 		'the checks will raise it as an open question.',
 		'',
+		'Where a note carries frontmatter of its own, those fields are the author’s',
+		'decisions and not your inferences. Carry every one of them onto the page',
+		'unchanged, including ones you would have chosen differently. Fill in only',
+		'what they left out. If a field they set contradicts their prose, keep the',
+		'field, say so in notes, and let them settle it.',
+		'',
 		'Do not modify the raw notes themselves.',
 	].join('\n');
 
@@ -264,7 +284,31 @@ export async function buildIngest(
 		`# The author's ${kind} notes`,
 		'',
 		documents
-			.map(document => `## \`${document.path}\`\n\n${document.contents.trim()}`)
+			.map(document =>
+				[
+					`## \`${document.path}\``,
+					'',
+					// Split out and labelled, rather than left as a fence at the top of
+					// the prose. A model shown "---\nmoment: x\n---" reads it as part of
+					// the note; shown it under a heading that says these are decisions,
+					// it carries them.
+					...(Object.keys(document.data).length === 0
+						? []
+						: [
+								'### What the author has already decided',
+								'',
+								'```yaml',
+								...Object.entries(document.data).map(
+									([key, value]) => `${key}: ${JSON.stringify(value)}`,
+								),
+								'```',
+								'',
+								'### What they wrote',
+								'',
+							]),
+					document.body.trim(),
+				].join('\n'),
+			)
 			.join('\n\n---\n\n'),
 	].join('\n');
 

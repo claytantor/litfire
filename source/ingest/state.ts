@@ -3,7 +3,7 @@ import {readdir, readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {parseDocument, stringifyDocument} from '../vault/frontmatter.js';
 import {resolve} from '../vault/paths.js';
-import {INGEST, type IngestKind} from './index.js';
+import {INGEST, type IngestKind, type RawDocument} from './index.js';
 
 /**
  * What a page records about where it came from.
@@ -101,4 +101,37 @@ export function stampSource(contents: string, sourcePath: string, hash: string):
 		data: {...data, [SOURCE_FIELD]: sourcePath, [HASH_FIELD]: hash},
 		body,
 	});
+}
+
+/**
+ * Puts the author's own frontmatter back on top of what the model produced.
+ *
+ * The instruction asks it to carry those fields through, and it usually does.
+ * "Usually" is not a guarantee, and this is a decision the author made — a
+ * `moment:` they set by command or by hand should not depend on a model
+ * remembering. Enforcing it in code costs nothing and removes the question.
+ *
+ * Applied only when the page is the one the note is *about*: a note named
+ * `sit-001.md` speaks for `sit-001`. A compendium that produces nine moments
+ * says nothing in particular about any one of them, so its frontmatter — if it
+ * has any — is left to the model to interpret.
+ *
+ * `source` and `source_hash` are excluded. They are the tool's bookkeeping and
+ * an author writing them into a note should not be able to forge provenance.
+ */
+export function honourAuthored(contents: string, document: RawDocument): string {
+	const authored = Object.entries(document.data).filter(
+		([key]) => key !== SOURCE_FIELD && key !== HASH_FIELD,
+	);
+	if (authored.length === 0) {
+		return contents;
+	}
+
+	const {data, body} = parseDocument(contents);
+	const stem = path.basename(document.path, '.md');
+	if (data['id'] !== stem) {
+		return contents;
+	}
+
+	return stringifyDocument({data: {...data, ...Object.fromEntries(authored)}, body});
 }

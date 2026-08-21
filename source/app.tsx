@@ -41,7 +41,13 @@ import {
 import {loadProvider, type Provider} from './llm/index.js';
 import {ReviewBatch, type Proposal} from './review/index.js';
 import {buildIngest, readRaw, type IngestKind} from './ingest/index.js';
-import {hashSource, readIngestState, stampSource, statusOf} from './ingest/state.js';
+import {
+	hashSource,
+	honourAuthored,
+	readIngestState,
+	stampSource,
+	statusOf,
+} from './ingest/state.js';
 import {runPlan} from './curator/index.js';
 import {editText, resolveEditor} from './vault/editor.js';
 import {
@@ -512,7 +518,13 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 								? proposal
 								: {
 										...proposal,
-										contents: stampSource(proposal.contents, document.path, hash),
+										// The author's own fields go back on last, so a decision
+										// they made outranks anything the model chose.
+										contents: stampSource(
+											honourAuthored(proposal.contents, document),
+											document.path,
+											hash,
+										),
 									},
 						);
 					}

@@ -31,6 +31,36 @@ prose, a table you pasted from somewhere. Naming a file after the thing it
 describes helps, because that is what `/ingest <kind> <document>` matches, but
 nothing requires it.
 
+## Saying what you already know
+
+A note may carry frontmatter. Those fields are **decisions**, not hints:
+
+```yaml
+---
+moment: inannas-first-memory
+cast: [inanna, linh-tran, sebastian-weber]
+place: oz-farm
+---
+Inanna was woken suddenly, she could feel afraid and alarm like any
+five-year-old would.
+```
+
+Ingest is told to carry every one of them onto the page unchanged, including
+ones it would have chosen differently, and to fill in only what you left out.
+It is also **enforced in code**: your fields go back on after the model returns,
+so a link you set does not depend on a model remembering it.
+
+Two limits, both deliberate:
+
+- It applies to the page the note is _about_ — a note named `sit-001.md` speaks
+  for `sit-001`. A compendium that produces nine pages says nothing in
+  particular about any one of them.
+- `source` and `source_hash` are the tool's bookkeeping. A note cannot set them,
+  so it cannot forge its own provenance.
+
+If a field you set contradicts your own prose, the field wins and ingest says so
+in its notes. Which one is right is yours to settle.
+
 ## What happens
 
 Your notes and the pages that already exist go to the structural pass, which

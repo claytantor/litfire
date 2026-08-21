@@ -9,6 +9,7 @@ import {readRaw} from '../source/ingest/index.js';
 import {
 	hashSource,
 	readIngestState,
+	honourAuthored,
 	stampSource,
 	statusOf,
 } from '../source/ingest/state.js';
@@ -212,5 +213,79 @@ describe('the log', () => {
 		await expect(
 			appendLog(path.join(root, 'nowhere', 'at', 'all'), 'ignored'),
 		).resolves.toBeUndefined();
+	});
+});
+
+describe('the author’s own frontmatter', () => {
+	const doc = (data: string, body: string) => ({
+		path: 'raw/situations/sit-001.md',
+		contents: `---\n${data}---\n\n${body}`,
+		data: parseDocument(`---\n${data}---\n\n${body}`).data,
+		body: parseDocument(`---\n${data}---\n\n${body}`).body,
+	});
+
+	it('is read off a note alongside its prose', async () => {
+		await note(
+			'raw/situations/sit-001.md',
+			'---\nmoment: inannas-first-memory\ncast: [inanna]\n---\n\nShe woke suddenly.\n',
+		);
+
+		const [document] = (await readRaw(root, 'situation')).documents;
+		expect(document?.data['moment']).toBe('inannas-first-memory');
+		expect(document?.data['cast']).toEqual(['inanna']);
+		expect(document?.body.trim()).toBe('She woke suddenly.');
+	});
+
+	/**
+	 * A decision the author made should not depend on a model remembering to
+	 * carry it. The instruction asks; this makes it so.
+	 */
+	it('outranks whatever the model chose for the same field', () => {
+		const proposed =
+			'---\nid: sit-001\nmoment: something-else\nplace: nowhere\n---\n\nProse.\n';
+		const merged = honourAuthored(
+			proposed,
+			doc('moment: inannas-first-memory\n', 'She woke suddenly.\n'),
+		);
+		const {data} = parseDocument(merged);
+
+		expect(data['moment']).toBe('inannas-first-memory');
+		// Fields the author did not set are still the model's to fill.
+		expect(data['place']).toBe('nowhere');
+	});
+
+	it('leaves the prose the model wrote alone', () => {
+		const proposed = '---\nid: sit-001\n---\n\nThe page body.\n';
+		const merged = honourAuthored(proposed, doc('cast: [inanna]\n', 'The note body.\n'));
+
+		expect(parseDocument(merged).body.trim()).toBe('The page body.');
+	});
+
+	/** A compendium says nothing in particular about any one page it produces. */
+	it('applies only to the page the note is about', () => {
+		const proposed = '---\nid: the-breach\n---\n\nProse.\n';
+		const merged = honourAuthored(
+			proposed,
+			doc('at: 100\n', 'Nine moments, in order.\n'),
+		);
+
+		expect(parseDocument(merged).data['at']).toBeUndefined();
+	});
+
+	it('never lets a note forge its own provenance', () => {
+		const proposed = '---\nid: sit-001\n---\n\nProse.\n';
+		const merged = honourAuthored(
+			proposed,
+			doc('source: somewhere-else.md\nsource_hash: deadbeefdead\n', 'Prose.\n'),
+		);
+		const {data} = parseDocument(merged);
+
+		expect(data['source']).toBeUndefined();
+		expect(data['source_hash']).toBeUndefined();
+	});
+
+	it('does nothing at all to a note with no frontmatter', () => {
+		const proposed = '---\nid: sit-001\n---\n\nProse.\n';
+		expect(honourAuthored(proposed, doc('', 'Just prose.\n'))).toBe(proposed);
 	});
 });
