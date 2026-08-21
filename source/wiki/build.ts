@@ -22,6 +22,7 @@ import type {Step} from '../ledger/replay.js';
 import {castOf, momentByStep} from '../ledger/state.js';
 import {compareInstants, grouped} from '../time/instant.js';
 import {calendarFor} from '../time/binding.js';
+import {findBlocks} from '../vault/markers.js';
 import type {Calendar} from '../time/calendar.js';
 import {parseDocument} from '../vault/frontmatter.js';
 import {resolve, VAULT} from '../vault/paths.js';
@@ -169,6 +170,26 @@ function authorFiles(root: string, directory: string, id: string): string[] {
  * descriptors and silently dropped the paragraphs. Computed facts are the
  * *annotation*; what the author established is the page.
  */
+/**
+ * The generated summary a page carries, and the prose without it.
+ *
+ * `/ingest` writes a `litrpg:summary` region at the top of every page it
+ * proposes — the two or three things a reader wants before the prose. In the
+ * page it is a marked block that regeneration replaces whole; here it is lifted
+ * out and given its own section, because a block of HTML comments buried
+ * mid-prose is exactly as useful as no summary at all.
+ */
+function splitSummary(body: string): {summary: string | undefined; prose: string} {
+	const block = findBlocks(body).find(one => one.name === 'summary');
+	if (block === undefined) {
+		return {summary: undefined, prose: body};
+	}
+
+	const prose = (body.slice(0, block.start) + body.slice(block.end)).trim();
+	const summary = block.content.trim();
+	return {summary: summary === '' ? undefined : summary, prose};
+}
+
 function authorSection(
 	root: string,
 	directory: string,
@@ -176,10 +197,18 @@ function authorSection(
 	source: string,
 ): string {
 	const written = readAuthorBody(root, directory, id);
+	if (written === undefined) {
+		return [`## From \`${source}\``, '', `_Nothing written in \`${source}\` yet._`].join(
+			'\n',
+		);
+	}
+
+	const {summary, prose} = splitSummary(written);
 	return [
+		...(summary === undefined ? [] : ['## At a glance', '', summary, '']),
 		`## From \`${source}\``,
 		'',
-		written ?? `_Nothing written in \`${source}\` yet._`,
+		prose === '' ? `_Nothing written in \`${source}\` yet._` : prose,
 	].join('\n');
 }
 

@@ -54,6 +54,40 @@ interview landed correctly on disk and still appeared nowhere, because the
 System page read only that file's frontmatter. Computed facts are the
 _annotation_; what the author established is the page.
 
+## At a glance
+
+Every page `/ingest` proposes carries a generated summary at the top — the two
+or three things a reader wants before the prose:
+
+```markdown
+<!-- litrpg:summary -->
+
+**Wants** — to be believed, and cannot say so out loud.
+**Leverage** — her brother, who does not know he has any.
+<!-- /litrpg:summary -->
+```
+
+What those points are depends on the kind, and they mirror what that kind's
+interview presses hardest on — the brief asks the question, the summary records
+the answer. A character's are what they want and who has leverage over them; a
+faction's are what they say they want against what they do instead; an
+artifact's are what it achieves and what using it costs.
+
+In the wiki the block is lifted out and rendered as its own **At a glance**
+section above the prose, with the markers stripped. A block of HTML comments
+buried mid-paragraph is exactly as useful as no summary at all.
+
+Three things follow from it being a generated region:
+
+- **It is regenerated whole on every ingest**, and nothing outside the markers
+  is touched. Your prose in the same file is safe.
+- **`/reviewer` cannot edit it.** The structural guard compares generated
+  regions before and after and refuses a proposal that changed one — a
+  spelling pass has no business rewriting a summary.
+- **A point the notes do not answer is left out.** Not guessed, not hedged, and
+  not written as "unknown". A missing line is the correct output for something
+  you have not decided, and `/questions` is where it surfaces instead.
+
 ## When an interview produces nothing
 
 The interview → extraction → review → disk chain can end without writing in

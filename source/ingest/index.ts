@@ -41,6 +41,16 @@ type Spec = {
 	readonly to: string;
 	/** The frontmatter, so a proposal parses rather than becoming a load issue. */
 	readonly fields: string;
+	/**
+	 * The handful of things a reader wants about this kind at a glance.
+	 *
+	 * These deliberately mirror what the interview brief for the same kind
+	 * presses hardest on: the brief asks the question, the summary records the
+	 * answer. A character's brief digs for what they want and what the System
+	 * gives them no credit for, and those are exactly the two lines worth having
+	 * at the top of their page.
+	 */
+	readonly summary: string;
 };
 
 export const INGEST: Readonly<Record<IngestKind, Spec>> = {
@@ -50,6 +60,8 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 		fields:
 			'id, name, level (int), xp, stats (map of id to number), skills (ids), ' +
 			'items (map of id to count), artifacts (ids), system (id)',
+		summary:
+			'what they want · what they are good at · who has leverage over them · what the System gives them no credit for',
 	},
 	moment: {
 		from: `${VAULT.raw}/moments`,
@@ -57,11 +69,13 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 		fields:
 			'id, name, at (whole seconds from the origin, may be negative and very ' +
 			'large — omit it rather than guessing), events (ledger events)',
+		summary: 'what changed · what became possible · what became impossible',
 	},
 	place: {
 		from: `${VAULT.raw}/places`,
 		to: VAULT.places,
 		fields: 'id, name. Everything else about a place is prose in the body',
+		summary: 'what it is for · who controls it · what it costs to be there',
 	},
 	situation: {
 		from: `${VAULT.raw}/situations`,
@@ -71,6 +85,7 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 			'place (id), themes (sub-theme ids), events (ledger events). ' +
 			'A situation with no arc is unplaced, which is a normal state — leave ' +
 			'the field out rather than moving the file anywhere',
+		summary: 'what changes by the end · what it costs someone',
 	},
 	system: {
 		from: `${VAULT.raw}/systems`,
@@ -78,6 +93,7 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 		fields:
 			'id, name, stats (id, name, default, min, max), skills (id, name, ' +
 			'requires_skills, requires_level), curves (xp_for_level, max_level)',
+		summary: 'what it wants · what advancement costs · the hard limit',
 	},
 	arc: {
 		from: `${VAULT.raw}/arcs`,
@@ -85,11 +101,13 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 		fields:
 			'id, name, order (int), starts_after (moment id), ends_before (moment id), ' +
 			'milestone (map of character id to intended level/skills/stats)',
+		summary: 'what is attempted · the interesting failure · what it takes forward',
 	},
 	faction: {
 		from: `${VAULT.raw}/factions`,
 		to: VAULT.factions,
 		fields: 'id, name, goal, members (character ids)',
+		summary: 'what they say they want · what they do instead · their nearest rival',
 	},
 	artifact: {
 		from: `${VAULT.raw}/artifacts`,
@@ -97,11 +115,13 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 		fields:
 			'id, name, kind, outcome (what it achieves — the defining field), ' +
 			'requires_skills (ids), requires_level (int)',
+		summary: 'what it achieves · what using it costs · who cannot use it',
 	},
 	theme: {
 		from: `${VAULT.raw}/themes`,
 		to: VAULT.themes,
 		fields: 'id, name, subthemes (id, name, description, tension)',
+		summary: 'the argument · the two poles it lives between',
 	},
 	chapter: {
 		from: `${VAULT.raw}/chapters`,
@@ -111,6 +131,7 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 			'in the replay sequence — it names where it begins and nothing else. ' +
 			'Which situations fall inside it is derived from the next cut, never ' +
 			'stored, so never list members',
+		summary: 'what the reader knows by the end · what question is left open',
 	},
 };
 
@@ -359,6 +380,34 @@ export async function buildIngest(
 		'field, say so in notes, and let them settle it.',
 		'',
 		'Do not modify the raw notes themselves.',
+		'',
+		'## The summary block',
+		'',
+		'Every page you write carries one generated region, at the very top of the',
+		'body, before any prose:',
+		'',
+		'    <!-- litrpg:summary -->',
+		'    **Wants** — to be believed, and cannot say so out loud.',
+		'    **Leverage** — her brother, who does not know he has any.',
+		'    <!-- /litrpg:summary -->',
+		'',
+		'One line per point, in the form `**Label** — value`. Keep each to a single',
+		'sentence. This is the at-a-glance view a reader gets before the prose, and',
+		'a paragraph in it is a paragraph in the wrong place.',
+		'',
+		...targets.map(
+			target =>
+				`For a ${target}, the points worth having are: ${INGEST[target].summary}.`,
+		),
+		'',
+		'Omit any point the notes do not answer. Do not guess one, do not soften a',
+		'guess into a hedge, and do not write "unknown" — a missing line is the',
+		'correct output for something the author has not decided, and the checks',
+		'will raise it as an open question if it matters.',
+		'',
+		'The markers are exact and the region is regenerated whole on every pass,',
+		'so nothing outside them is ever touched. Never put the author’s prose',
+		'inside the block, and never put a heading inside it.',
 	].join('\n');
 
 	const map = await buildCorpusMap(root, project);

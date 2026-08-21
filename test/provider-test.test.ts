@@ -87,6 +87,8 @@ describe('/provider test says whether your model is one of them', () => {
 		// `/provider test openai` asks about that key, not about this vault's
 		// choice — reporting a mismatch here would be answering a different
 		// question than the one asked.
-		expect(said(await run('/provider test openai'))).not.toContain('this vault is set to');
+		expect(said(await run('/provider test openai'))).not.toContain(
+			'this vault is set to',
+		);
 	});
 });
