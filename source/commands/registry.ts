@@ -2177,9 +2177,30 @@ const provider: Command = {
 
 			if (outcome.ok) {
 				lines.push(
-					ok(`key accepted — ${outcome.models.length} model(s) available`),
+					ok(`key accepted — ${String(outcome.models.length)} model(s) available`),
 					...(outcome.note === undefined ? [] : [muted(outcome.note)]),
+					...outcome.models.slice(0, 12).map(model => muted(`  ${model.id}`)),
+					...(outcome.models.length > 12
+						? [muted(`  …and ${String(outcome.models.length - 12)} more`)]
+						: []),
 				);
+
+				// The one fact this command exists to establish, and it used to
+				// report the count and throw it away: a key that works against a
+				// model the account cannot reach fails at request time, long after
+				// the test said everything was fine.
+				const wanted = named === undefined ? config.provider.model : undefined;
+				if (wanted !== undefined) {
+					lines.push(
+						blank(),
+						outcome.models.some(model => model.id === wanted)
+							? ok(`this vault is set to ${wanted}, and it is available`)
+							: error(`this vault is set to ${wanted}, which this key cannot reach`),
+					);
+					if (!outcome.models.some(model => model.id === wanted)) {
+						lines.push(muted('/provider picks one of the models listed above'));
+					}
+				}
 			} else {
 				lines.push(error(outcome.reason));
 				if (outcome.hint !== undefined) {
