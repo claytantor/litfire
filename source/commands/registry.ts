@@ -25,6 +25,7 @@ import {
 	type IngestKind,
 } from '../ingest/index.js';
 import {planAdoption} from '../ingest/adopt.js';
+import {agendaFor, BRIEF_FOR, INTERVIEWABLE} from '../interview/agenda.js';
 import {readIngestState, statusOf} from '../ingest/state.js';
 import {authoredFile, setAuthored} from '../ingest/authoring.js';
 import {partitionChapters} from '../chapters/index.js';
@@ -797,16 +798,109 @@ const lint: Command = {
 	},
 };
 
+/**
+ * `/questions [<kind>] [<id>|resume]` — what is unresolved, and being asked it.
+ *
+ * Bare, it lists the open queue, as it always has. Given a kind it conducts an
+ * interview about that kind, opening on exactly what the checks found — which
+ * is the join this tool was missing. The queue was an agenda nobody worked and
+ * the interview was a brief with no idea what this vault lacks; each was the
+ * other's missing half.
+ *
+ * It **conducts** an interview and never prints a questionnaire. The persona is
+ * imperative about it — ask one question at a time, never stack, never number a
+ * list — and the name is for what the author gets, not how it arrives. A
+ * numbered list that waits is a form, and being better than a form is the whole
+ * claim this tool makes.
+ */
 const questions: Command = {
 	name: 'questions',
-	usage: '/questions',
-	summary: 'open question queue',
-	async run(_args, context) {
+	usage: '/questions [<kind>] [<id>|resume]',
+	summary: 'what is unresolved — and, given a kind, an interview about it',
+	async run(args, context) {
 		if (!context.project) {
 			return needsProject();
 		}
-		const lines = renderQuestions(context.project);
-		return {lines, paged: lines.length > 14, title: 'questions'};
+
+		const [kind, ...rest] = args;
+		if (kind === undefined) {
+			const lines = renderQuestions(context.project);
+			return {lines, paged: lines.length > 14, title: 'questions'};
+		}
+
+		if (!isIngestKind(kind) || kind === 'interview') {
+			return {
+				lines: [
+					error(`no kind '${kind}'`),
+					muted(`try one of: ${INGEST_KINDS.join(', ')}`),
+				],
+			};
+		}
+
+		const brief = BRIEF_FOR[kind];
+		if (brief === undefined) {
+			// Reported rather than refused sideways: five of the nine primitives
+			// have no brief yet, and an author who asks for one deserves to be told
+			// that is why, not that they typed something wrong.
+			return {
+				lines: [
+					warn(`no interview brief for ${kind}s yet`),
+					muted(`briefs exist for: ${INTERVIEWABLE.join(', ')}`),
+					muted(`/${kind} new writes one by hand in the meantime`),
+				],
+			};
+		}
+
+		const config = await readConfig(context.root);
+		if (config.provider.id === undefined || config.provider.model === undefined) {
+			return {
+				lines: [
+					error('no model provider configured'),
+					muted('run /provider to choose one — interviews need a model'),
+				],
+			};
+		}
+
+		const focus = rest.find(one => one !== 'resume');
+		const start: CommandResult = {
+			lines: [],
+			interview: {
+				kind: brief,
+				...(focus === undefined ? {} : {focus}),
+				...(rest.includes('resume') ? {resume: true} : {}),
+			},
+		};
+
+		if (rest.includes('resume')) {
+			return start;
+		}
+
+		const agenda = agendaFor(context.project, kind);
+		if (agenda.length === 0) {
+			// The checks are happy, so there is no agenda and no reason to have
+			// been asked for. Offering rather than starting is what tells the
+			// author which of two quite different sessions they are about to be in:
+			// filling gaps, or going deeper into something already consistent.
+			return {
+				lines: [ok(`no open questions about ${kind}s.`)],
+				confirm: {
+					question: 'begin interview anyway?',
+					proceed: start,
+					declined: `nothing to do — /questions lists the rest of the vault`,
+				},
+			};
+		}
+
+		return {
+			...start,
+			lines: [
+				heading(
+					`${String(agenda.length)} open question${agenda.length === 1 ? '' : 's'} about ${kind}s`,
+				),
+				...agenda.slice(0, 6).map(one => muted(`  ${one.where} — ${one.detail}`)),
+				...(agenda.length > 6 ? [muted(`  …and ${String(agenda.length - 6)} more`)] : []),
+			],
+		};
 	},
 };
 

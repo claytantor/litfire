@@ -65,6 +65,36 @@ export type CommandResult = {
 		readonly focus?: string | undefined;
 	};
 	/**
+	 * Asks the author one yes-or-no question before going any further.
+	 *
+	 * `proceed` is an ordinary `CommandResult` — whatever the command would have
+	 * returned had it just gone ahead — so a confirmed action is dispatched by
+	 * exactly the same code as an unconfirmed one, and a command that asks stays
+	 * as testable as one that does not. No callbacks: a handler still returns
+	 * plain data, which is the property that lets the whole registry be tested
+	 * without a renderer.
+	 *
+	 * The default is **no**. Every use of this so far is a question about
+	 * spending something the author may not want to spend — a model session, a
+	 * fifty-diff review — and for those, `return` should be the cheap answer.
+	 *
+	 * `lines` are printed above the prompt, so a command explains itself before
+	 * it asks.
+	 */
+	readonly confirm?: {
+		/** Without the `y/N`, which the prompt renders itself. */
+		readonly question: string;
+		/**
+		 * Dispatched if the author says yes.
+		 *
+		 * Named `proceed` rather than `then` because an object carrying a `then`
+		 * key sits one careless `await` away from being treated as a thenable.
+		 */
+		readonly proceed: CommandResult;
+		/** Printed if they decline. A plain acknowledgement when absent. */
+		readonly declined?: string;
+	};
+	/**
 	 * Gives authored corpus pages a note in `raw/` to have come from.
 	 *
 	 * Unlike `ingest`, the proposals arrive already computed: adoption is a copy

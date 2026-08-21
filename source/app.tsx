@@ -10,6 +10,7 @@ import {
 	text,
 	type CommandContext,
 	type Line,
+	type CommandResult,
 } from './commands/types.js';
 import {Composer} from './components/composer.js';
 import {Footer} from './components/footer.js';
@@ -111,6 +112,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 	const [busyLabel, setBusyLabel] = useState<string | undefined>(undefined);
 	const [pager, setPager] = useState<PagerState | undefined>(undefined);
 	const [wizard, setWizard] = useState<'provider' | undefined>(undefined);
+	const [confirm, setConfirm] = useState<CommandResult['confirm']>(undefined);
 	const [interview, setInterview] = useState<
 		{session: InterviewSession; provider: Provider; grounding: string} | undefined
 	>(undefined);
@@ -192,7 +194,35 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 	}, []);
 
 	useInput(
-		(_input, key) => {
+		(input, key) => {
+			// While a question is up, every key answers it and nothing else. A
+			// stray character must not fall through and start editing the draft
+			// behind a prompt the author has not answered.
+			if (confirm) {
+				const pending = confirm;
+				setConfirm(undefined);
+				if (input.toLowerCase() === 'y') {
+					setBusy(true);
+					void (async () => {
+						try {
+							await applyResult(pending.proceed, 'confirm');
+						} catch (caught) {
+							append([error(caught instanceof Error ? caught.message : String(caught))]);
+						} finally {
+							setBusy(false);
+							setBusyLabel(undefined);
+						}
+					})();
+					return;
+				}
+				// Anything else declines, `return` and `esc` included. The default is
+				// no because every question asked here is about spending something —
+				// a model session, a long review — that the author may not have
+				// meant to spend.
+				append([muted(pending.declined ?? 'not now')]);
+				return;
+			}
+
 			if (key.escape && draft !== '') {
 				setDraft('');
 			}
@@ -767,6 +797,99 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 		[append, root],
 	);
 
+	/**
+	 * Acts on a `CommandResult`, whoever produced it.
+	 *
+	 * Lifted out of `handleSubmit` so a confirmed action and an unconfirmed one
+	 * travel the same path: `confirm.proceed` is an ordinary result, and answering
+	 * yes dispatches it here rather than through a second, parallel version of
+	 * this chain that would drift from it.
+	 */
+	const applyResult = useCallback(
+		async (result: CommandResult, name: string): Promise<void> => {
+			// Asked before anything is acted on, and before `lines` are consumed by
+			// a branch below — the explanation belongs above the question.
+			if (result.confirm) {
+				if (result.lines.length > 0) {
+					append(result.lines);
+				}
+				setConfirm(result.confirm);
+				return;
+			}
+
+			if (result.exit) {
+				// The server outlives the command that started it, so quitting has
+				// to close it or the port stays held by a session that is gone.
+				await stopWikiServe();
+				exit();
+				return;
+			}
+			if (result.switchProject !== undefined) {
+				const next = result.switchProject;
+				// Anything scoped to the old vault has to go: an active
+				// character, a half-finished review, an open interview, an
+				// reviewer grounded on a corpus that is no longer loaded.
+				setActiveCharacter(undefined);
+				setPager(undefined);
+				setReview(undefined);
+				setInterview(undefined);
+				setReviewing(undefined);
+				// The wiki server serves one vault; it must not keep serving the
+				// old one after a switch.
+				await stopWikiServe();
+				setRoot(next);
+			}
+
+			if (result.interview) {
+				await startInterview(
+					result.interview.kind,
+					result.interview.focus,
+					result.interview.resume ?? false,
+				);
+			} else if (result.extract) {
+				await runExtract(
+					result.extract.kind,
+					result.extract.focus,
+					result.extract.all ?? false,
+				);
+			} else if (result.curator) {
+				await openCurator();
+			} else if (result.adopt) {
+				append(result.lines);
+				await openAdoption(result.adopt.proposals, result.adopt.title);
+			} else if (result.ingest) {
+				append(result.lines);
+				await runIngest(result.ingest.kind, result.ingest.focus);
+			} else if (result.reviewer) {
+				await startReviewer();
+			} else if (result.wizard) {
+				setWizard(result.wizard);
+			} else if (result.paged && result.lines.length > 0) {
+				setPager({title: result.title ?? name, lines: result.lines});
+			} else if (result.lines.length > 0) {
+				append(result.lines);
+			}
+			if (result.dirty) {
+				recompute();
+			}
+			if (result.openEditor !== undefined) {
+				await openAuthoring(result.openEditor);
+			}
+		},
+		[
+			append,
+			exit,
+			openAdoption,
+			openAuthoring,
+			openCurator,
+			recompute,
+			runExtract,
+			runIngest,
+			startInterview,
+			startReviewer,
+		],
+	);
+
 	const handleSubmit = useCallback(
 		(value: string) => {
 			const trimmed = value.trim();
@@ -806,64 +929,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 					};
 
 					const result = await command.run(args, context);
-					if (result.exit) {
-						// The server outlives the command that started it, so quitting has
-						// to close it or the port stays held by a session that is gone.
-						await stopWikiServe();
-						exit();
-						return;
-					}
-					if (result.switchProject !== undefined) {
-						const next = result.switchProject;
-						// Anything scoped to the old vault has to go: an active
-						// character, a half-finished review, an open interview, an
-						// reviewer grounded on a corpus that is no longer loaded.
-						setActiveCharacter(undefined);
-						setPager(undefined);
-						setReview(undefined);
-						setInterview(undefined);
-						setReviewing(undefined);
-						// The wiki server serves one vault; it must not keep serving the
-						// old one after a switch.
-						await stopWikiServe();
-						setRoot(next);
-					}
-
-					if (result.interview) {
-						await startInterview(
-							result.interview.kind,
-							result.interview.focus,
-							result.interview.resume ?? false,
-						);
-					} else if (result.extract) {
-						await runExtract(
-							result.extract.kind,
-							result.extract.focus,
-							result.extract.all ?? false,
-						);
-					} else if (result.curator) {
-						await openCurator();
-					} else if (result.adopt) {
-						append(result.lines);
-						await openAdoption(result.adopt.proposals, result.adopt.title);
-					} else if (result.ingest) {
-						append(result.lines);
-						await runIngest(result.ingest.kind, result.ingest.focus);
-					} else if (result.reviewer) {
-						await startReviewer();
-					} else if (result.wizard) {
-						setWizard(result.wizard);
-					} else if (result.paged && result.lines.length > 0) {
-						setPager({title: result.title ?? name, lines: result.lines});
-					} else if (result.lines.length > 0) {
-						append(result.lines);
-					}
-					if (result.dirty) {
-						recompute();
-					}
-					if (result.openEditor !== undefined) {
-						await openAuthoring(result.openEditor);
-					}
+					await applyResult(result, name);
 				} catch (caught) {
 					append([error(caught instanceof Error ? caught.message : String(caught))]);
 				} finally {
@@ -872,22 +938,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 				}
 			})();
 		},
-		[
-			activeCharacter,
-			append,
-			consentFormulas,
-			ensure,
-			exit,
-			recompute,
-			root,
-			runExtract,
-			startReviewer,
-			runIngest,
-			openAdoption,
-			openCurator,
-			openAuthoring,
-			startInterview,
-		],
+		[activeCharacter, append, applyResult, consentFormulas, ensure, root],
 	);
 
 	const banner = useMemo<Line[]>(() => {
@@ -1122,11 +1173,18 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 				</Box>
 			)}
 
+			{confirm === undefined ? undefined : (
+				<Box paddingX={1}>
+					<Text color="#e0af68">{confirm.question} </Text>
+					<Text dimColor>y/N</Text>
+				</Box>
+			)}
+
 			<Composer
 				value={draft}
 				onChange={setDraft}
 				onSubmit={handleSubmit}
-				disabled={busy}
+				disabled={busy || confirm !== undefined}
 				{...(busyLabel === undefined ? {} : {busyLabel})}
 				history={history}
 			/>
