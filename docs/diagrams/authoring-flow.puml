@@ -1,0 +1,124 @@
+@startuml authoring-flow
+' The authoring flow, end to end.
+'
+'   java -jar plantuml.jar -tsvg docs/diagrams/authoring-flow.puml
+'
+' The one thing this diagram exists to say: every arrow into the corpus
+' passes through the review gate, and everything below the corpus is
+' regenerated from it. Only the author writes raw/ — with two named
+' exceptions, drawn in the author's own colour because that is what makes
+' them exceptional.
+
+top to bottom direction
+
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam nodesep 14
+skinparam ranksep 26
+skinparam ArrowColor #6b739c
+skinparam ArrowFontColor #6b739c
+skinparam ArrowFontSize 10
+
+skinparam rectangle {
+  BorderColor #dcdfe8
+  FontColor #1a1b26
+  BackgroundColor #ffffff
+  roundCorner 3
+}
+
+skinparam package {
+  BorderColor #dcdfe8
+  FontColor #6b739c
+  BackgroundColor transparent
+  FontSize 11
+}
+
+' Layer colours are litfire's own TUI role colours, from source/theme.ts:
+'   author #d2481a · model #7a4bbd · computed #2b5fa8
+package "1 · You write" #FDF6F3 {
+  rectangle "**Obsidian**\nor any editor" as obsidian #FFF3EE
+  rectangle "**/<kind> new**\n**/<kind> edit**" as buffer #FFF3EE
+  rectangle "**/questions <kind>**" as interview #FFF3EE
+}
+
+package "2 · The only thing you own" #FDF6F3 {
+  rectangle "**raw/<kind>/<id>.md**\nfreeform · the filename is the id" as raw #FFEDE5
+  rectangle "**raw/interviews/**\ntimestamped transcripts" as transcripts #FFEDE5
+}
+
+package "3 · The tool proposes" #F7F4FC {
+  rectangle "**/ingest <kind>**\nnotes → pages" as ingest #F2EDFA
+  rectangle "**/ingest interview**\none transcript, every kind" as ingestI #F2EDFA
+  rectangle "**/ingest adopt**\npage → note · no model" as adopt #F2EDFA
+  rectangle "**/curator**\nmay restructure" as curator #F2EDFA
+  rectangle "**/reviewer**\nmay only correct prose" as reviewer #F2EDFA
+}
+
+package "4 · Nothing lands without a decision" #F3EDFB {
+  rectangle "==review gate\none diff at a time · accept · reject · edit" as gate #E8DEF8
+}
+
+package "5 · Regenerated, never edited" #F2F5FB {
+  rectangle "**corpus**\ncharacters/ · places/ · factions/ · themes/\ntimeline/moments/ · timeline/arcs/ · situations/\n//every page cites the note it came from//" as corpus #E9F0FA
+  rectangle "**ledger/**\nreplay" as ledger #E3ECF8
+  rectangle "**wiki/**\n/wiki build" as wiki #E3ECF8
+  rectangle "**manuscript.md**\n/export" as manuscript #E3ECF8
+}
+
+' --- 1 → 2 -----------------------------------------------------------
+obsidian --> raw
+buffer --> raw
+interview --> transcripts
+
+' --- 2 → 3 -----------------------------------------------------------
+raw --> ingest : **new** or **changed** only\n//source_hash decides//
+transcripts --> ingestI
+
+' --- 3 → 4 -----------------------------------------------------------
+ingest --> gate
+ingestI --> gate
+adopt --> gate
+curator --> gate
+reviewer --> gate
+
+' --- 4 → 5, and the two ways back into raw ---------------------------
+gate --> corpus : accepted
+gate -[#d2481a]-> raw : the **only** two writers\nthat are not you
+
+' --- 5 → 5 -----------------------------------------------------------
+corpus --> ledger
+corpus --> wiki
+corpus --> manuscript
+
+note bottom of ingest
+  Each pass **reads the corpus first**: `/ingest`
+  to update rather than duplicate, `/ingest adopt`
+  to find the pages with no **source:** yet.
+  Not drawn — it would cross every arrow here.
+end note
+
+note right of gate
+  **P3.** Every write above reaches you as a diff.
+  Idempotency is what makes that bearable — an
+  unchanged note produces no diffs at all.
+
+  **/ingest** and **/curator** append to **log.md**.
+  The other two leave nothing worth recording.
+end note
+
+note bottom of raw
+  **P6 — the tool never rewrites your prose.**
+  A linking command edits frontmatter and adopts
+  the page into raw/ if it is not there yet. The
+  body stays yours.
+end note
+
+note bottom of corpus
+  Safe to delete **only** once every page cites a
+  source. **/ingest adopt** gets a vault there;
+  **/lint** says how far it has got.
+end note
+
+@enduml
