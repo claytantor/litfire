@@ -7,6 +7,7 @@ import type {CommandContext} from '../source/commands/types.js';
 import {computeProject} from '../source/core/project.js';
 import {readIngestState, statusOf} from '../source/ingest/state.js';
 import {parseDocument} from '../source/vault/frontmatter.js';
+import {VAULT} from '../source/vault/paths.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
 
 let root = '';
@@ -182,5 +183,40 @@ describe('what it refuses', () => {
 		// Nothing adopted, because nothing was set: a refused edit must not leave
 		// a half-migrated page behind.
 		expect(await exists('raw/moments/the-breach.md')).toBe(false);
+	});
+});
+
+describe('a scene is adopted like everything else', () => {
+	/**
+	 * The kind where it matters most: a scene's body is prose the tool must
+	 * never rewrite (P6), so it belongs in `raw/` beside everything else the
+	 * author owns. `/situation edit` opened the corpus page long after every
+	 * other kind had moved.
+	 */
+	it('opens the note, not the derived page', async () => {
+		await file(
+			'corpus/situations/sit-900.md',
+			'---\nid: sit-900\ntitle: Loose\n---\n\nHe took the stairs twice.\n',
+		);
+		context = {...context, project: await computeProject(root)};
+
+		const result = await run('/situation sit-900 edit');
+
+		expect(result.openEditor).toContain(path.join('raw', 'situations', 'sit-900.md'));
+		expect(said(result)).toContain('adopted into');
+		expect(await read('raw/situations/sit-900.md')).toContain(
+			'He took the stairs twice.',
+		);
+	});
+
+	it('still opens a scene left in a home the layout moved on from', async () => {
+		await file(
+			`${VAULT.inbox}/sit-901.md`,
+			'---\nid: sit-901\ntitle: Older\n---\n\nProse.\n',
+		);
+		context = {...context, project: await computeProject(root)};
+
+		const result = await run('/situation sit-901 edit');
+		expect(result.openEditor).toContain('inbox');
 	});
 });

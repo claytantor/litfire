@@ -1898,12 +1898,24 @@ const situation: Command = {
 				return {lines: [error('usage: /situation <id> edit')]};
 			}
 
-			const file = await findSituationFile(context.root, id);
-			if (file === undefined) {
+			// The same adoption every other kind gets: the author should be editing
+			// their own copy, and a scene is the one where that matters most —
+			// the body is prose the tool must never rewrite (P6), so it belongs in
+			// `raw/` beside every other thing the author owns.
+			const opened = await authoredFile(context.root, 'situation', id);
+			if (!('error' in opened)) {
+				return {lines: adoptionNote(opened), openEditor: opened.file};
+			}
+
+			// A scene still in a home the layout has moved on from has no canonical
+			// page to adopt from. Opening it where it actually is beats refusing;
+			// `legacy_location` is what tells the author to move it.
+			const legacy = await findSituationFile(context.root, id);
+			if (legacy === undefined) {
 				return {lines: [error(`no file for situation '${id}'`)]};
 			}
 
-			return {lines: [], openEditor: file};
+			return {lines: [], openEditor: legacy};
 		}
 
 		// Anchor the scene on the clock. This is the link every character state in

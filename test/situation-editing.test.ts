@@ -57,12 +57,22 @@ describe('writing a situation', () => {
 		expect(said(result)).not.toContain('opened in');
 	});
 
-	it('reopens an existing scene by id', async () => {
+	/**
+	 * `new` writes the derived page and `edit` adopts it into `raw/`, so these
+	 * two are not the same file yet — they will be when `new` moves to raw
+	 * (raw-first step 4), and this asserts the current truth rather than the
+	 * intended one so the gap stays visible instead of being papered over.
+	 */
+	it('reopens an existing scene by id, as the author’s own copy', async () => {
 		const created = await dispatch('/situation new A Scene');
-		const id = parseDocument(await readFile(created.openEditor!, 'utf8')).data['id'];
+		const id = String(
+			parseDocument(await readFile(created.openEditor!, 'utf8')).data['id'],
+		);
 
-		const reopened = await dispatch(`/situation edit ${String(id)}`);
-		expect(reopened.openEditor).toBe(created.openEditor);
+		const reopened = await dispatch(`/situation edit ${id}`);
+
+		expect(reopened.openEditor).toContain(path.join('raw', 'situations', `${id}.md`));
+		expect(said(reopened)).toContain('adopted into');
 	});
 
 	it('reports an id it cannot find rather than opening an empty buffer', async () => {
@@ -79,7 +89,7 @@ describe('writing a situation', () => {
 	/**
 	 * The reported bug. `/primitives` prints the id, so the author has it in
 	 * hand and types it first; being told that is the wrong order teaches
-	 * nothing. `/system` and `/character` already read arguments this way.
+	 * nothing.
 	 */
 	it('takes the id before or after the verb', async () => {
 		const created = await dispatch('/situation new A Scene');
@@ -91,7 +101,7 @@ describe('writing a situation', () => {
 		const idFirst = await dispatch(`/situation ${id} edit`);
 
 		expect(idFirst.openEditor).toBe(verbFirst.openEditor);
-		expect(idFirst.openEditor).toBe(created.openEditor);
+		expect(idFirst.openEditor).toContain(path.join('raw', 'situations'));
 	});
 
 	it('names every form it accepts when it cannot parse the line', async () => {

@@ -76,9 +76,10 @@ almost always why.
 /situation new The Ledger Room
 ```
 
-Scaffolds `corpus/situations/` and opens the [native buffer](./writing-a-scene.md)
-so you can write. Scenes start in the inbox: an unplaced situation is a valid
-permanent state, not a staging error.
+Scaffolds the scene and opens the [native buffer](./writing-a-scene.md) so you
+can write. A scene with no arc is **unplaced**, which is a valid permanent
+state and not a staging error — it simply contributes nothing to the ledger
+until it is anchored.
 
 ### 3b. Somewhere for it to happen
 
@@ -98,7 +99,7 @@ legitimate.
 ### 4. Link it
 
 ```
-/situation sit-002 arc arc-02          # moves it out of the inbox
+/situation sit-002 arc arc-02          # places it in the narrative order
 /situation sit-002 moment the-breach   # anchors it on the clock
 /situation sit-002 place the-atrium    # where it happens
 /situation sit-002 cast carl donut     # who is in it

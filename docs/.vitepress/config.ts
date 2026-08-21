@@ -42,6 +42,8 @@ export default defineConfig({
 				text: 'Guide',
 				items: [
 					{text: 'Getting started', link: '/guide/getting-started'},
+					{text: 'How litfire works', link: '/guide/how-it-works'},
+					{text: 'Creating primitives', link: '/guide/creating-primitives'},
 					{text: 'Commands', link: '/guide/commands'},
 					{text: 'Writing a scene', link: '/guide/writing-a-scene'},
 					{text: 'Populating a situation', link: '/guide/populating-a-situation'},

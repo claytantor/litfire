@@ -31,7 +31,7 @@
 | `/situation <id> cast <name>…` | Add characters to the scene                       |
 | `/situation <id> place <id>`   | Where the scene happens                           |
 | `/situation <id> moment <id>`  | Anchor the scene on the clock                     |
-| `/situation <id> arc <id>`     | Place it on an arc, out of the inbox              |
+| `/situation <id> arc <id>`     | Place it on an arc                                |
 | `/situation new [title]`       | Scaffold a scene and open it in the buffer        |
 | `/arc [<id>]`                  | Arcs, or one arc with the scenes on it            |
 | `/arc new [title]`             | Create an arc                                     |
@@ -51,7 +51,7 @@
 | `/ingest <kind>`               | Turn notes in `raw/<kind>/` into typed pages      |
 | `/ingest <kind> <document>`    | Ingest one note                                   |
 | `/<primitive> extract`         | Ingest that kind’s notes, from the primitive      |
-| `/situation place <id> <arc>`  | Move a situation out of the inbox                 |
+| `/situation place <id> <arc>`  | The same, verb first                              |
 | `/help`, `/quit`               |                                                   |
 
 Output taller than the viewport opens a windowed pager (`↑↓`, space, `g`/`G`, `q`).
