@@ -92,6 +92,7 @@ export default defineConfig({
 								text: 'Documentation publishing',
 								link: '/project/proposals/documentation-site',
 							},
+							{text: 'Raw-first authoring', link: '/project/proposals/raw-first'},
 						],
 					},
 				],
