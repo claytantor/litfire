@@ -11,7 +11,7 @@
 
 top to bottom direction
 
-skinparam backgroundColor transparent
+skinparam backgroundColor #dddddd
 skinparam shadowing false
 skinparam defaultFontName "Helvetica"
 skinparam defaultFontSize 12
@@ -92,6 +92,22 @@ corpus --> ledger
 corpus --> wiki
 corpus --> manuscript
 
+note bottom of ledger
+  ==Every write path into the computed layer
+  · replay, on every load → **ledger/**
+  · **/wiki build** → **wiki/**
+  · **/export** → **manuscript.md**
+  · **/ingest** and **/curator** → **log.md**, append-only
+
+  No proposal can reach any of these. **.litrpg/**,
+  **ledger/**, **raw/**, **manuscript.md** and **wiki/** are
+  refused by path before their content is read, so
+  nothing a model returns can land here at all.
+
+  //Hand edits are lost on the next recompute — which//
+  //is the deal, not a defect.//
+end note
+
 note bottom of ingest
   Each pass **reads the corpus first**: `/ingest`
   to update rather than duplicate, `/ingest adopt`
@@ -109,16 +125,47 @@ note right of gate
 end note
 
 note bottom of raw
-  **P6 — the tool never rewrites your prose.**
-  A linking command edits frontmatter and adopts
-  the page into raw/ if it is not there yet. The
-  body stays yours.
+  ==Every write path into raw/
+  · you, in Obsidian or any editor
+  · **/<kind> edit** — the native buffer
+  · **/situation cast|place|moment|arc**,
+    **/moment at|name**, **/place name**,
+    **/arc order|after** — frontmatter only,
+    adopting the page first if it is not here yet
+  · **/curator** and **/ingest adopt** — the only two
+    writers that are not you, and both are gated
+
+  **P6.** None of them touches your prose. A linking
+  command sets a field; the body stays yours.
+
+  //resolveInsideVault refuses raw/ to every proposal//
+  //unless allowRaw is set. Those two hold it.//
 end note
 
 note bottom of corpus
+  ==Every write path into the corpus
+  Gated — everything a **model** proposes:
+  · **/ingest**, **/ingest interview**, **/ingest adopt**
+  · **/curator**, **/reviewer**
+
+  Ungated — everything **you** assert directly:
+  · **setAuthored**, syncing the page after a linking
+    command. A copy of what you just said, not an
+    inference about it (D21)
+  · **/<kind> new** · **/status write** · **/chapter new|move**
+  · **/init**, once, and never over an existing file
+
+  //The gate is for writes the tool authors, not writes//
+  //you author. Your own typed edit is already explicit;//
+  //asking you to approve it twice would be theatre.//
+
   Safe to delete **only** once every page cites a
   source. **/ingest adopt** gets a vault there;
   **/lint** says how far it has got.
+
+  //Still open: **/<kind> new** and **/chapter** write here//
+  //rather than raw/, and chapters have no raw/ folder//
+  //to write to. That is step 4 and an open question.//
 end note
 
 @enduml
