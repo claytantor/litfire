@@ -593,3 +593,41 @@ it used.
 
 `docs/concepts/architecture.md` is unaffected. That is the tool's architecture,
 which is a different word doing an honest job.
+
+## D21 — Adopt on edit
+
+**Committed:** a linking command writes the author's copy in `raw/`, adopting
+the page there if it is not yet, and carries the change onto the derived page in
+code.
+
+The raw-first proposal sequenced this as two steps — move the linking commands,
+then move `new` — and they could not be split that way. Both resolve the same
+constant: `/moment new` and `/moment <id> at` each write
+`timeline/moments/<id>.md`. Change one and not the other and the second reports
+`no moment 'the-breach' — /moment new <name> creates one`, which is the
+command that had just run.
+
+Adoption resolves it. An edit that finds no note in `raw/` writes one from the
+corpus page — frontmatter and prose together, so the note is a complete record
+rather than a stub whose body the next ingest would drop — and edits that.
+Migration then happens by using the tool, on the pages actually being worked on,
+and a vault can sit half-moved indefinitely. It also removes most of what step 6
+was going to be: by the time corpus writes are forbidden, everything anyone
+touches has already moved itself.
+
+**The derived page is updated too, in code, with no model call.** Setting `at:`
+on a moment is a copy, not an inference — the author said the number, and
+`/ingest` would do nothing cleverer with it. Requiring a model round trip to
+make a typed edit visible would have made the tool worse at the thing it is for.
+The page is re-stamped with the note's new hash, so the corpus reflects the note
+exactly and the next ingest correctly skips it. Prose changes still need a pass,
+because those genuinely need reading.
+
+This is not a second writer. It is one write, performed by the cheaper of two
+mechanisms, with the note remaining the source of truth — which is the same
+reasoning that stamps `source_hash` in code rather than asking a model for a
+digest.
+
+Every kind goes through one helper, so the layer a primitive is authored in is
+decided in exactly one place. A refused edit adopts nothing: a value that fails
+its schema must not leave a half-migrated page behind.

@@ -19,6 +19,7 @@ import {
 } from '../time/index.js';
 import {INGEST_KINDS, isIngestKind, readRaw} from '../ingest/index.js';
 import {readIngestState, statusOf} from '../ingest/state.js';
+import {authoredFile, setAuthored} from '../ingest/authoring.js';
 import {partitionChapters} from '../chapters/index.js';
 import {renderManuscript} from '../chapters/manuscript.js';
 import {
@@ -1141,19 +1142,16 @@ const place: Command = {
 				};
 			}
 
-			const file = resolve(context.root, VAULT.places, `${id}.md`);
-			const raw = await readFile(file, 'utf8').catch(() => undefined);
-			if (raw === undefined) {
-				return {
-					lines: [
-						error(`no page for place '${id}'`),
-						muted(`/place new ${id} writes one`),
-					],
-				};
-			}
-
 			if (verb === 'edit') {
-				return {lines: [], openEditor: file};
+				const opened = await authoredFile(context.root, 'place', id);
+				return 'error' in opened
+					? {
+							lines: [
+								error(`no page for place '${id}'`),
+								muted(`/place new ${id} writes one`),
+							],
+						}
+					: {lines: adoptionNote(opened), openEditor: opened.file};
 			}
 
 			const name = positional.slice(1).join(' ').trim();
@@ -1161,21 +1159,15 @@ const place: Command = {
 				return {lines: [error('usage: /place <id> name <text>')]};
 			}
 
-			const document = parseDocument(raw);
-			const data = {...document.data, name};
-			try {
-				placeSchema.parse(data);
-			} catch (caught) {
-				return {
-					lines: [
-						error(
-							caught instanceof Error ? caught.message.split('\n')[0]! : String(caught),
-						),
-					],
-				};
-			}
-			await writeFile(file, stringifyDocument({data, body: document.body}), 'utf8');
-			return {lines: [ok(`${id} is now “${name}”`)], dirty: true};
+			const done = await setAuthored(context.root, 'place', id, {name}, value =>
+				placeSchema.parse(value),
+			);
+			return 'error' in done
+				? {lines: [error(done.error)]}
+				: {
+						lines: [ok(`${id} is now “${name}”`), ...adoptionNote(done)],
+						dirty: true,
+					};
 		}
 
 		if (
@@ -1200,6 +1192,19 @@ const place: Command = {
 		};
 	},
 };
+
+/**
+ * What to say when an edit brought a page into `raw/` for the first time.
+ *
+ * Said once, plainly, and only when it happened: adoption is not something the
+ * author asked for and they should be told it did, but a line on every edit
+ * forever would be noise.
+ */
+function adoptionNote(result: {adopted: boolean; file?: string}): Line[] {
+	return result.adopted
+		? [muted(`adopted into ${result.file ?? 'raw/'} — your copy lives there now`)]
+		: [];
+}
 
 const MOMENT_VERBS = new Set(['show', 'edit', 'at', 'name']);
 
@@ -1275,32 +1280,14 @@ const moment: Command = {
 		const positional = args.filter(argument => !MOMENT_VERBS.has(argument));
 		const [id] = positional;
 
-		/** Rewrites a moment's frontmatter, body untouched. Undefined means it worked. */
-		const patch = async (
-			target: string,
-			data: Record<string, unknown>,
-		): Promise<string | undefined> => {
-			const file = resolve(context.root, VAULT.moments, `${target}.md`);
-			const raw = await readFile(file, 'utf8').catch(() => undefined);
-			if (raw === undefined) {
-				return `no moment '${target}' — /moment new <name> creates one`;
-			}
-
-			const document = parseDocument(raw);
-			const merged = {...document.data, ...data};
-			try {
-				momentSchema.parse(merged);
-			} catch (caught) {
-				return caught instanceof Error ? caught.message.split('\n')[0]! : String(caught);
-			}
-
-			await writeFile(
-				file,
-				stringifyDocument({data: merged, body: document.body}),
-				'utf8',
+		/**
+		 * Sets a field on the author's copy in `raw/`, adopting the page there if
+		 * this is the first edit, and carrying the change onto the derived page.
+		 */
+		const patch = (target: string, data: Record<string, unknown>) =>
+			setAuthored(context.root, 'moment', target, data, value =>
+				momentSchema.parse(value),
 			);
-			return undefined;
-		};
 
 		if (verb === 'at') {
 			const target = id;
@@ -1321,9 +1308,9 @@ const moment: Command = {
 
 			// Writing the bigint, not a string: this is the clock, and it round-trips
 			// through YAML at full precision only as an integer.
-			const failed = await patch(target, {at: instant});
-			if (failed !== undefined) {
-				return {lines: [error(failed)]};
+			const done = await patch(target, {at: instant});
+			if ('error' in done) {
+				return {lines: [error(done.error)]};
 			}
 
 			return {
@@ -1332,6 +1319,7 @@ const moment: Command = {
 					muted(
 						`reads as ${calendar.format(instant)} · ${describeDuration(instant)} from origin`,
 					),
+					...adoptionNote(done),
 				],
 				dirty: true,
 			};
@@ -1343,24 +1331,23 @@ const moment: Command = {
 			if (target === undefined || name === '') {
 				return {lines: [error('usage: /moment <id> name <text>')]};
 			}
-			const failed = await patch(target, {name});
-			return failed === undefined
-				? {lines: [ok(`${target} is now “${name}”`)], dirty: true}
-				: {lines: [error(failed)]};
+			const done = await patch(target, {name});
+			return 'error' in done
+				? {lines: [error(done.error)]}
+				: {
+						lines: [ok(`${target} is now “${name}”`), ...adoptionNote(done)],
+						dirty: true,
+					};
 		}
 
 		if (verb === 'edit') {
 			if (!id) {
 				return {lines: [error('usage: /moment <id> edit')]};
 			}
-			const file = resolve(context.root, VAULT.moments, `${id}.md`);
-			const exists = await readFile(file, 'utf8').then(
-				() => true,
-				() => false,
-			);
-			return exists
-				? {lines: [], openEditor: file}
-				: {lines: [error(`no moment '${id}' — /moment new <name> creates one`)]};
+			const opened = await authoredFile(context.root, 'moment', id);
+			return 'error' in opened
+				? {lines: [error(`${opened.error} — /moment new <name> creates one`)]}
+				: {lines: adoptionNote(opened), openEditor: opened.file};
 		}
 
 		if (
@@ -1458,7 +1445,13 @@ const arc: Command = {
 			const patched = await patchArc(context.root, id, {order});
 			return 'error' in patched
 				? {lines: [error(patched.error)]}
-				: {lines: [ok(`${id} replays at order ${String(order)}`)], dirty: true};
+				: {
+						lines: [
+							ok(`${id} replays at order ${String(order)}`),
+							...adoptionNote(patched),
+						],
+						dirty: true,
+					};
 		}
 
 		if (verb === 'after') {
@@ -1480,6 +1473,7 @@ const arc: Command = {
 				: {
 						lines: [
 							ok(`${id} starts after ${momentId}`),
+							...adoptionNote(patched),
 							// This is the link that lets moments interleave ahead of the
 							// arc's situations, which is what gives their scenes a clock
 							// position to inherit.
@@ -1512,30 +1506,13 @@ const arc: Command = {
 	},
 };
 
-/** The arc counterpart of `patchSituation`; same reasoning about the body. */
+/** The arc counterpart: the same adopt-on-edit path every other kind takes. */
 async function patchArc(
 	root: string,
 	id: string,
 	patch: Record<string, unknown>,
-): Promise<{file: string} | {error: string}> {
-	const file = resolve(root, VAULT.arcs, `${id}.md`);
-	const raw = await readFile(file, 'utf8').catch(() => undefined);
-	if (raw === undefined) {
-		return {error: `no arc '${id}' — /arc new <title> creates one`};
-	}
-
-	const document = parseDocument(raw);
-	const data = {...document.data, ...patch};
-	try {
-		arcSchema.parse(data);
-	} catch (caught) {
-		return {
-			error: caught instanceof Error ? caught.message.split('\n')[0]! : String(caught),
-		};
-	}
-
-	await writeFile(file, stringifyDocument({data, body: document.body}), 'utf8');
-	return {file};
+): Promise<Awaited<ReturnType<typeof setAuthored>>> {
+	return setAuthored(root, 'arc', id, patch, value => arcSchema.parse(value));
 }
 
 /**
@@ -1550,36 +1527,18 @@ async function patchArc(
 const SITUATION_VERBS = new Set(['show', 'edit', 'arc', 'place', 'moment', 'cast']);
 
 /**
- * Rewrites one situation's frontmatter, leaving the body byte-identical.
+ * Sets a field on a scene's authored copy.
  *
  * Every linking verb goes through here, so the author's prose is untouchable by
- * construction rather than by each verb remembering (P6). The schema is
- * re-parsed after patching, so a bad link is refused before it reaches disk
- * instead of turning into a load issue on the next recompute.
+ * construction rather than by each verb remembering (P6) — and so the layer a
+ * scene is authored in is decided in one place.
  */
 async function patchSituation(
 	root: string,
 	id: string,
 	patch: Record<string, unknown>,
-): Promise<{file: string} | {error: string}> {
-	const file = await findSituationFile(root, id);
-	if (file === undefined) {
-		return {error: `no file for situation '${id}'`};
-	}
-
-	const document = parseDocument(await readFile(file, 'utf8'));
-	const data = {...document.data, ...patch};
-
-	try {
-		situationSchema.parse(data);
-	} catch (caught) {
-		return {
-			error: caught instanceof Error ? caught.message.split('\n')[0]! : String(caught),
-		};
-	}
-
-	await writeFile(file, stringifyDocument({data, body: document.body}), 'utf8');
-	return {file};
+): Promise<Awaited<ReturnType<typeof setAuthored>>> {
+	return setAuthored(root, 'situation', id, patch, value => situationSchema.parse(value));
 }
 
 const situation: Command = {
@@ -1681,7 +1640,10 @@ const situation: Command = {
 			if ('error' in patched) {
 				return {lines: [error(patched.error)]};
 			}
-			return {lines: [ok(`${id} happens at ${momentId}`)], dirty: true};
+			return {
+				lines: [ok(`${id} happens at ${momentId}`), ...adoptionNote(patched)],
+				dirty: true,
+			};
 		}
 
 		// Where it happens. Places have no schema — free prose in a directory — so
@@ -1704,7 +1666,11 @@ const situation: Command = {
 				() => `no places/${placeId}.md yet — the wiki will still link it`,
 			);
 			return {
-				lines: [ok(`${id} happens at ${placeId}`), ...(written ? [muted(written)] : [])],
+				lines: [
+					ok(`${id} happens at ${placeId}`),
+					...(written ? [muted(written)] : []),
+					...adoptionNote(patched),
+				],
 				dirty: true,
 			};
 		}
@@ -1734,6 +1700,7 @@ const situation: Command = {
 			return {
 				lines: [
 					ok(`${id} cast: ${cast.join(', ')}`),
+					...adoptionNote(patched),
 					// Reported, never refused: naming someone before writing their page
 					// is a normal order to work in, and the checks will keep asking.
 					...unknown.map(name => muted(`no character page for '${name}' yet`)),
@@ -1758,11 +1725,6 @@ const situation: Command = {
 				return {lines: [error(`no situation '${id}'`)]};
 			}
 
-			const source = await findSituationFile(context.root, id);
-			if (source === undefined) {
-				return {lines: [error(`no file for situation '${id}'`)]};
-			}
-
 			const orders = context.project.vault.situations
 				.filter(s => s.arc === arcId && s.order !== undefined)
 				.map(s => s.order as number);
@@ -1772,19 +1734,16 @@ const situation: Command = {
 			// out of `situations/inbox/`, which encoded in the filesystem what the
 			// frontmatter already said — and gave one scene two possible homes,
 			// which is how one came to exist in both at once.
-			const document = parseDocument(await readFile(source, 'utf8'));
-			await writeFile(
-				source,
-				stringifyDocument({
-					data: {...document.data, arc: arcId, order},
-					// P6: the body is passed through untouched.
-					body: document.body,
-				}),
-				'utf8',
-			);
+			const patched = await patchSituation(context.root, id, {arc: arcId, order});
+			if ('error' in patched) {
+				return {lines: [error(patched.error)]};
+			}
 
 			return {
-				lines: [ok(`placed ${id} on ${arcId} at order ${String(order)}`)],
+				lines: [
+					ok(`placed ${id} on ${arcId} at order ${String(order)}`),
+					...adoptionNote(patched),
+				],
 				dirty: true,
 			};
 		}

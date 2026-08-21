@@ -80,6 +80,29 @@ Three things it is told, which are the ones that matter:
   raise it as an open question. A plausible guess nobody wrote is worse than a
   gap.
 
+## Editing brings a page across
+
+A vault written before this had pages in the corpus and nothing in `raw/`. There
+is no migration to schedule: **the first time you edit a page, it moves.**
+
+```
+› /moment the-breach at 86400
+  the-breach at 86,400
+  reads as 86,400s · 1d from origin
+  adopted into raw/moments/the-breach.md — your copy lives there now
+```
+
+The whole page is copied — frontmatter and prose — so the note is a complete
+record rather than a stub. From then on, that note is the one being edited, and
+the said-once line does not come back.
+
+The derived page is updated at the same time, **without a model call**. Setting
+a field you stated is a copy, not an inference, and `/ingest` would do nothing
+cleverer with it. The page is re-stamped with the note's new hash, so the next
+`/ingest` correctly skips it.
+
+Prose changes still need a pass. Those genuinely need reading.
+
 ## Your notes are not touched
 
 `/ingest` reads `raw/` and proposes elsewhere. The notes stay exactly as you

@@ -251,7 +251,9 @@ corpus and leave nothing worth recording.
 1. `/init` scaffolds `raw/<kind>/`. Harmless on its own, and useful immediately.
 2. `source:` and `source_hash` on ingested pages; skip unchanged. Idempotency
    before anything depends on it.
-3. Raw frontmatter, and the linking commands move to it.
+3. Raw frontmatter, and the linking commands move to it — by adopting a page
+   into `raw/` the first time it is edited (D21), which is what let this land
+   without step 4.
 4. `/<kind> new` writes raw.
 5. Interviews become a source kind, and the per-kind `extract` commands fold
    into `/ingest`.
@@ -260,8 +262,11 @@ corpus and leave nothing worth recording.
 Each step is useful alone and the order never requires backing up. Step 6 is the
 irreversible one and should not be taken until the rest have been lived with.
 
-**Steps 1 and 2 are done.** `/init` creates the nine folders with a README
+**Steps 1, 2 and 3 are done.** `/init` creates the nine folders with a README
 apiece, and ingested pages carry `source` and `source_hash` — so an unchanged
 note costs nothing and `/ingest` reports what it will read before it reads it.
 `log.md` is written by `/ingest` and `/curator`, which settled question four
-early.
+early. Notes carry frontmatter the ingest honours, and every linking command now
+writes the author's copy — adopting the page into `raw/` on first edit and
+carrying the change onto the derived page in code, so a typed edit still takes
+effect immediately.
