@@ -307,6 +307,7 @@ describe('the anchor', () => {
 			places: [],
 			sources: [],
 			legacy: [],
+			interfaces: {},
 			artifacts: [],
 			themes: [],
 			replay: result,

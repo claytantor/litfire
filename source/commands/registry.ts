@@ -94,26 +94,27 @@ import {
 	type Line,
 } from './types.js';
 import {
-	renderChapter,
-	renderChapters,
-	renderLint,
-	renderPacing,
-	renderPrimitives,
-	renderCharacter,
-	renderQuestions,
 	renderArc,
 	renderArcs,
+	renderCast,
+	renderChapter,
+	renderChapters,
+	renderCharacter,
+	renderLint,
 	renderMoment,
 	renderMoments,
+	renderPacing,
 	renderPlace,
 	renderPlaces,
-	renderTime,
-	renderUnreadableTime,
-	renderCast,
+	renderPrimitives,
+	renderQuestions,
 	renderSheet,
+	renderSituationSheet,
 	renderSystem,
 	renderThemes,
+	renderTime,
 	renderTimeline,
+	renderUnreadableTime,
 } from './views.js';
 
 const needsProject = (): CommandResult => ({
@@ -329,12 +330,15 @@ const status: Command = {
 				return {lines: [error(`no file for situation '${situationId}'`)]};
 			}
 
-			const block = renderStatusBlock(character, {profile});
+			const drawn = context.project.vault.interfaces[character.system ?? ''];
+			const block = renderStatusBlock(character, {profile, drawn});
 			await writeStatusBlock(file, block, {char: characterId, at: situationId});
 
 			return {
 				lines: [
-					ok(`${profile.status_template} block → ${path.relative(context.root, file)}`),
+					ok(
+						`${drawn === undefined ? profile.status_template : character.system} block → ${path.relative(context.root, file)}`,
+					),
 					muted('regenerate any time — only the marked span is replaced'),
 				],
 				dirty: true,
@@ -361,11 +365,16 @@ const status: Command = {
 		}
 
 		context.setActiveCharacter(characterId);
-		const block = renderStatusBlock(character, {profile});
+		const drawn = context.project.vault.interfaces[character.system ?? ''];
+		const block = renderStatusBlock(character, {profile, drawn});
 
 		const lines = [
 			heading(`status — ${characterId}${at === undefined ? '' : `  @ ${at}`}`),
-			muted(`${profile.status_template} template, from ${profile.name}`),
+			muted(
+				drawn === undefined
+					? `${profile.status_template} template, from ${profile.name}`
+					: `drawn by ${character.system ?? 'the system'}`,
+			),
 			blank(),
 			...block.split('\n').map(line => text(line)),
 			blank(),
@@ -1824,6 +1833,7 @@ async function patchArc(
  */
 const SITUATION_VERBS = new Set([
 	'show',
+	'sheet',
 	'edit',
 	'extract',
 	'arc',
@@ -1849,7 +1859,7 @@ async function patchSituation(
 
 const situation: Command = {
 	name: 'situation',
-	usage: '/situation <id> [show|edit|extract|cast|place|moment|arc] · new [title]',
+	usage: '/situation <id> [show|sheet|edit|extract|cast|place|moment|arc] · new [title]',
 	summary: 'show a scene\u2019s cast, write it, and link it to the world',
 	async run(args, context) {
 		if (!context.project) {
@@ -2078,6 +2088,20 @@ const situation: Command = {
 		// Exactly one positional, because `/situation what now` names no scene and
 		// looking up the first word of a mistyped line reports the wrong problem.
 		const [id] = positional;
+
+		// The scene as its cast would see it, each through their own system's
+		// screen. `show` answers who is here and what links are set; this answers
+		// what the numbers are, which is the question an author writing the scene
+		// has in front of them.
+		if (verb === 'sheet') {
+			if (id === undefined) {
+				return {lines: [error('usage: /situation <id> sheet')]};
+			}
+			const {profile} = await loadSetting(context.root);
+			const lines = renderSituationSheet(context.project, id, profile);
+			return {lines, paged: lines.length > 14, title: `situation ${id} sheet`};
+		}
+
 		if (
 			(verb === undefined || verb === 'show') &&
 			id !== undefined &&

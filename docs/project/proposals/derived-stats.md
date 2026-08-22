@@ -121,6 +121,22 @@ the half of this tool that is deliberately not a model's job.
 
 ## The four hard parts
 
+### 0. Substitution, and nothing more — decided
+
+`{coherence}` becomes the number and everything around it is the author's own
+drawing, kept byte for byte. No bars, no formats, no conditionals.
+
+Two richer options were weighed and dropped. A `{coherence|bar}` filter is a
+template language, with a width convention, a glyph convention and rounding to
+specify, document and test — and one more thing for a generated interface to get
+wrong. Letting a gauge be a text-returning formula was tempting, because
+`callText` already exists and custom calendars already use it — but it makes
+every screen a program, and the point of the interface is that an author draws
+it.
+
+The cost is real and worth stating: a bar drawn in the template never moves. A
+screen can say `3/10` and that is the whole of what it can say about progress.
+
 ### 1. TypeScript, or JavaScript?
 
 The request says TypeScript formulas. The sandbox runs **JavaScript**, and the
@@ -196,10 +212,15 @@ decides, and the decision is put in terms the author can actually decide on.
    `system_stats_inert` for a system whose stats nothing moves,
    `system_stats_unset` for one that declares none, and `derived_stat_driven`
    for a scene fighting a formula.
-2. **The author's interface.** The `interface` block on a system page, replacing
-   the profile's choice of three templates for vaults that define one.
-3. **Per-scene rendering.** `/situation <id> sheet`, the wiki section, and
-   `/status write` using the author's interface.
+2. ~~**The author's interface.** The `interface` block on a system page,
+   replacing the profile's choice of three templates for vaults that define
+   one.~~ **Done**, with `interface_field_unknown` reporting a placeholder the
+   system has no stat for — which is what makes the screen a specification
+   rather than decoration.
+3. ~~**Per-scene rendering.** `/situation <id> sheet`, and `/status write`
+   using the author's interface.~~ **Done.** A system that draws nothing still
+   falls back to the profile's template, so a vault renders before anyone has
+   drawn anything. The wiki section is still to do.
 4. **`/system generate stats`.** The model pass, last — it is the only part that
    needs the other three to exist before it can be judged.
 

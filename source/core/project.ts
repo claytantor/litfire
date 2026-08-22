@@ -85,6 +85,7 @@ export async function computeProject(
 			factions: vault.factions,
 			places: vault.places,
 			sources: vault.sources,
+			interfaces: vault.interfaces,
 			legacy: vault.legacy,
 			artifacts: vault.artifacts,
 			themes: vault.themes,

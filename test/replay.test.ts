@@ -223,6 +223,7 @@ describe('deterministic checks', () => {
 			places: [],
 			sources: [],
 			legacy: [],
+			interfaces: {},
 			artifacts: [],
 			themes: [],
 			replay: replayResult,

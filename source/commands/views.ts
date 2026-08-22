@@ -10,6 +10,8 @@ import {
 	MAX_INSTANT,
 	type Instant,
 } from '../time/instant.js';
+import type {ResolvedProfile} from '../genre/types.js';
+import {renderStatusBlock} from '../system/status.js';
 import type {Calendar} from '../time/calendar.js';
 import {
 	allStates,
@@ -322,6 +324,81 @@ export function renderPrimitives(project: Project, focus?: string): Line[] {
  * artifacts are laid out per character rather than merged: what makes a scene
  * writable is seeing that one of them has the artifact and the other does not.
  */
+/**
+ * Every character in a scene, as their own system draws them.
+ *
+ * This is what the interface is for. `/sheet` answers "what does the ledger
+ * hold about this person", which is a question about a character; this answers
+ * "what would each of them see on their screen, standing here", which is a
+ * question about a scene — and it is the one an author writing that scene
+ * actually has.
+ *
+ * A character under a system that draws nothing falls back to the profile's
+ * template, so a vault gets something useful before anyone has drawn anything.
+ */
+export function renderSituationSheet(
+	project: Project,
+	situationId: string,
+	profile: ResolvedProfile,
+): Line[] {
+	const situation = project.vault.situations.find(one => one.id === situationId);
+	if (situation === undefined) {
+		return [error(`no situation '${situationId}'`)];
+	}
+
+	const clock = momentByStep(project.replay.sequence, project.vault.situations);
+	const cast = castOf(project.replay, clock, situation);
+
+	const lines: Line[] = [
+		heading(`${situation.id}${situation.title ? ` — ${situation.title}` : ''}`),
+	];
+
+	if (cast.moment === undefined) {
+		lines.push(
+			warn('no moment on the clock — these are the states as the sequence left them'),
+		);
+	}
+
+	if (cast.states.length === 0) {
+		lines.push(blank(), muted('nobody in this scene has a state to show'));
+		return lines;
+	}
+
+	for (const state of cast.states) {
+		const drawn = project.vault.interfaces[state.system ?? ''];
+		const block = renderStatusBlock(
+			{
+				id: state.character,
+				system: state.system,
+				level: state.level,
+				xp: state.xp,
+				stats: {...state.stats},
+				skills: [...state.skills],
+				items: {...state.items},
+				artifacts: [...state.artifacts],
+			},
+			{profile, drawn, displayName: state.character},
+		);
+
+		lines.push(
+			blank(),
+			text(`${state.character}${state.system ? ` · ${state.system}` : ''}`, {
+				color: '#9ece6a',
+			}),
+			...block.split('\n').map(line => text(line)),
+		);
+	}
+
+	// Named rather than omitted: a scene casting someone the ledger has never
+	// seen is a broken reference, and silence here would hide it behind a screen
+	// that looks complete.
+	if (cast.missing.length > 0) {
+		lines.push(blank(), warn(`no state for ${cast.missing.join(', ')}`));
+	}
+
+	return lines;
+}
+
 export function renderCast(project: Project, situationId: string): Line[] {
 	const situation = project.vault.situations.find(
 		candidate => candidate.id === situationId,

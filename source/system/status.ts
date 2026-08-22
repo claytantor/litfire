@@ -3,6 +3,7 @@ import {term} from '../genre/lexicon.js';
 import type {ResolvedProfile} from '../genre/types.js';
 import type {CharacterState} from '../ledger/replay.js';
 import {upsertBlock} from '../vault/markers.js';
+import {renderInterface} from './interface.js';
 
 export type StatusTemplate = 'sheet' | 'hud' | 'inline';
 
@@ -147,10 +148,23 @@ export function renderStatusBlock(
 		readonly profile: ResolvedProfile;
 		readonly template?: StatusTemplate;
 		readonly displayName?: string;
+		/**
+		 * The screen this character's system draws, when it draws one.
+		 *
+		 * It wins over the profile's choice of the three built-ins, because it is
+		 * the author's own and those are a guess made from the idiom. Absent, the
+		 * guess is still better than nothing.
+		 */
+		readonly drawn?: string | undefined;
 	},
 ): string {
-	const template = options.template ?? options.profile.status_template;
 	const displayName = options.displayName ?? character.id;
+
+	if (options.drawn !== undefined && options.drawn.trim() !== '') {
+		return renderInterface(options.drawn, character, {displayName});
+	}
+
+	const template = options.template ?? options.profile.status_template;
 
 	switch (template) {
 		case 'sheet': {

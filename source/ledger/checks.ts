@@ -12,6 +12,7 @@ import type {
 import type {FormulaRunner} from '../system/sandbox.js';
 import {LEGACY_DIRECTORIES, LEGACY_FILES, VAULT} from '../vault/paths.js';
 import type {Source} from '../vault/load.js';
+import {BUILT_IN_FIELDS, fieldsOf} from '../system/interface.js';
 import {systemFor, type Finding, type LedgerState, type ReplayResult} from './replay.js';
 
 export type OpenQuestion = {
@@ -26,6 +27,8 @@ export type OpenQuestion = {
 
 export type CheckInput = {
 	readonly systems: readonly SystemDef[];
+	/** The status screen each system draws, by id. */
+	readonly interfaces: Readonly<Record<string, string>>;
 	readonly arcs: readonly Arc[];
 	readonly moments: readonly Moment[];
 	readonly situations: readonly Situation[];
@@ -498,6 +501,43 @@ function inertStats(input: CheckInput): Finding[] {
 }
 
 /**
+ * A status screen asking for something the system does not have.
+ *
+ * This is what makes the interface a specification rather than decoration. An
+ * author draws `{coherence}` on the screen their world shows, and that is a
+ * statement that coherence exists — so a placeholder with nothing behind it is
+ * the gap between the world they have described and the world the tool knows
+ * about, which is precisely the kind of thing this queue is for.
+ *
+ * Rendering leaves the placeholder standing rather than blanking it, so the two
+ * halves agree: the screen shows `{coherence}` and the queue says why.
+ */
+function interfaceFields(input: CheckInput): Finding[] {
+	const findings: Finding[] = [];
+
+	for (const system of input.systems) {
+		const template = input.interfaces[system.id];
+		if (template === undefined) {
+			continue;
+		}
+
+		const declared = new Set(system.stats.map(stat => stat.id));
+		for (const field of fieldsOf(template)) {
+			if (declared.has(field) || (BUILT_IN_FIELDS as readonly string[]).includes(field)) {
+				continue;
+			}
+			findings.push({
+				kind: 'interface_field_unknown',
+				detail: `'${system.id}' draws {${field}} on its status screen, and declares no such stat`,
+				where: system.id,
+			});
+		}
+	}
+
+	return findings;
+}
+
+/**
  * An event that moves a stat the system computes.
  *
  * Applying it would work and then be undone: derived stats are recomputed after
@@ -801,6 +841,7 @@ export function runChecks(input: CheckInput): OpenQuestion[] {
 		...factionGoals(input),
 		...inertStats(input),
 		...derivedStatsDriven(input),
+		...interfaceFields(input),
 		...artifactUse(input),
 		...artifactOutcomes(input),
 		...formulaErrors(input),

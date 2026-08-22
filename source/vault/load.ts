@@ -24,6 +24,7 @@ import {
 	type Moment,
 } from '../domain/schema.js';
 import {extractFormulas} from '../system/formulas.js';
+import {extractInterface} from '../system/interface.js';
 import type {Formula} from '../system/sandbox.js';
 import {parseDocument} from './frontmatter.js';
 import {homesOf, resolve, VAULT} from './paths.js';
@@ -60,6 +61,14 @@ export type Vault = {
 	 */
 	readonly systems: readonly SystemDef[];
 	readonly formulas: readonly Formula[];
+	/**
+	 * The status screen each system draws, by system id, for those that draw one.
+	 *
+	 * Kept beside the systems rather than on `SystemDef` because it lives in the
+	 * page's body and the schema describes its frontmatter — the same division
+	 * formulas already sit on.
+	 */
+	readonly interfaces: Readonly<Record<string, string>>;
 	readonly moments: readonly Moment[];
 	/** How this vault reads its clock. Absent means raw seconds from origin. */
 	readonly time: TimeBinding | undefined;
@@ -173,9 +182,14 @@ async function loadDirectory<T>(
 async function loadSystems(
 	root: string,
 	issues: LoadIssue[],
-): Promise<{systems: SystemDef[]; formulas: Formula[]}> {
+): Promise<{
+	systems: SystemDef[];
+	formulas: Formula[];
+	interfaces: Record<string, string>;
+}> {
 	const systems: SystemDef[] = [];
 	const formulas: Formula[] = [];
+	const interfaces: Record<string, string> = {};
 
 	const seen = new Set<string>();
 	for (const home of homesOf(VAULT.systems)) {
@@ -198,6 +212,10 @@ async function loadSystems(
 					for (const formula of extractFormulas(body)) {
 						formulas.push({...formula, system: system.id});
 					}
+					const drawn = extractInterface(body);
+					if (drawn !== undefined) {
+						interfaces[system.id] = drawn;
+					}
 				}
 			} catch (caught) {
 				issues.push({
@@ -208,7 +226,7 @@ async function loadSystems(
 		}
 	}
 
-	return {systems, formulas};
+	return {systems, formulas, interfaces};
 }
 
 /**
@@ -290,7 +308,11 @@ export async function loadVault(root: string): Promise<Vault> {
 		}
 	}
 
-	const {systems: named, formulas: scopedFormulas} = await loadSystems(root, issues);
+	const {
+		systems: named,
+		formulas: scopedFormulas,
+		interfaces,
+	} = await loadSystems(root, issues);
 
 	// The shared file stays unscoped, so a formula in it is reachable from every
 	// system — the escape hatch for a rule that genuinely is universal.
@@ -430,6 +452,7 @@ export async function loadVault(root: string): Promise<Vault> {
 		root,
 		systems,
 		formulas,
+		interfaces,
 		moments,
 		time,
 		arcs,
