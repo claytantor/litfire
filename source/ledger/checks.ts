@@ -436,6 +436,108 @@ function factionGoals(input: CheckInput): Finding[] {
 }
 
 /**
+ * A system whose stats do nothing.
+ *
+ * Declaring a stat is half of having one. The other half is something that
+ * changes it — a ledger event in a scene, or a formula that derives it from
+ * the rest of the state. With neither, every sheet under that system shows the
+ * declared defaults, in every scene, forever: the numbers are decoration, and
+ * nothing an author writes moves them.
+ *
+ * That is invisible from inside. A system page with eleven stats on it looks
+ * finished, `/sheet` renders happily, and the vault reports no error, because
+ * nothing is wrong — there is simply nothing there. One real vault had fifteen
+ * stats across two systems and not one event touching any of them.
+ *
+ * Reported per system, not per stat. Fifteen findings saying the same thing
+ * would bury it, and the decision is one decision: this system needs a stats
+ * model.
+ */
+function inertStats(input: CheckInput): Finding[] {
+	const changed = new Set<string>();
+	for (const situation of input.situations) {
+		for (const event of situation.events ?? []) {
+			if (event.type === 'stat') {
+				changed.add(event.stat);
+			}
+		}
+	}
+
+	return input.systems.flatMap(system => {
+		if (system.stub) {
+			return [];
+		}
+
+		if (system.stats.length === 0) {
+			return [
+				{
+					kind: 'system_stats_unset',
+					detail: `system '${system.id}' declares no stats — nothing a character does under it can be tracked`,
+					where: system.id,
+				},
+			];
+		}
+
+		// Derived or driven: either counts as alive. A stat with a formula moves
+		// when the state it reads moves, without any event naming it.
+		const live = system.stats.filter(
+			stat => changed.has(stat.id) || stat.formula !== undefined,
+		);
+		if (live.length > 0) {
+			return [];
+		}
+
+		return [
+			{
+				kind: 'system_stats_inert',
+				detail: `system '${system.id}' declares ${String(system.stats.length)} stat(s) that nothing changes and none derives — every sheet under it shows defaults`,
+				where: system.id,
+			},
+		];
+	});
+}
+
+/**
+ * An event that moves a stat the system computes.
+ *
+ * Applying it would work and then be undone: derived stats are recomputed after
+ * every step, so the event's value survives exactly until the formula runs.
+ * Reported rather than refused, because which of the two the author meant is
+ * theirs to decide — drop the event, or drop the formula and let the scene
+ * drive the number.
+ */
+function derivedStatsDriven(input: CheckInput): Finding[] {
+	const derived = new Map<string, string>();
+	for (const system of input.systems) {
+		for (const stat of system.stats) {
+			if (stat.formula !== undefined) {
+				derived.set(stat.id, system.id);
+			}
+		}
+	}
+
+	const findings: Finding[] = [];
+	for (const situation of input.situations) {
+		for (const event of situation.events ?? []) {
+			if (event.type !== 'stat') {
+				continue;
+			}
+			const system = derived.get(event.stat);
+			if (system !== undefined) {
+				findings.push({
+					kind: 'derived_stat_driven',
+					detail: `${situation.id} changes '${event.stat}', which '${system}' computes — the formula overwrites it at the end of the step`,
+					where: situation.id,
+					actor: event.actor,
+				});
+			}
+		}
+	}
+
+	return findings;
+}
+
+/**
  * A file whose name is not its id.
  *
  * The id is the filename stem by convention, and the convention was only that:
@@ -697,6 +799,8 @@ export function runChecks(input: CheckInput): OpenQuestion[] {
 		...misnamedFiles(input),
 		...systemNames(input),
 		...factionGoals(input),
+		...inertStats(input),
+		...derivedStatsDriven(input),
 		...artifactUse(input),
 		...artifactOutcomes(input),
 		...formulaErrors(input),

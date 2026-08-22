@@ -7,6 +7,7 @@ import type {
 	Moment,
 } from '../domain/schema.js';
 import type {FormulaRunner} from '../system/sandbox.js';
+import {applyDerived, evaluationOrder} from './derived.js';
 import {compareInstants, MAX_INSTANT, type Instant} from '../time/instant.js';
 
 export type CharacterState = {
@@ -301,6 +302,27 @@ export async function replay(input: ReplayInput): Promise<ReplayResult> {
 		return created;
 	};
 
+	// Computed once per system, not once per character per step: the order is a
+	// property of how the author wrote their formulas and does not change as the
+	// story runs. A cycle is reported once, here, and its stats are skipped —
+	// there is no answer to compute and guessing a starting point would produce
+	// a number that looks like one.
+	const orders = new Map<string, readonly string[]>();
+	const orderFor = (system: SystemDef): readonly string[] => orders.get(system.id) ?? [];
+	for (const system of systems) {
+		const {order, cycle} = evaluationOrder(system, id =>
+			formulas?.sourceOf(id, system.id),
+		);
+		orders.set(system.id, order);
+		if (cycle.length > 0) {
+			findings.push({
+				kind: 'stat_formula_cycle',
+				detail: `stats ${cycle.join(', ')} in '${system.id}' derive from each other in a loop — none of them can be computed`,
+				where: system.id,
+			});
+		}
+	}
+
 	for (const step of sequence) {
 		const where = step.id;
 		for (const event of eventsById.get(step.id) ?? []) {
@@ -468,6 +490,24 @@ export async function replay(input: ReplayInput): Promise<ReplayResult> {
 					break;
 				}
 			}
+		}
+
+		// After the events, because a derived stat is a consequence of them: it
+		// reads the state as it stands at this point in the story, which is what
+		// makes it a fact about a scene rather than about a character sheet.
+		for (const character of Object.values(state.characters)) {
+			const system = systems.find(candidate => candidate.id === character.system);
+			if (system === undefined) {
+				continue;
+			}
+			await applyDerived(
+				character,
+				system,
+				orderFor(system),
+				formulas,
+				step.id,
+				findings,
+			);
 		}
 
 		snapshots.set(step.id, cloneState(state));

@@ -54,7 +54,7 @@ A block on the system's page, in the world's own voice, with the values marked:
     ┌─ THE LATHE ─────────────────────────────┐
     │  {name}                    TIER {level} │
     │                                         │
-    │  COHERENCE   {coherence}/{max_coherence}│
+    │  COHERENCE  {coherence}/{max-coherence} │
     │  RESONANCE   {resonance}/10             │
     │  FLUX        {flux}                     │
     │                                         │
@@ -64,7 +64,7 @@ A block on the system's page, in the world's own voice, with the values marked:
 ````
 
 That is a specification and a rendering at once. `coherence` must exist.
-`max_coherence` must exist and is plainly derived rather than accumulated.
+`max-coherence` must exist and is plainly derived rather than accumulated.
 `resonance` has a ceiling of 10 stated in the interface itself.
 
 ### What `/system generate stats` does
@@ -83,10 +83,21 @@ Every one of those is a diff through the review gate, like every other write.
 
 ```yaml
 stats:
-  - id: max_coherence
+  - id: max-coherence
     name: Max Coherence
     formula: max-coherence # ← the whole change
 ```
+
+::: warning Stat ids are kebab-case, and that has a consequence
+`idSchema` is `^[a-z0-9][a-z0-9-]*$`, so `max_coherence` is not a legal id —
+which matters more than it looks. A formula reads its inputs by destructuring,
+and `({max-coherence}) =>` is a syntax error. A derived stat that another
+formula needs to read has to be reached as `state['max-coherence']`, or given a
+single-word id.
+
+The shipped example works only because `constitution` and `level` happen to be
+single words.
+:::
 
 A stat with a `formula` is computed; a stat without one is accumulated by
 events. That mirrors `curves.xp_for_level` exactly, which is the pattern the
@@ -127,14 +138,15 @@ deliberate decision about the consent model, not a side effect of this feature.
 
 ### 2. A derived stat must not be accumulable
 
-`{type: stat, stat: max_coherence, delta: 5}` against a computed stat is a
+`{type: stat, stat: max-coherence, delta: 5}` against a computed stat is a
 contradiction: replay would apply it and the next evaluation would overwrite it.
 The schema cannot express "accumulated or derived, never both" on its own, so
-this needs a check — `stat_is_derived`, reported and never silently resolved.
+this needs a check — `derived_stat_driven`, reported and never silently
+resolved.
 
 ### 3. Derived stats form a graph, and graphs cycle
 
-`max_coherence` may depend on `tier`, which depends on `coherence`. That is a
+`max-coherence` may depend on `tier`, which depends on `coherence`. That is a
 dependency order and it can be circular. It needs a topological sort and a cycle
 check — a cycle is an author error the tool must report rather than hang on.
 
@@ -178,9 +190,12 @@ decides, and the decision is put in terms the author can actually decide on.
 
 ## Sequencing
 
-1. **Derived stats, hand-written.** The `formula:` field, the dependency sort,
-   the cycle and accumulation checks. No model involved, and it makes the
-   scaffold's stranded `max-hp` mean something.
+1. ~~**Derived stats, hand-written.** The `formula:` field, the dependency sort,
+   the cycle and accumulation checks.~~ **Done.** No model involved, and the
+   scaffold's stranded `max-hp` now means something. Three checks came with it:
+   `system_stats_inert` for a system whose stats nothing moves,
+   `system_stats_unset` for one that declares none, and `derived_stat_driven`
+   for a scene fighting a formula.
 2. **The author's interface.** The `interface` block on a system page, replacing
    the profile's choice of three templates for vaults that define one.
 3. **Per-scene rendering.** `/situation <id> sheet`, the wiki section, and

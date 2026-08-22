@@ -78,6 +78,7 @@ export class FormulaRunner {
 	readonly #isolate: ivm.Isolate;
 	readonly #context: ivm.Context;
 	readonly #refs = new Map<string, ivm.Reference>();
+	readonly #sources = new Map<string, string>();
 	readonly #errors: FormulaError[] = [];
 	#disposed = false;
 
@@ -103,7 +104,9 @@ export class FormulaRunner {
 					reference: true,
 					timeout: CPU_TIMEOUT_MS,
 				});
-				runner.#refs.set(formulaKey(formula.id, formula.system), reference);
+				const key = formulaKey(formula.id, formula.system);
+				runner.#refs.set(key, reference);
+				runner.#sources.set(key, formula.source);
 			} catch (caught) {
 				runner.#errors.push({
 					id: formula.id,
@@ -135,6 +138,20 @@ export class FormulaRunner {
 
 	has(id: string, system?: string): boolean {
 		return this.resolve(id, system) !== undefined;
+	}
+
+	/**
+	 * The source text a formula id resolves to, for callers that need to read a
+	 * formula rather than run it.
+	 *
+	 * Derived stats work out their evaluation order by seeing which other stats
+	 * a formula names, and the source is the only place that is written down.
+	 * Asking the author to declare dependencies beside a formula that already
+	 * names them is bookkeeping they would get wrong.
+	 */
+	sourceOf(id: string, system?: string): string | undefined {
+		const key = this.resolve(id, system);
+		return key === undefined ? undefined : this.#sources.get(key);
 	}
 
 	/**

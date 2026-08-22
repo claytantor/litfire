@@ -34,6 +34,19 @@ export const statDefSchema = z.object({
 	default: z.number().default(0),
 	/** When false (the default), a negative value raises an open question. */
 	allow_negative: z.boolean().default(false),
+	/**
+	 * Names a formula that computes this stat, making it derived rather than
+	 * accumulated.
+	 *
+	 * A stat without one is moved by ledger events and by nothing else. A stat
+	 * with one is recomputed from the rest of the character's state after every
+	 * step, and an event naming it is a contradiction the checks report — the
+	 * event would be applied and then immediately overwritten.
+	 *
+	 * The same shape as `curves.xp_for_level`: a schema field naming a formula,
+	 * so the sandbox contract does not change to accommodate it.
+	 */
+	formula: idSchema.optional(),
 });
 
 export const skillDefSchema = z.object({
