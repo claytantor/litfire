@@ -266,3 +266,33 @@ describe('the brief', () => {
 		expect(messages[1]?.content).toContain('split it');
 	});
 });
+
+/**
+ * A screen that cannot resolve produces a weak stats model, and the author
+ * usually cannot see why — the placeholders look fine, they just render as
+ * themselves. The curator is the one pass that reads raw and corpus together,
+ * so it is where that feedback belongs.
+ */
+describe('the curator on status screens', () => {
+	const prompt = CURATOR_PERSONA;
+
+	it('knows a system can carry one', () => {
+		expect(prompt).toContain('interface');
+	});
+
+	it('names the three failures that actually happen', () => {
+		expect(prompt).toContain('A placeholder for text rather than a number');
+		expect(prompt).toContain('A placeholder for a bound');
+		expect(prompt).toContain('really a derived stat');
+	});
+
+	it('says to tell the author rather than rewrite the drawing', () => {
+		// The author lined it up by hand and what it should say is theirs.
+		expect(prompt).toContain('Do not silently rewrite a screen');
+	});
+
+	it('says what a good screen looks like, not only what is wrong', () => {
+		expect(prompt).toContain('The good outcome');
+		expect(prompt).toContain('{skills}');
+	});
+});

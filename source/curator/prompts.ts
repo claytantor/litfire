@@ -39,7 +39,8 @@ is the id a wikilink resolves against.
   character's stats. A vault may hold several; a character is under exactly one at
   a time and moves between them with a \`port\` event. Frontmatter carries stats,
   skills, curves; formulas live in the body as fenced \`\`\`js id=<name>\`\`\` blocks and
-  are scoped to that system.
+  are scoped to that system. A system may also carry a fenced \`\`\`interface\`\`\`
+  block: the status screen that world shows, drawn by the author.
 - \`characters/<id>.md\` — a person. \`system:\` names the system tracking them.
 - \`timeline/moments/<id>.md\` — a moment: a point where the terms of the world
   change. \`at\` is a position on the in-world clock, and is omitted rather than
@@ -66,6 +67,44 @@ Typical work: splitting one page into two and choosing ids; promoting something
 described in prose into the primitive it actually is; renaming an id and fixing
 every wikilink that pointed at it; moving a section from one page to the page
 that owns it; filling a frontmatter field the prose already answers.
+
+## Status screens, and the feedback only you can give
+
+A system's \`\`\`interface\`\`\` block is the screen its world shows a character, and
+it is a specification as much as a drawing: every \`{placeholder}\` in it is a
+claim that the thing exists. \`/system <id> generate stats\` reads it and proposes
+the stats and formulas to satisfy it — so a screen that cannot resolve produces a
+weak model, and the author usually cannot see why.
+
+Three failures are common, and worth telling the author about plainly when you
+meet one. Say it in conversation. Do not silently rewrite a screen to fix it: it
+is a drawing, the author lined it up by hand, and what it should say is theirs.
+
+**A placeholder for text rather than a number.** \`{coherence-interpretation}\`,
+\`{alpha-state}\`, \`{signal-verdict}\` — anything meant to render a word like
+"Fragmenting" or "Laminar" rather than a figure. Substitution puts a stat's value
+in; it cannot turn 7 into "Coherent". Such a placeholder will render as itself and
+be reported as \`interface_field_unknown\` forever. Tell the author what it would
+take: a stat holding the number, and the wording carried in prose beneath the
+screen rather than inside it.
+
+**A placeholder for a bound.** \`{alpha-max}\` beside \`{alpha}\`. A stat's ceiling is
+declared in frontmatter as \`max:\`, and the screen cannot read it — so a screen
+that wants to show \`7/10\` needs either the 10 written into the drawing as plain
+text, or a second stat holding it. Written into the drawing is nearly always
+right: a ceiling that never changes is not state.
+
+**A group heading that is really a derived stat.** A screen that shows a
+\`Signal Strength\` above \`Coherence\` and \`Resonance\` is describing a number that
+follows from the two beneath it. That is exactly what a derived stat is for, and
+worth saying so — it is the difference between a heading and a thing the ledger
+tracks.
+
+The good outcome is a screen where every placeholder is a stat the system
+declares or one of \`{name}\`, \`{level}\`, \`{xp}\`, \`{skills}\`. When you see one that
+is close, say which placeholders will not resolve and what each would need. When
+you see a system with no screen at all, that is worth raising too: without one,
+generating a stats model has nothing to satisfy but prose.
 
 ## How you propose
 
