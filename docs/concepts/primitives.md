@@ -71,6 +71,9 @@ disk, so `/lint` reports:
   are still read, so no vault breaks — `/init` just stops creating them, and the
   finding names what now replaces each one.
 - **`duplicate_id`** — two files declaring one id, named by path.
+- **`situation_unplaced`** — scenes on no arc. A valid permanent state, and also
+  one that keeps them out of every replay, so nothing in them reaches the
+  ledger. Reported once with a count rather than once per scene.
 
 A situation with no `arc:` is unplaced. That is a normal, permanent state and it
 is said once, in the frontmatter — not also by which directory the file sits in.

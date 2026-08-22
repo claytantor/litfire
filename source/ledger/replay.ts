@@ -98,13 +98,7 @@ export function buildSequence(
 			(a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER) ||
 			a.id.localeCompare(b.id),
 	)) {
-		const anchor = arc.starts_after ? anchorAt.get(arc.starts_after) : undefined;
-		if (anchor !== undefined) {
-			emitMomentsUpTo(anchor);
-		}
-
 		// D3: sparse integers, ties broken by id so replay is deterministic even
-		// when an author duplicates an order value.
 		const inArc = situations
 			.filter(situation => situation.arc === arc.id)
 			.toSorted(
@@ -112,6 +106,37 @@ export function buildSequence(
 					(a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER) ||
 					a.id.localeCompare(b.id),
 			);
+
+		/**
+		 * Where the clock has to have reached before this arc's scenes play.
+		 *
+		 * `starts_after` when the author named one. Otherwise the earliest moment
+		 * the arc's own scenes claim — because an arc without an anchor used to
+		 * mean "the beginning of time", which put a prologue's scenes *before the
+		 * moment they say they happen at*. A scene anchored aeons back replayed
+		 * ahead of the aeons, so any events that moment carried had not applied
+		 * yet and the scene saw a world that had not changed.
+		 *
+		 * A first arc is the case that needs this. Every other arc follows one, so
+		 * its author has a moment to name; the opening has nothing before it, and
+		 * naming a moment its own first scene already names would be saying the
+		 * same thing twice.
+		 */
+		const claimed = inArc
+			.map(situation =>
+				situation.moment === undefined ? undefined : anchorAt.get(situation.moment),
+			)
+			.filter((at): at is Instant => at !== undefined);
+
+		const anchor = arc.starts_after
+			? anchorAt.get(arc.starts_after)
+			: claimed.length === 0
+				? undefined
+				: claimed.reduce((earliest, at) => (at < earliest ? at : earliest));
+
+		if (anchor !== undefined) {
+			emitMomentsUpTo(anchor);
+		}
 
 		for (const situation of inArc) {
 			sequence.push({kind: 'situation', id: situation.id, arc: arc.id});

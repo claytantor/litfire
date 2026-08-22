@@ -797,6 +797,29 @@ function unplaced(input: CheckInput): Finding[] {
 		}
 	}
 
+	/**
+	 * A scene with no arc is unplaced, which is a valid permanent state — and
+	 * also means it is absent from every replay, so nothing in it reaches the
+	 * ledger and nobody in it has a state at it. Both halves are true and only
+	 * the first was ever said out loud.
+	 *
+	 * Once, with a count, rather than once per scene. An author may have fifty
+	 * scenes waiting to be placed and that is not fifty problems; it is one
+	 * fact about the vault, and fifty findings would bury it.
+	 */
+	const loose = input.situations.filter(situation => situation.arc === undefined);
+	if (loose.length > 0) {
+		const named = loose
+			.slice(0, 3)
+			.map(situation => situation.id)
+			.join(', ');
+		findings.push({
+			kind: 'situation_unplaced',
+			detail: `${String(loose.length)} scene(s) are on no arc — ${named}${loose.length > 3 ? `, and ${String(loose.length - 3)} more` : ''} — so they are in no replay and contribute nothing to the ledger`,
+			where: loose[0]?.id ?? 'situations',
+		});
+	}
+
 	return findings;
 }
 
