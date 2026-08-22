@@ -96,6 +96,15 @@ export type CommandResult = {
 		readonly declined?: string;
 	};
 	/**
+	 * Derives a stats model for one system from the screen its author drew.
+	 *
+	 * Runs a model pass, so App owns it: the command's job is to say which
+	 * system, having already checked there is one and that a provider exists.
+	 */
+	readonly generateStats?: {
+		readonly system: string;
+	};
+	/**
 	 * Gives authored corpus pages a note in `raw/` to have come from.
 	 *
 	 * Unlike `ingest`, the proposals arrive already computed: adoption is a copy

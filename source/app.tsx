@@ -46,6 +46,7 @@ import {
 import {resolveDates} from './ingest/dates.js';
 import {calendarFor} from './time/binding.js';
 import {runPlan} from './curator/index.js';
+import {buildStatsGeneration} from './system/generate.js';
 import {editText, resolveEditor} from './vault/editor.js';
 import {
 	displayPath,
@@ -605,6 +606,70 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 	);
 
 	/**
+	 * Derives a stats model for one system from the screen its author drew.
+	 *
+	 * One pass, one file — the system's own note in `raw/`. Unlike ingest there
+	 * is nothing to iterate over: the brief is a single system, and splitting it
+	 * would give each formula less of the picture than the screen it has to
+	 * satisfy.
+	 */
+	const runStatsGeneration = useCallback(
+		async (systemId: string) => {
+			const resolved = await ensure();
+			if (!resolved) {
+				append([error('no vault loaded here — run /init first')]);
+				return;
+			}
+
+			const system = resolved.vault.systems.find(one => one.id === systemId);
+			if (system === undefined) {
+				append([error(`no system '${systemId}'`)]);
+				return;
+			}
+
+			const config = await readConfig(root);
+			const loaded = await loadProvider(
+				config.provider.id,
+				config.provider.model,
+				config.provider.baseUrl,
+			);
+			if ('error' in loaded) {
+				append([error(loaded.error)]);
+				return;
+			}
+
+			setBusy(true);
+			setBusyLabel(`deriving ${systemId}'s stats…`);
+			const controller = new AbortController();
+
+			try {
+				const {profile} = await loadSetting(root);
+				const {instruction, context} = await buildStatsGeneration(root, resolved, system);
+				const outcome = await runPlan(
+					loaded.provider,
+					root,
+					instruction,
+					context,
+					profile.register ?? '',
+					controller.signal,
+				);
+
+				await appendLog(
+					root,
+					`/system ${systemId} generate stats: proposed ${String(outcome.proposals.length)} write(s)`,
+				);
+				await handlePlanned(outcome);
+			} catch (caught) {
+				append([error(caught instanceof Error ? caught.message : String(caught))]);
+			} finally {
+				setBusy(false);
+				setBusyLabel(undefined);
+			}
+		},
+		[append, ensure, handlePlanned, root],
+	);
+
+	/**
 	 * Adoption arrives already decided — it is a copy of what a page says, not a
 	 * model's reading of it — so App only opens the gate.
 	 *
@@ -741,6 +806,9 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			} else if (result.adopt) {
 				append(result.lines);
 				await openAdoption(result.adopt.proposals, result.adopt.title);
+			} else if (result.generateStats) {
+				append(result.lines);
+				await runStatsGeneration(result.generateStats.system);
 			} else if (result.ingest) {
 				append(result.lines);
 				await runIngest(
@@ -772,6 +840,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			openCurator,
 			recompute,
 			runIngest,
+			runStatsGeneration,
 			startInterview,
 			startReviewer,
 		],

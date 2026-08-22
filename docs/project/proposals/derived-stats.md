@@ -1,6 +1,6 @@
 # Proposal — the interface is the specification
 
-**Status:** proposed, not accepted
+**Status:** accepted, and built
 **Wants:** two capabilities — generating a stats model, and executing it per scene
 
 ## The idea, restated
@@ -221,8 +221,19 @@ decides, and the decision is put in terms the author can actually decide on.
    using the author's interface.~~ **Done.** A system that draws nothing still
    falls back to the profile's template, so a vault renders before anyone has
    drawn anything. The wiki section is still to do.
-4. **`/system generate stats`.** The model pass, last — it is the only part that
-   needs the other three to exist before it can be judged.
+4. ~~**`/system generate stats`.** The model pass, last — it is the only part
+   that needs the other three to exist before it can be judged.~~ **Done.**
+
+   It proposes into `raw/systems/<id>.md`, not the derived page: a formula
+   written to the corpus would be dropped by the next `/ingest system`, because
+   the page is rebuilt from the note and the note would not have it. That is the
+   same permission the curator holds, for the same reason.
+
+   `rationale` is capped at four wrapped lines in the gate, deliberately — it
+   must never be why the decision scrolls away — so the worked table goes in the
+   file, above the block it explains, and `rationale` carries the one-line
+   summary it is sized for. The table then stays in the vault as documentation
+   of a rule the story runs on.
 
 Steps 1–3 are useful on their own to an author who wants to write their own
 formulas, which is the test of whether the sequence is honest.

@@ -2290,11 +2290,18 @@ const provider: Command = {
  */
 const system: Command = {
 	name: 'system',
-	usage: '/system [<id>]',
+	usage: '/system [<id>] [generate stats]',
 	summary: 'the rules a character is tracked by',
 	async run(args, context) {
 		if (!context.project) {
 			return needsProject();
+		}
+
+		if (args.includes('generate')) {
+			return generateStats(
+				args.find(one => one !== 'generate' && one !== 'stats'),
+				context,
+			);
 		}
 
 		// `renderSystem` decides all three cases itself — several systems listed,
@@ -2307,6 +2314,64 @@ const system: Command = {
 		return {lines, paged: lines.length > 14, title: 'system'};
 	},
 };
+
+/**
+ * `/system [<id>] generate stats` — derive a stats model from the drawn screen.
+ *
+ * Refuses before spending anything on the two cases where the answer is not a
+ * model's to give: no system to work on, and no provider to ask. Everything
+ * else it proposes reaches the author as a diff.
+ */
+async function generateStats(
+	named: string | undefined,
+	context: CommandContext,
+): Promise<CommandResult> {
+	const systems = context.project!.vault.systems;
+	const id = named ?? (systems.length === 1 ? systems[0]?.id : undefined);
+
+	if (id === undefined) {
+		return {
+			lines: [
+				error(`this vault has ${String(systems.length)} systems — name one`),
+				...systems.map(one => muted(`  /system ${one.id} generate stats`)),
+			],
+		};
+	}
+
+	const system = systems.find(one => one.id === id);
+	if (system === undefined) {
+		return {lines: [error(`no system '${id}' in this vault`)]};
+	}
+
+	const config = await readConfig(context.root);
+	if (config.provider.id === undefined || config.provider.model === undefined) {
+		return {
+			lines: [
+				error('no model provider configured'),
+				muted('run /provider to choose one — generating a stats model needs one'),
+			],
+		};
+	}
+
+	const drawn = context.project!.vault.interfaces[id];
+	return {
+		lines: [
+			muted(
+				drawn === undefined
+					? `${id} draws no status screen — working from its prose and stats alone`
+					: `deriving ${id}'s stats from the screen it draws`,
+			),
+			...(drawn === undefined
+				? [
+						muted('an ```interface block on its page is what makes this precise —'),
+						muted('draw the screen your world shows and run this again'),
+					]
+				: []),
+			muted('every formula arrives with a worked table, in the file, for you to judge'),
+		],
+		generateStats: {system: id},
+	};
+}
 
 const character: Command = {
 	name: 'character',
