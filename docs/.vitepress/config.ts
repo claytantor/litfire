@@ -96,6 +96,10 @@ export default defineConfig({
 							},
 							{text: 'Raw-first authoring', link: '/project/proposals/raw-first'},
 							{text: 'One verb for asking', link: '/project/proposals/questions'},
+							{
+								text: 'The interface is the specification',
+								link: '/project/proposals/derived-stats',
+							},
 						],
 					},
 				],
