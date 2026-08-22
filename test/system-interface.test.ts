@@ -5,6 +5,7 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {findCommand} from '../source/commands/registry.js';
 import type {CommandContext} from '../source/commands/types.js';
 import {computeProject} from '../source/core/project.js';
+import {buildIngest, readRaw} from '../source/ingest/index.js';
 import {extractInterface, fieldsOf, renderInterface} from '../source/system/interface.js';
 import {VAULT} from '../source/vault/paths.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
@@ -177,5 +178,55 @@ describe('the scene, as its cast sees it', () => {
 	it('asks for an id rather than guessing', async () => {
 		await vaultWithScreen();
 		expect(said(await run('/situation sheet'))).toContain('usage:');
+	});
+});
+
+/**
+ * A drawing is the one thing in a vault where whitespace is content. Ingest
+ * rebuilds a page from its note on every pass, so without this the author's
+ * boxes would be at the mercy of whatever a model thought tidier.
+ */
+describe('ingest is told to leave the drawing alone', () => {
+	it('says to reproduce it byte for byte', async () => {
+		await vaultWithScreen();
+		const {documents} = await readRaw(root, 'system');
+		const {instruction} = await buildIngest(root, context.project!, 'system', documents);
+
+		expect(instruction).toContain('reproduce it');
+		expect(instruction).toContain('byte for byte');
+		expect(instruction).toContain('whitespace is content');
+	});
+
+	it('forbids adding a placeholder, which would invent a stat', async () => {
+		await vaultWithScreen();
+		const {documents} = await readRaw(root, 'system');
+		const {instruction} = await buildIngest(root, context.project!, 'system', documents);
+
+		expect(instruction).toContain('never add or remove a placeholder');
+	});
+});
+
+/**
+ * Systems were the one kind with no way to open their own note. That is where
+ * the interface block goes, so the guide for drawing one had to tell an author
+ * to edit a file by hand — while `/moment`, `/place` and `/situation` all
+ * opened theirs.
+ */
+describe('/system edit', () => {
+	it('opens the author’s note, adopting it if it is not there yet', async () => {
+		await vaultWithScreen();
+		const result = await run('/system core edit');
+
+		expect(result.openEditor).toContain(path.join('raw', 'systems', 'core.md'));
+	});
+
+	it('takes the only system without being told', async () => {
+		await vaultWithScreen();
+		expect((await run('/system edit')).openEditor).toContain('core.md');
+	});
+
+	it('still renders the view when not editing', async () => {
+		await vaultWithScreen();
+		expect(said(await run('/system core'))).toContain('Core');
 	});
 });

@@ -396,6 +396,14 @@ export async function buildIngest(
 		'field, say so in notes, and let them settle it.',
 		'',
 		'Do not modify the raw notes themselves.',
+		'',
+		'If a note or an existing page carries a ```interface block, reproduce it',
+		'byte for byte — every space, every box-drawing character, every',
+		'`{placeholder}`. It is a status screen the author drew and lined up by',
+		'hand, and it is the one thing in the vault where whitespace is content.',
+		'Never tidy it, never re-align it, and never add or remove a placeholder:',
+		'a placeholder is a claim that a stat exists, and adding one invents a',
+		'stat the author did not ask for.',
 		...(clock === undefined
 			? []
 			: [

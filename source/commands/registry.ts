@@ -2290,11 +2290,35 @@ const provider: Command = {
  */
 const system: Command = {
 	name: 'system',
-	usage: '/system [<id>] [generate stats]',
+	usage: '/system [<id>] [edit | generate stats]',
 	summary: 'the rules a character is tracked by',
 	async run(args, context) {
 		if (!context.project) {
 			return needsProject();
+		}
+
+		// Systems were the one kind with no way to open their own note, which is
+		// where an author draws the status screen their world shows — so the guide
+		// for doing it had to describe editing a file by hand.
+		if (args.includes('edit')) {
+			const systems = context.project.vault.systems;
+			const id =
+				args.find(one => one !== 'edit') ??
+				(systems.length === 1 ? systems[0]?.id : undefined);
+
+			if (id === undefined) {
+				return {
+					lines: [
+						error(`this vault has ${String(systems.length)} systems — name one`),
+						...systems.map(one => muted(`  /system ${one.id} edit`)),
+					],
+				};
+			}
+
+			const opened = await authoredFile(context.root, 'system', id);
+			return 'error' in opened
+				? {lines: [error(opened.error)]}
+				: {lines: adoptionNote(opened), openEditor: opened.file};
 		}
 
 		if (args.includes('generate')) {
@@ -2309,7 +2333,7 @@ const system: Command = {
 		// focus straight through rather than reporting the same thing twice.
 		const lines = renderSystem(
 			context.project,
-			args.find(one => one !== 'show'),
+			args.find(one => one !== 'show' && one !== 'edit'),
 		);
 		return {lines, paged: lines.length > 14, title: 'system'};
 	},

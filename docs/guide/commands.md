@@ -12,6 +12,9 @@
 | `/timeline`                    | Structural view; moments, arcs, what is unplaced  |
 | `/themes`                      | Leaf-level coverage with upward rollup            |
 | `/system [<id>]`               | The rules a character is tracked by               |
+| `/system <id> edit`            | Open its note — where the status screen goes      |
+| `/system <id> generate stats`  | Derive stats and formulas from the drawn screen   |
+| `/situation <id> sheet`        | Every character in the scene, on their own screen |
 | `/character <name>`            | A character as the corpus has them                |
 | `/questions`                   | Everything unresolved, across the vault           |
 | `/questions <kind> [<id>]`     | An interview about that kind, opening on its gaps |

@@ -47,6 +47,7 @@ export default defineConfig({
 					{text: 'Commands', link: '/guide/commands'},
 					{text: 'Writing a scene', link: '/guide/writing-a-scene'},
 					{text: 'Populating a situation', link: '/guide/populating-a-situation'},
+					{text: 'Drawing your status screen', link: '/guide/the-status-screen'},
 					{text: 'Moments', link: '/guide/moments'},
 					{text: 'Places', link: '/guide/places'},
 					{text: 'Interviews', link: '/guide/interviews'},
