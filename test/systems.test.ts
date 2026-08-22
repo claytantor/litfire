@@ -369,7 +369,6 @@ describe('the in-world clock at deep time', () => {
 		const project = await computeProject(root);
 
 		expect(project.vault.issues).toEqual([]);
-		expect(project.questions.map(q => q.kind)).not.toContain('clock_beyond_exact_range');
 		expect(project.vault.moments[0]?.at).toBe(-25_228_800_000_000_000n);
 	});
 
@@ -386,12 +385,22 @@ describe('the in-world clock at deep time', () => {
 		expect(order.indexOf('patch')).toBeLessThan(order.indexOf('aftermath'));
 	});
 
-	it('says nothing about positions the clock can represent exactly', async () => {
+	/**
+	 * This used to assert that `clock_beyond_exact_range` did not fire, which
+	 * stopped meaning anything the day that check was deleted: an assertion that
+	 * a finding is absent passes forever once the finding cannot occur. What is
+	 * still worth pinning is that two ordinary, distinct instants produce no
+	 * complaint about the clock at all.
+	 */
+	it('says nothing about two ordinary positions a day apart', async () => {
 		await moment('the-arrival', 'at: 0\n');
 		await moment('later', 'at: 86400\n');
 
 		const project = await computeProject(root);
-		expect(project.questions.map(q => q.kind)).not.toContain('clock_beyond_exact_range');
+		const clockFindings = project.questions.filter(q => q.kind.startsWith('clock_'));
+
+		expect(clockFindings).toEqual([]);
+		expect(project.vault.issues).toEqual([]);
 	});
 
 	it('reports two events the author genuinely placed at the same instant', async () => {

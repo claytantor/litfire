@@ -119,8 +119,12 @@ function offsetAt(ms: number, timeZone: string): number {
  * Two passes, because the offset depends on the instant we are trying to find.
  * The first guess treats the fields as UTC, reads the offset that would have
  * been in force there, and corrects; the second pass catches the case where
- * the correction moved across a transition. This is the same trap that made
- * `at.py` subtract naive wall-clock values across a DST boundary.
+ * the correction moved across a transition.
+ *
+ * One pass is the standard bug here, and it is quiet: it is right all year
+ * except within an hour of a transition, where it lands an hour out. A story
+ * anchored in a zone that observes daylight saving crosses two of those every
+ * year, so "usually right" is not a property worth having.
  */
 function utcFromFields(fields: Fields, timeZone: string): number {
 	const naive = Date.UTC(

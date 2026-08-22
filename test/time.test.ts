@@ -84,7 +84,8 @@ describe('no calendar bound', () => {
 });
 
 describe('Earth/Sol time', () => {
-	// The vault's own origin, from scripts/at.py.
+	// A real vault's binding: an anchor in a zone that observes daylight saving,
+	// which is what makes the cases below more than theory.
 	const cal = gregorian({
 		epoch: '2031-08-15T19:33:00-07:00',
 		timeZone: 'America/Los_Angeles',
@@ -101,8 +102,10 @@ describe('Earth/Sol time', () => {
 	});
 
 	/**
-	 * The trap that produced a wrong answer in `scripts/at.py`: subtracting
-	 * wall-clock fields across a transition ignores that the offset changed.
+	 * Subtracting wall-clock fields across a transition ignores that the offset
+	 * changed, and the answer is out by exactly the hour that repeated. Easy to
+	 * get wrong twice over: the expected value here is 49 hours, not 25, and
+	 * reasoning about it casually produces both.
 	 */
 	it('crosses a daylight-saving boundary without losing the hour', () => {
 		// 2031-11-02 is the US fall-back. Midnight before, midnight after.
