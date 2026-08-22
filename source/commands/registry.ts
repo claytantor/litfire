@@ -1181,7 +1181,16 @@ async function adopt(
 	// author should see that named even when there is nothing else to do.
 	const notes: Line[] = plan.skipped.map(skip => warn(`  ${skip.page} — ${skip.reason}`));
 
-	if (plan.adopting.length === 0) {
+	const relocations =
+		plan.moved.length === 0
+			? []
+			: [
+					muted(
+						`  ${String(plan.moved.length)} page(s) already cite a note but sit in a superseded home — moved, unchanged`,
+					),
+				];
+
+	if (plan.adopting.length === 0 && plan.moved.length === 0) {
 		return {
 			lines: [
 				plan.alreadyAdopted > 0
@@ -1201,13 +1210,18 @@ async function adopt(
 
 	return {
 		lines: [
-			heading(`adopting ${String(plan.adopting.length)} page(s) from ${scope}`),
+			heading(
+				plan.adopting.length === 0
+					? `moving ${String(plan.moved.length)} page(s) in ${scope}`
+					: `adopting ${String(plan.adopting.length)} page(s) from ${scope}`,
+			),
 			...[...byKind].map(([name, count]) =>
 				muted(`  ${String(count).padStart(3)} ${name}`),
 			),
 			blank(),
 			muted('each page becomes a note in raw/ and is stamped to cite it —'),
 			muted('after this /ingest can rebuild the corpus, so it becomes disposable'),
+			...relocations,
 			...(plan.alreadyAdopted > 0
 				? [muted(`${String(plan.alreadyAdopted)} page(s) already adopted, untouched`)]
 				: []),
@@ -1222,7 +1236,7 @@ async function adopt(
 
 const ingest: Command = {
 	name: 'ingest',
-	usage: '/ingest <kind> [<document>] · /ingest adopt [<kind>]',
+	usage: '/ingest <kind> [<document>] [again] · /ingest adopt [<kind>]',
 	summary: 'turn notes in raw/<kind>/ into typed pages, through the review gate',
 	async run(args, context) {
 		if (!context.project) {
@@ -1251,7 +1265,16 @@ const ingest: Command = {
 			};
 		}
 
-		const focus = rest.join(' ').trim();
+		// `source_hash` tracks the note, not the recipe. When what ingest asks for
+		// changes — a summary block, dates it can now resolve — every page is
+		// stale in a way no hash can see, because the note it was built from did
+		// not move. `again` is how an author says so; it is deliberately explicit,
+		// since it is one model request per note.
+		const again = rest.includes('again');
+		const focus = rest
+			.filter(one => one !== 'again')
+			.join(' ')
+			.trim();
 		const {documents, directory} = await readRaw(
 			context.root,
 			kind,
@@ -1282,13 +1305,13 @@ const ingest: Command = {
 			document,
 			status: statusOf(state, document.path, document.contents),
 		}));
-		const pending = sorted.filter(entry => entry.status !== 'unchanged');
+		const pending = again ? sorted : sorted.filter(entry => entry.status !== 'unchanged');
 
 		if (pending.length === 0) {
 			return {
 				lines: [
 					ok(`nothing to do — all ${String(documents.length)} up to date`),
-					muted(`edit a note in ${directory}/ and run this again`),
+					muted(`edit a note in ${directory}/, or /ingest ${kind} again to re-read them`),
 				],
 			};
 		}
@@ -1305,7 +1328,7 @@ const ingest: Command = {
 					? []
 					: [muted(`  ${String(sorted.length - pending.length)} unchanged, skipped`)]),
 			],
-			ingest: {kind, ...(focus === '' ? {} : {focus})},
+			ingest: {kind, ...(focus === '' ? {} : {focus}), ...(again ? {again} : {})},
 		};
 	},
 };

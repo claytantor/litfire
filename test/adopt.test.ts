@@ -129,13 +129,31 @@ describe('what adoption refuses to touch', () => {
 		expect(plan.alreadyAdopted).toBeGreaterThan(0);
 	});
 
-	it('leaves a page in a legacy location alone', async () => {
-		// Adopting it would give one id a note, a canonical page and a legacy
-		// page — making the duplicate harder to resolve, not easier.
+	/**
+	 * Adoption used to skip a page in a superseded home, on the reasoning that
+	 * writing a note for it would leave one id with a note, a canonical page and
+	 * a legacy page. That reasoning was right about the outcome and wrong about
+	 * the fix: skipping meant `/ingest adopt` did nothing at all on an
+	 * unmigrated vault, which is the one it exists for. It adopts and finishes
+	 * the move instead.
+	 */
+	it('adopts a page from a superseded home, and clears the old file', async () => {
 		await file(VAULT.inbox + '/sit-900.md', '---\nid: sit-900\n---\n\nLoose.\n');
 		const plan = await planAdoption(root, ['situation']);
 
-		expect(plan.proposals.some(p => p.path.includes('sit-900'))).toBe(false);
+		expect(find(plan.proposals, 'raw/situations/sit-900.md')).toBeDefined();
+		expect(find(plan.proposals, 'corpus/situations/sit-900.md')).toBeDefined();
+
+		const removal = find(plan.proposals, `${VAULT.inbox}/sit-900.md`);
+		expect(removal?.remove).toBe(true);
+		expect(removal?.rationale).toContain('superseded by');
+	});
+
+	it('removes nothing when the page was already canonical', async () => {
+		await authoredPage();
+		const plan = await planAdoption(root, ['faction']);
+
+		expect(plan.proposals.some(one => one.remove === true)).toBe(false);
 	});
 });
 
@@ -208,5 +226,48 @@ describe('a note that carries a time', () => {
 			documents,
 		);
 		expect(block).toContain('at: -31557600000000');
+	});
+});
+
+/**
+ * A page that already cites a note but sits in a superseded home would never
+ * be moved by anything: adoption skipped it as already adopted, and every
+ * other pass writes the canonical path and leaves this one shadowing it.
+ */
+describe('a page that is adopted but in the wrong place', () => {
+	it('is moved, byte for byte, and the old file cleared', async () => {
+		await file(
+			'characters/nyx.md',
+			'---\nid: nyx\nname: Nyx\nsource: raw/characters/nyx.md\nsource_hash: abc123\n---\n\nHer.\n',
+		);
+		await file('raw/characters/nyx.md', '---\nid: nyx\nname: Nyx\n---\n\nHer.\n');
+
+		const plan = await planAdoption(root, ['character']);
+
+		expect(plan.moved.map(one => one.id)).toContain('nyx');
+		// Not re-derived, not re-summarised: the same bytes at the right path.
+		expect(find(plan.proposals, 'corpus/characters/nyx.md')?.contents).toContain('Her.');
+		expect(find(plan.proposals, 'characters/nyx.md')?.remove).toBe(true);
+	});
+
+	it('is counted separately from a page that needed adopting', async () => {
+		await file(
+			'characters/nyx.md',
+			'---\nid: nyx\nsource: raw/characters/nyx.md\nsource_hash: abc\n---\n\nHer.\n',
+		);
+		await file('raw/characters/nyx.md', '---\nid: nyx\n---\n\nHer.\n');
+
+		const plan = await planAdoption(root, ['character']);
+
+		expect(plan.adopting.map(one => one.id)).not.toContain('nyx');
+		expect(plan.moved).toHaveLength(1);
+	});
+
+	it('leaves a canonical adopted page entirely alone', async () => {
+		const plan = await planAdoption(root, ['character']);
+
+		// The scaffold's own protagonist: adopted, and already where it belongs.
+		expect(plan.moved).toEqual([]);
+		expect(plan.alreadyAdopted).toBeGreaterThan(0);
 	});
 });

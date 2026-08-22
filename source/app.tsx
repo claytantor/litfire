@@ -474,7 +474,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 	 * the author accepts one at a time.
 	 */
 	const runIngest = useCallback(
-		async (kind: SourceKind, focus: string | undefined) => {
+		async (kind: SourceKind, focus: string | undefined, again = false) => {
 			const resolved = await ensure();
 			if (!resolved) {
 				append([error('no vault loaded here — run /init first')]);
@@ -501,9 +501,14 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			const {profile} = await loadSetting(root);
 			const {calendar} = calendarFor(resolved.vault.time);
 			const state = await readIngestState(root, kind);
-			const pending = documents.filter(
-				document => statusOf(state, document.path, document.contents) !== 'unchanged',
-			);
+			// `again` reads them all, including the ones the corpus already reflects:
+			// a change to what ingest asks for leaves every page stale with no hash
+			// able to see it, because the note did not move.
+			const pending = again
+				? documents
+				: documents.filter(
+						document => statusOf(state, document.path, document.contents) !== 'unchanged',
+					);
 			if (pending.length === 0) {
 				return;
 			}
@@ -738,7 +743,11 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 				await openAdoption(result.adopt.proposals, result.adopt.title);
 			} else if (result.ingest) {
 				append(result.lines);
-				await runIngest(result.ingest.kind, result.ingest.focus);
+				await runIngest(
+					result.ingest.kind,
+					result.ingest.focus,
+					result.ingest.again ?? false,
+				);
 			} else if (result.reviewer) {
 				await startReviewer();
 			} else if (result.wizard) {

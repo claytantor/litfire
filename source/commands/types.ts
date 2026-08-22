@@ -56,6 +56,14 @@ export type CommandResult = {
 		readonly kind: SourceKind;
 		/** A filename stem in the raw directory; absent means all of them. */
 		readonly focus?: string | undefined;
+		/**
+		 * Read notes the corpus already reflects, rather than skipping them.
+		 *
+		 * Idempotency is keyed on the note, so a change to what ingest *asks for*
+		 * leaves every page stale with nothing able to tell. This is the author
+		 * saying they know, and it costs one request per note.
+		 */
+		readonly again?: boolean;
 	};
 	/**
 	 * Asks the author one yes-or-no question before going any further.

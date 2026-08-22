@@ -1,7 +1,7 @@
 import {readdir, readFile} from 'node:fs/promises';
 import type {Proposal} from '../review/types.js';
 import {parseDocument, stringifyDocument} from '../vault/frontmatter.js';
-import {resolve} from '../vault/paths.js';
+import {homesOf, resolve} from '../vault/paths.js';
 import {authoringPath, corpusPath} from './authoring.js';
 import {INGEST, INGEST_KINDS, type IngestKind} from './index.js';
 import {hashSource, HASH_FIELD, SOURCE_FIELD} from './state.js';
@@ -47,30 +47,44 @@ export type AdoptionPlan = {
 	/** Two proposals per adoption: the note, then the page that cites it. */
 	readonly proposals: readonly Proposal[];
 	readonly adopting: readonly Adoption[];
+	/** Pages that already cite a note but sit in a superseded home. */
+	readonly moved: readonly Adoption[];
 	readonly skipped: readonly AdoptionSkip[];
 	/** Pages that already carry provenance. Counted, never listed. */
 	readonly alreadyAdopted: number;
 };
 
 /**
- * Only the canonical directory, never a legacy one.
+ * Every page of a kind, wherever it currently sits.
  *
- * A situation in `situations/inbox/` needs moving, not adopting — writing a
- * note for it would give one id a note, a canonical page and a legacy page, and
- * make the duplicate harder to resolve rather than easier. `legacy_location`
- * already tells the author to move it; adoption reports it and leaves it alone.
+ * Reading only the canonical directory made `/ingest adopt` a silent no-op on
+ * exactly the vaults it was written for: one that has not moved to `corpus/`
+ * keeps its pages where the previous layout put them, and is the one most in
+ * need of adopting.
  */
-async function pagesOf(root: string, kind: IngestKind): Promise<string[]> {
-	const directory = INGEST[kind].to;
-	const entries = await readdir(resolve(root, directory), {withFileTypes: true}).catch(
-		() => [],
-	);
+async function pagesOf(
+	root: string,
+	kind: IngestKind,
+): Promise<{path: string; legacy: boolean}[]> {
+	const canonical = INGEST[kind].to;
+	const found: {path: string; legacy: boolean}[] = [];
 
-	return entries
-		.filter(entry => entry.isFile() && entry.name.endsWith('.md'))
-		.filter(entry => entry.name !== 'README.md')
-		.map(entry => `${directory}/${entry.name}`)
-		.toSorted();
+	for (const directory of homesOf(canonical)) {
+		const entries = await readdir(resolve(root, directory), {
+			withFileTypes: true,
+		}).catch(() => []);
+
+		for (const entry of entries) {
+			if (entry.isFile() && entry.name.endsWith('.md') && entry.name !== 'README.md') {
+				found.push({
+					path: `${directory}/${entry.name}`,
+					legacy: directory !== canonical,
+				});
+			}
+		}
+	}
+
+	return found.toSorted((a, b) => a.path.localeCompare(b.path));
 }
 
 /**
@@ -87,11 +101,12 @@ export async function planAdoption(
 ): Promise<AdoptionPlan> {
 	const proposals: Proposal[] = [];
 	const adopting: Adoption[] = [];
+	const moved: Adoption[] = [];
 	const skipped: AdoptionSkip[] = [];
 	let alreadyAdopted = 0;
 
 	for (const kind of kinds) {
-		for (const page of await pagesOf(root, kind)) {
+		for (const {path: page, legacy} of await pagesOf(root, kind)) {
 			const contents = await readFile(resolve(root, page), 'utf8').catch(() => undefined);
 			if (contents === undefined) {
 				continue;
@@ -102,6 +117,29 @@ export async function planAdoption(
 			const id = typeof data['id'] === 'string' ? data['id'] : stem;
 
 			if (typeof data[SOURCE_FIELD] === 'string') {
+				// Already has a note, so there is nothing to adopt — but a page that
+				// already cites one and still sits in a superseded home would never
+				// be moved by anything, since every other pass writes the canonical
+				// path and leaves this one shadowing it. A pure relocation: the same
+				// bytes at the right path, and the old file cleared.
+				if (legacy && page !== corpusPath(kind, id)) {
+					proposals.push({
+						path: corpusPath(kind, id),
+						contents,
+						confidence: 'high',
+						rationale: `moved from ${page}, unchanged`,
+					});
+					proposals.push({
+						path: page,
+						contents: '',
+						remove: true,
+						confidence: 'high',
+						rationale: `moved to ${corpusPath(kind, id)} by this batch`,
+					});
+					moved.push({kind, id, page, note: corpusPath(kind, id)});
+					continue;
+				}
+
 				alreadyAdopted += 1;
 				continue;
 			}
@@ -151,9 +189,25 @@ export async function planAdoption(
 				confidence: 'high',
 				rationale: `cites ${note}, so /ingest can tell this page is up to date`,
 			});
+			// A page adopted out of a superseded home leaves the old file behind,
+			// shadowed by the canonical one and reported forever as
+			// `legacy_location`. Its content is written by two other proposals in
+			// this same batch, so removing it is the honest completion of the move
+			// rather than a separate chore — and like everything else here it is a
+			// diff the author accepts or does not.
+			if (legacy && page !== corpusPath(kind, id)) {
+				proposals.push({
+					path: page,
+					contents: '',
+					remove: true,
+					confidence: 'high',
+					rationale: `superseded by ${corpusPath(kind, id)}, which this batch writes`,
+				});
+			}
+
 			adopting.push({kind, id, page, note});
 		}
 	}
 
-	return {proposals, adopting, skipped, alreadyAdopted};
+	return {proposals, adopting, moved, skipped, alreadyAdopted};
 }
