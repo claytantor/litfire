@@ -807,6 +807,35 @@ function unplaced(input: CheckInput): Finding[] {
 	 * scenes waiting to be placed and that is not fifty problems; it is one
 	 * fact about the vault, and fifty findings would bury it.
 	 */
+	/**
+	 * A vault still running on what `/init` wrote.
+	 *
+	 * Every scaffolded page is marked, and every one of them is a placeholder
+	 * for something the author has not decided: a protagonist with no name, an
+	 * arc called Ground Floor, a scene called The Arrival. Individually each is
+	 * harmless. Together they are a vault that has not started, and the checks
+	 * below will happily report on them as though they were a world.
+	 *
+	 * Once, with a count. It is one fact — this is still scaffolding — and it
+	 * stops being true a page at a time as the author replaces them.
+	 */
+	const examples = [
+		...input.systems,
+		...input.characters,
+		...input.moments,
+		...input.arcs,
+		...input.situations,
+		...input.themes,
+	].filter(page => page.example);
+
+	if (examples.length > 0) {
+		findings.push({
+			kind: 'scaffold_unreplaced',
+			detail: `${String(examples.length)} page(s) are still the scaffolding /init wrote — /questions system replaces them with your own world`,
+			where: examples[0]?.id ?? 'vault',
+		});
+	}
+
 	const loose = input.situations.filter(situation => situation.arc === undefined);
 	if (loose.length > 0) {
 		const named = loose

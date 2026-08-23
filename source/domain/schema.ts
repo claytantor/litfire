@@ -22,6 +22,17 @@ export const idSchema = z
  */
 const stubFlag = z.boolean().default(false);
 
+/**
+ * Scaffolding `/init` wrote, which the author has not replaced.
+ *
+ * A new vault is full of it — a protagonist with no name, an arc called Ground
+ * Floor — and it exists to give the graph something to connect rather than
+ * because anyone wants it. Carried on the schema rather than read out of raw
+ * frontmatter where it is needed, so everything that already has a primitive
+ * can tell scaffolding from a world without opening the file again.
+ */
+const exampleFlag = z.boolean().default(false);
+
 // ---------------------------------------------------------------------------
 // System — author-owned game rules (§3)
 // ---------------------------------------------------------------------------
@@ -98,6 +109,7 @@ export const systemSchema = z.object({
 	skills: z.array(skillDefSchema).default([]),
 	curves: curvesSchema.default({xp_for_level: 'xp-for-level', max_level: 100}),
 	stub: stubFlag,
+	example: exampleFlag,
 });
 
 // ---------------------------------------------------------------------------
@@ -193,6 +205,7 @@ export const momentSchema = z.object({
 	at: instantSchema.optional(),
 	events: z.array(ledgerEventSchema).default([]),
 	stub: stubFlag,
+	example: exampleFlag,
 });
 
 export const milestoneSchema = z.object({
@@ -211,6 +224,7 @@ export const arcSchema = z.object({
 	/** Per-character intended power checkpoint; drives milestone drift (§5). */
 	milestone: z.record(idSchema, milestoneSchema).default({}),
 	stub: stubFlag,
+	example: exampleFlag,
 });
 
 /**
@@ -229,6 +243,7 @@ export const placeSchema = z.object({
 	id: idSchema,
 	name: z.string().optional(),
 	stub: stubFlag,
+	example: exampleFlag,
 });
 
 // ---------------------------------------------------------------------------
@@ -260,6 +275,7 @@ export const situationSchema = z.object({
 	themes: z.array(idSchema).default([]),
 	events: z.array(ledgerEventSchema).default([]),
 	stub: stubFlag,
+	example: exampleFlag,
 });
 
 // ---------------------------------------------------------------------------
@@ -278,6 +294,7 @@ export const themeSchema = z.object({
 	name: z.string().optional(),
 	subthemes: z.array(subthemeSchema).default([]),
 	stub: stubFlag,
+	example: exampleFlag,
 });
 
 export const characterSchema = z.object({
@@ -297,6 +314,7 @@ export const characterSchema = z.object({
 	 */
 	system: idSchema.optional(),
 	stub: stubFlag,
+	example: exampleFlag,
 });
 
 // ---------------------------------------------------------------------------
@@ -325,6 +343,7 @@ export const factionSchema = z.object({
 	/** Character ids. A member without a page is reported, never invented. */
 	members: z.array(idSchema).default([]),
 	stub: stubFlag,
+	example: exampleFlag,
 });
 
 // ---------------------------------------------------------------------------
@@ -360,6 +379,7 @@ export const artifactSchema = z.object({
 	requires_skills: z.array(idSchema).default([]),
 	requires_level: z.number().int().optional(),
 	stub: stubFlag,
+	example: exampleFlag,
 });
 
 // ---------------------------------------------------------------------------

@@ -205,7 +205,7 @@ const init: Command = {
 		}
 		lines.push(
 			blank(),
-			muted(`idiom: ${chosen} — change it any time in system/system.md`),
+			muted(`idiom: ${chosen} — change it any time in ${VAULT.settingFile}`),
 			muted('open this folder in Obsidian — the graph is already connected'),
 		);
 
@@ -215,10 +215,47 @@ const init: Command = {
 			lines.push(ok(`switched to ${displayPath(target)}`));
 		}
 
+		/**
+		 * The founding interview, offered rather than required.
+		 *
+		 * Everything a new vault holds is example content — a protagonist with no
+		 * name, an arc called Ground Floor — and it exists to give the graph
+		 * something to connect, not because anyone wants it. An interview here
+		 * replaces it with the author's own world on the first day, and a system
+		 * interview is the one that reaches furthest: it establishes the system
+		 * and names characters, a turning point and a faction on the way, which
+		 * `/ingest interview` then files under each.
+		 *
+		 * Offered, because `/init` is the one command that must work with no
+		 * provider, no key and no network. It is how a vault is made offline, how
+		 * a throwaway one is made to try something, and how every fixture in the
+		 * test suite is built. Declining leaves exactly the vault that was made
+		 * before this existed.
+		 */
+		const config = await readConfig(target);
+		const founded =
+			config.provider.id !== undefined && config.provider.model !== undefined;
+
+		if (!founded) {
+			lines.push(
+				blank(),
+				muted('what is here is scaffolding — a protagonist with no name, an arc'),
+				muted('called Ground Floor. /provider, then /questions system, replaces it'),
+				muted('with your own world.'),
+			);
+			return {lines, dirty: true, ...(switched ? {switchProject: target} : {})};
+		}
+
 		return {
 			lines,
 			dirty: true,
 			...(switched ? {switchProject: target} : {}),
+			confirm: {
+				question: 'interview you about this world now?',
+				proceed: {lines: [], interview: {kind: 'system'}},
+				declined:
+					'scaffolding kept — /questions system starts the interview whenever you like',
+			},
 		};
 	},
 };

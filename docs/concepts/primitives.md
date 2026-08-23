@@ -71,6 +71,8 @@ disk, so `/lint` reports:
   are still read, so no vault breaks — `/init` just stops creating them, and the
   finding names what now replaces each one.
 - **`duplicate_id`** — two files declaring one id, named by path.
+- **`scaffold_unreplaced`** — pages `/init` wrote that you have not replaced.
+  One finding with a count; it stops being true a page at a time.
 - **`situation_unplaced`** — scenes on no arc. A valid permanent state, and also
   one that keeps them out of every replay, so nothing in them reaches the
   ledger. Reported once with a count rather than once per scene.
