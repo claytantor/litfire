@@ -23,7 +23,7 @@ import {castOf, momentByStep, type SituationCast} from '../ledger/state.js';
 import {compareInstants, grouped} from '../time/instant.js';
 import {calendarFor} from '../time/binding.js';
 import {findBlocks} from '../vault/markers.js';
-import {fieldsOf, renderInterface} from '../system/interface.js';
+import {fieldsOf, formatStat, renderInterface} from '../system/interface.js';
 import type {Calendar} from '../time/calendar.js';
 import {parseDocument} from '../vault/frontmatter.js';
 import {homesOf, resolve, VAULT} from '../vault/paths.js';
@@ -1463,7 +1463,7 @@ function buildSituationPage(
 			: cast.states.map(state => {
 					const stats = Object.entries(state.stats)
 						.toSorted(([a], [b]) => a.localeCompare(b))
-						.map(([id, value]) => `${id} ${String(value)}`)
+						.map(([id, value]) => `${id} ${formatStat(value)}`)
 						.join(', ');
 					const held =
 						state.artifacts.length === 0

@@ -263,3 +263,39 @@ describe('a screen asking for a reading nobody wrote', () => {
 		);
 	});
 });
+
+/**
+ * Ω is β/α, so a perfectly ordinary pair of numbers produces
+ * `1.4444444444444444` — unreadable in a status block and absurd in prose a
+ * character is meant to be reading as their own.
+ */
+describe('how a value reads', () => {
+	const carl = {
+		id: 'carl',
+		system: 'core',
+		level: 1,
+		xp: 0,
+		stats: {omega: 65 / 45, alpha: 45, whole: 2, tiny: 0.00001},
+		skills: [],
+		items: {},
+		artifacts: [],
+	};
+
+	it('rounds to four decimals', () => {
+		expect(renderInterface('{omega}', carl)).toBe('1.4444');
+	});
+
+	it('leaves a whole number whole', () => {
+		// A stat that divides evenly must not acquire a decimal point.
+		expect(renderInterface('{alpha} {whole}', carl)).toBe('45 2');
+	});
+
+	it('does not invent significance below four places', () => {
+		expect(renderInterface('{tiny}', carl)).toBe('0');
+	});
+
+	it('changes what is shown and not what is stored', () => {
+		// The ledger keeps full precision for anything computing from it.
+		expect(carl.stats.omega).toBe(65 / 45);
+	});
+});

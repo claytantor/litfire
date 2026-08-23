@@ -72,6 +72,22 @@ export function fieldsOf(template: string): string[] {
 	return [...seen];
 }
 
+/**
+ * A stat value as it should appear on a page.
+ *
+ * Derived stats are real division — Ω is β/α — so a perfectly ordinary pair of
+ * numbers produces `1.4444444444444444`, which is unreadable in a status block
+ * and absurd in prose that a person is meant to read as their own.
+ *
+ * Four decimals, and no trailing zeros: a whole number stays whole, and a stat
+ * that happens to divide evenly does not acquire a decimal point it never had.
+ * The stored value is untouched — this is how it reads, not what it is, and the
+ * ledger keeps full precision for anything computing from it.
+ */
+export function formatStat(value: number): string {
+	return Number.isFinite(value) ? String(Number(value.toFixed(4))) : String(value);
+}
+
 /** The suffix that asks for a stat's reading rather than its value. */
 const INTERPRETATION = '-interpretation';
 
@@ -134,7 +150,7 @@ export function renderInterface(
 				}
 
 				const value = character.stats[field];
-				return value === undefined ? whole : String(value);
+				return value === undefined ? whole : formatStat(value);
 			}
 		}
 	});

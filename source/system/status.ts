@@ -4,7 +4,7 @@ import type {SystemDef} from '../domain/schema.js';
 import type {ResolvedProfile} from '../genre/types.js';
 import type {CharacterState} from '../ledger/replay.js';
 import {upsertBlock} from '../vault/markers.js';
-import {renderInterface} from './interface.js';
+import {formatStat, renderInterface} from './interface.js';
 
 export type StatusTemplate = 'sheet' | 'hud' | 'inline';
 
@@ -81,7 +81,7 @@ function renderSheet(
 	if (stats.length > 0) {
 		lines.push('>', '> | stat | value |', '> | --- | --- |');
 		for (const [id, value] of stats) {
-			lines.push(`> | ${id} | ${value} |`);
+			lines.push(`> | ${id} | ${formatStat(value)} |`);
 		}
 	}
 
@@ -117,7 +117,7 @@ function renderHud(
 
 	const resources = profile.archetypes.resources.flatMap(id => {
 		const value = character.stats[id];
-		return value === undefined ? [] : [`${id} ${value}`];
+		return value === undefined ? [] : [`${id} ${formatStat(value)}`];
 	});
 
 	if (resources.length > 0) {

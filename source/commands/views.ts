@@ -11,6 +11,7 @@ import {
 	type Instant,
 } from '../time/instant.js';
 import type {ResolvedProfile} from '../genre/types.js';
+import {formatStat} from '../system/interface.js';
 import {renderStatusBlock} from '../system/status.js';
 import type {Calendar} from '../time/calendar.js';
 import {
@@ -66,7 +67,9 @@ export function renderSheet(
 	);
 	if (stats.length > 0) {
 		lines.push(muted('stats'));
-		for (const row of columns(stats.map(([id, value]) => [`  ${id}`, String(value)]))) {
+		for (const row of columns(
+			stats.map(([id, value]) => [`  ${id}`, formatStat(value)]),
+		)) {
 			lines.push(text(row));
 		}
 		lines.push(blank());
@@ -559,7 +562,9 @@ function stateRows(state: CharacterStateView): Line[] {
 	];
 
 	if (stats.length > 0) {
-		for (const row of columns(stats.map(([id, value]) => [`  ${id}`, String(value)]))) {
+		for (const row of columns(
+			stats.map(([id, value]) => [`  ${id}`, formatStat(value)]),
+		)) {
 			lines.push(text(row));
 		}
 	}
@@ -1022,7 +1027,9 @@ export function renderCharacter(project: Project, id: string): Line[] {
 	);
 	if (stats.length > 0) {
 		lines.push(blank(), muted('declared stats'));
-		for (const row of columns(stats.map(([key, value]) => [`  ${key}`, String(value)]))) {
+		for (const row of columns(
+			stats.map(([key, value]) => [`  ${key}`, formatStat(value)]),
+		)) {
 			lines.push(text(row));
 		}
 	}
