@@ -71,6 +71,10 @@ disk, so `/lint` reports:
   are still read, so no vault breaks — `/init` just stops creating them, and the
   finding names what now replaces each one.
 - **`duplicate_id`** — two files declaring one id, named by path.
+- **`stat_unread`** — a screen shows what the system makes of a stat, and no
+  bands say how it reads. The stat is there; nobody has said what it means.
+- **`stat_unread`** — a screen shows what the system makes of a stat, and no
+  bands say how it reads. The stat is there; nobody has said what it means.
 - **`scaffold_unreplaced`** — pages `/init` wrote that you have not replaced.
   One finding with a count; it stops being true a page at a time.
 - **`situation_unplaced`** — scenes on no arc. A valid permanent state, and also

@@ -522,10 +522,33 @@ function interfaceFields(input: CheckInput): Finding[] {
 		}
 
 		const declared = new Set(system.stats.map(stat => stat.id));
+		const banded = new Set(
+			system.stats.filter(stat => stat.bands.length > 0).map(stat => stat.id),
+		);
+
 		for (const field of fieldsOf(template)) {
 			if (declared.has(field) || (BUILT_IN_FIELDS as readonly string[]).includes(field)) {
 				continue;
 			}
+
+			// `{coherence-interpretation}` asks what the system makes of the value,
+			// which is a different gap from a missing stat and has a different fix:
+			// the stat is there, nobody has said how it reads.
+			if (field.endsWith('-interpretation')) {
+				const statId = field.slice(0, -'-interpretation'.length);
+				if (declared.has(statId) && !banded.has(statId)) {
+					findings.push({
+						kind: 'stat_unread',
+						detail: `'${system.id}' shows what it makes of ${statId}, and has no bands saying how it reads — /system ${system.id} generate interpretations writes them`,
+						where: system.id,
+					});
+					continue;
+				}
+				if (declared.has(statId)) {
+					continue;
+				}
+			}
+
 			findings.push({
 				kind: 'interface_field_unknown',
 				detail: `'${system.id}' draws {${field}} on its status screen, and declares no such stat`,

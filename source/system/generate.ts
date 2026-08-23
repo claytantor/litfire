@@ -2,6 +2,7 @@ import type {Project} from '../core/project.js';
 import type {SystemDef} from '../domain/schema.js';
 import {authoringPath} from '../ingest/authoring.js';
 import {resolve} from '../vault/paths.js';
+import {fieldsOf} from './interface.js';
 import {readFile} from 'node:fs/promises';
 
 /**
@@ -186,4 +187,154 @@ export async function buildStatsGeneration(
 	].join('\n');
 
 	return {instruction: INSTRUCTION, context, note};
+}
+
+/**
+ * Asking a system what it makes of a number.
+ *
+ * A LitRPG system that judges is most of what makes one worth having. The
+ * screen says Coherence 31; the world says "Fragmenting", and the second is
+ * what a reader remembers. This pass writes those readings, in the system's own
+ * voice, from the system's own text.
+ *
+ * ## Once, not at render time
+ *
+ * The obvious shape is to ask a model at render time — the system is an AI, let
+ * it judge. It is the wrong shape twice over. `/wiki build` is free, offline and
+ * deterministic, and a call per stat per character per scene is none of those.
+ * And a judgement that varied between renderings would be a continuity error:
+ * a reader who sees Coherence 31 called "Fragmenting" in one chapter and
+ * "Unsettled" in another, with the number unchanged, has caught a mistake the
+ * author did not make.
+ *
+ * So the model writes bands once, the author accepts them, and code reads them
+ * back for ever. The judgement is the system's; applying it is arithmetic.
+ */
+const INTERPRETATION_INSTRUCTION = [
+	'You are the character system described below. Not an assistant describing',
+	'it — it. You are the thing that watches these people and reports what it',
+	'sees, and you are writing down, once and for all, how you read each of the',
+	'numbers you track.',
+	'',
+	'Speak as that system speaks. If its text is clinical, be clinical; if it is',
+	'liturgical or bureaucratic or cruel, be that. Its prose below is the only',
+	'guide to its voice and you must not reach outside it.',
+	'',
+	'## What you write',
+	'',
+	'For each stat named below, a set of bands: ascending ranges, and what you',
+	'call a descendant who sits in each.',
+	'',
+	'```yaml',
+	'stats:',
+	'  - id: coherence',
+	'    bands:',
+	'      - upto: 20',
+	'        reads: Fragmenting',
+	'      - upto: 60',
+	'        reads: Unsettled',
+	'      - reads: Laminar',
+	'```',
+	'',
+	'Emit the whole raw note with the bands folded into the stats already there.',
+	'Change nothing else — not the prose, not the ```interface block, not a',
+	'formula, not a stat that has no bands to add.',
+	'',
+	'## The rules of a band',
+	'',
+	'`upto` is inclusive and the bands ascend. The last one omits `upto` and',
+	'takes everything above the one before it, so the range is always covered and',
+	'a value can never fall through.',
+	'',
+	'Three to five bands per stat. Two is a switch rather than a reading; seven',
+	'is a gradient nobody can feel the difference between.',
+	'',
+	'Set the boundaries where the system\u2019s own text sets them. Where it gives a',
+	'table of values and readings, those are the boundaries and that table is not',
+	'yours to improve. Where it describes low, middling and high without numbers,',
+	'place the boundaries across the range the stat actually occupies and say in',
+	'`notes` that you chose them.',
+	'',
+	'## What a reading is',
+	'',
+	'A phrase, not a sentence. Two or three words. It appears inline on a status',
+	'screen beside the number, and a clause there is a paragraph in the wrong',
+	'place.',
+	'',
+	'It names a state, not a judgement of the person: "Fragmenting" rather than',
+	'"Poor", "Laminar" rather than "Good". A system reports what it observes.',
+	'Whether that is good news is the author\u2019s to decide and the reader\u2019s to feel.',
+	'',
+	'## What you must not do',
+	'',
+	'Do not invent a scale the text does not support, or a threshold it does not',
+	'imply. Do not add a stat, rename one, or give bands to one the screen never',
+	'shows a reading for. Do not write a reading you could not defend from the',
+	'prose below \u2014 if the system says nothing about what a middling value means,',
+	'say so in `notes` rather than deciding for it.',
+	'',
+	'Give the write a one-line `rationale` naming the stats you banded.',
+].join('\n');
+
+/**
+ * The stats a screen asks for a reading of, and has none.
+ *
+ * Driven by the interface rather than by every stat the system declares: a
+ * reading nobody shows is a phrase written for nobody, and the screen is the
+ * only place that says which numbers this world speaks about.
+ */
+export function statsWantingBands(
+	system: SystemDef,
+	template: string | undefined,
+): string[] {
+	if (template === undefined) {
+		return [];
+	}
+
+	const declared = new Map(system.stats.map(stat => [stat.id, stat]));
+	const wanted: string[] = [];
+
+	for (const field of fieldsOf(template)) {
+		if (!field.endsWith('-interpretation')) {
+			continue;
+		}
+		const statId = field.slice(0, -'-interpretation'.length);
+		const stat = declared.get(statId);
+		if (stat !== undefined && stat.bands.length === 0) {
+			wanted.push(statId);
+		}
+	}
+
+	return wanted;
+}
+
+export async function buildInterpretationGeneration(
+	root: string,
+	project: Project,
+	system: SystemDef,
+): Promise<StatsGeneration> {
+	const note = authoringPath('system', system.id);
+	const existing = await readFile(resolve(root, note), 'utf8').catch(() => undefined);
+	const drawn = project.vault.interfaces[system.id];
+	const wanted = statsWantingBands(system, drawn);
+
+	const context = [
+		`# You are ${system.name ?? system.id}`,
+		'',
+		'## Everything you are, in your author\u2019s words',
+		'',
+		existing?.trim() ?? '_The note is empty._',
+		'',
+		'## The numbers to read',
+		'',
+		wanted.length === 0
+			? '_None: the screen asks for no readings._'
+			: wanted.map(id => `- \`${id}\``).join('\n'),
+		'',
+		`## The note to propose, at ${note}`,
+		'',
+		'Emit it whole, with `bands` added to those stats and nothing else changed.',
+	].join('\n');
+
+	return {instruction: INTERPRETATION_INSTRUCTION, context, note};
 }

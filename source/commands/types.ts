@@ -103,6 +103,13 @@ export type CommandResult = {
 	 */
 	readonly generateStats?: {
 		readonly system: string;
+		/**
+		 * `stats` derives the model from the screen; `interpretations` asks the
+		 * system, in its own voice, what it makes of the numbers it already
+		 * tracks. Two passes because they are two questions, and the second only
+		 * makes sense once the first has been answered.
+		 */
+		readonly what: 'stats' | 'interpretations';
 	};
 	/**
 	 * Gives authored corpus pages a note in `raw/` to have come from.

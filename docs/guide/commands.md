@@ -1,65 +1,66 @@
 # Commands
 
-| Command                           | Behaviour                                         |
-| --------------------------------- | ------------------------------------------------- |
-| `/init [idiom] [path]`            | Scaffold a vault; asks the idiom if omitted       |
-| `/project [path]`                 | Switch vaults, or list recent ones                |
-| `/consent`                        | Allow this vault's formulas to execute            |
-| `/sheet <character> [at]`         | Replayed state, optionally at a point in the run  |
-| `/status <character> [at]`        | The same state as an in-world status block        |
-| `/status write <char> <sit>`      | Place that block inside a situation               |
-| `/pacing`                         | Planned vs actual level by arc                    |
-| `/timeline`                       | Structural view; moments, arcs, what is unplaced  |
-| `/themes`                         | Leaf-level coverage with upward rollup            |
-| `/system [<id>]`                  | The rules a character is tracked by               |
-| `/system <id> edit`               | Open its note — where the status screen goes      |
-| `/system <id> generate stats`     | Derive stats and formulas from the drawn screen   |
-| `/situation <id> sheet`           | Every character in the scene, on their own screen |
-| `/character <name>`               | A character as the corpus has them                |
-| `/character <name> stat <id> <n>` | Where they start — before any scene moves it      |
-| `/character <name> level <n>`     | The level they begin at                           |
-| `/character <name> edit`          | Open their note                                   |
-| `/questions`                      | Everything unresolved, across the vault           |
-| `/questions <kind> [<id>]`        | An interview about that kind, opening on its gaps |
-| `/questions <kind> resume`        | Continue the saved interview                      |
-| `/ingest interview`               | File a transcript across every kind it touches    |
-| `/chapter [id\|new\|move]`        | Cut the sequence into chapters; show the seams    |
-| `/export [path]`                  | Assemble the chapters into a manuscript           |
-| `/wiki [build\|serve\|stop]`      | Derived cross-reference, browsable over http      |
-| `/reviewer`                       | Literary editor over the rendered corpus          |
-| `/lint`                           | Deterministic checks                              |
-| `/questions`                      | Open question queue                               |
-| `/provider`                       | Choose an LLM provider, key, and model            |
-| `/provider status`                | Show configured providers and masked keys         |
-| `/provider clear <id>`            | Remove a stored key                               |
-| `/situation <id>`                 | A scene’s cast: who is in it, and what they hold  |
-| `/situation <id> edit`            | Write a scene in the native buffer                |
-| `/situation <id> cast <name>…`    | Add characters to the scene                       |
-| `/situation <id> place <id>`      | Where the scene happens                           |
-| `/situation <id> moment <id>`     | Anchor the scene on the clock                     |
-| `/situation <id> arc <id>`        | Place it on an arc                                |
-| `/situation <id> uncast <name>`   | Take someone out of the scene                     |
-| `/situation new [title]`          | Scaffold a scene and open it in the buffer        |
-| `/arc [<id>]`                     | Arcs, or one arc with the scenes on it            |
-| `/arc new [title]`                | Create an arc                                     |
-| `/arc <id> after <moment>`        | Anchor an arc on the clock                        |
-| `/arc <id> order <n>`             | Set its replay order                              |
-| `/time`                           | The in-world clock and the calendar it reads by   |
-| `/time gregorian <epoch>`         | Bind the clock to Earth/Sol time                  |
-| `/time custom`                    | Read it through a calendar formula you wrote      |
-| `/time at <date>`                 | Convert a date to seconds, or back                |
-| `/moment [<id>]`                  | Moments in clock order, or one of them            |
-| `/moment <id> at <when>`          | Set or change a moment’s time                     |
-| `/moment <id> edit`               | Write its description in the buffer               |
-| `/moment new <name>`              | Create a moment and open the buffer               |
-| `/place [<id>]`                   | Places, or one with the scenes there              |
-| `/place new <name>`               | Write a place and open the buffer                 |
-| `/place <id> edit`                | Edit its description                              |
-| `/ingest <kind>`                  | Turn notes in `raw/<kind>/` into typed pages      |
-| `/ingest <kind> <document>`       | Ingest one note                                   |
-| `/<primitive> extract`            | Ingest that kind’s notes, from the primitive      |
-| `/situation place <id> <arc>`     | The same, verb first                              |
-| `/help`, `/quit`                  |                                                   |
+| Command                                 | Behaviour                                         |
+| --------------------------------------- | ------------------------------------------------- |
+| `/init [idiom] [path]`                  | Scaffold a vault; asks the idiom if omitted       |
+| `/project [path]`                       | Switch vaults, or list recent ones                |
+| `/consent`                              | Allow this vault's formulas to execute            |
+| `/sheet <character> [at]`               | Replayed state, optionally at a point in the run  |
+| `/status <character> [at]`              | The same state as an in-world status block        |
+| `/status write <char> <sit>`            | Place that block inside a situation               |
+| `/pacing`                               | Planned vs actual level by arc                    |
+| `/timeline`                             | Structural view; moments, arcs, what is unplaced  |
+| `/themes`                               | Leaf-level coverage with upward rollup            |
+| `/system [<id>]`                        | The rules a character is tracked by               |
+| `/system <id> edit`                     | Open its note — where the status screen goes      |
+| `/system <id> generate stats`           | Derive stats and formulas from the drawn screen   |
+| `/system <id> generate interpretations` | Ask the system how it reads its own numbers       |
+| `/situation <id> sheet`                 | Every character in the scene, on their own screen |
+| `/character <name>`                     | A character as the corpus has them                |
+| `/character <name> stat <id> <n>`       | Where they start — before any scene moves it      |
+| `/character <name> level <n>`           | The level they begin at                           |
+| `/character <name> edit`                | Open their note                                   |
+| `/questions`                            | Everything unresolved, across the vault           |
+| `/questions <kind> [<id>]`              | An interview about that kind, opening on its gaps |
+| `/questions <kind> resume`              | Continue the saved interview                      |
+| `/ingest interview`                     | File a transcript across every kind it touches    |
+| `/chapter [id\|new\|move]`              | Cut the sequence into chapters; show the seams    |
+| `/export [path]`                        | Assemble the chapters into a manuscript           |
+| `/wiki [build\|serve\|stop]`            | Derived cross-reference, browsable over http      |
+| `/reviewer`                             | Literary editor over the rendered corpus          |
+| `/lint`                                 | Deterministic checks                              |
+| `/questions`                            | Open question queue                               |
+| `/provider`                             | Choose an LLM provider, key, and model            |
+| `/provider status`                      | Show configured providers and masked keys         |
+| `/provider clear <id>`                  | Remove a stored key                               |
+| `/situation <id>`                       | A scene’s cast: who is in it, and what they hold  |
+| `/situation <id> edit`                  | Write a scene in the native buffer                |
+| `/situation <id> cast <name>…`          | Add characters to the scene                       |
+| `/situation <id> place <id>`            | Where the scene happens                           |
+| `/situation <id> moment <id>`           | Anchor the scene on the clock                     |
+| `/situation <id> arc <id>`              | Place it on an arc                                |
+| `/situation <id> uncast <name>`         | Take someone out of the scene                     |
+| `/situation new [title]`                | Scaffold a scene and open it in the buffer        |
+| `/arc [<id>]`                           | Arcs, or one arc with the scenes on it            |
+| `/arc new [title]`                      | Create an arc                                     |
+| `/arc <id> after <moment>`              | Anchor an arc on the clock                        |
+| `/arc <id> order <n>`                   | Set its replay order                              |
+| `/time`                                 | The in-world clock and the calendar it reads by   |
+| `/time gregorian <epoch>`               | Bind the clock to Earth/Sol time                  |
+| `/time custom`                          | Read it through a calendar formula you wrote      |
+| `/time at <date>`                       | Convert a date to seconds, or back                |
+| `/moment [<id>]`                        | Moments in clock order, or one of them            |
+| `/moment <id> at <when>`                | Set or change a moment’s time                     |
+| `/moment <id> edit`                     | Write its description in the buffer               |
+| `/moment new <name>`                    | Create a moment and open the buffer               |
+| `/place [<id>]`                         | Places, or one with the scenes there              |
+| `/place new <name>`                     | Write a place and open the buffer                 |
+| `/place <id> edit`                      | Edit its description                              |
+| `/ingest <kind>`                        | Turn notes in `raw/<kind>/` into typed pages      |
+| `/ingest <kind> <document>`             | Ingest one note                                   |
+| `/<primitive> extract`                  | Ingest that kind’s notes, from the primitive      |
+| `/situation place <id> <arc>`           | The same, verb first                              |
+| `/help`, `/quit`                        |                                                   |
 
 Output taller than the viewport opens a windowed pager (`↑↓`, space, `g`/`G`, `q`).
 

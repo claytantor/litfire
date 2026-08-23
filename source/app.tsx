@@ -46,7 +46,7 @@ import {
 import {resolveDates} from './ingest/dates.js';
 import {calendarFor} from './time/binding.js';
 import {runPlan} from './curator/index.js';
-import {buildStatsGeneration} from './system/generate.js';
+import {buildInterpretationGeneration, buildStatsGeneration} from './system/generate.js';
 import {editText, resolveEditor} from './vault/editor.js';
 import {
 	displayPath,
@@ -614,7 +614,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 	 * satisfy.
 	 */
 	const runStatsGeneration = useCallback(
-		async (systemId: string) => {
+		async (systemId: string, what: 'stats' | 'interpretations') => {
 			const resolved = await ensure();
 			if (!resolved) {
 				append([error('no vault loaded here — run /init first')]);
@@ -639,12 +639,19 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 			}
 
 			setBusy(true);
-			setBusyLabel(`deriving ${systemId}'s stats…`);
+			setBusyLabel(
+				what === 'interpretations'
+					? `asking ${systemId} how it reads its own numbers…`
+					: `deriving ${systemId}'s stats…`,
+			);
 			const controller = new AbortController();
 
 			try {
 				const {profile} = await loadSetting(root);
-				const {instruction, context} = await buildStatsGeneration(root, resolved, system);
+				const {instruction, context} =
+					what === 'interpretations'
+						? await buildInterpretationGeneration(root, resolved, system)
+						: await buildStatsGeneration(root, resolved, system);
 				const outcome = await runPlan(
 					loaded.provider,
 					root,
@@ -656,7 +663,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 
 				await appendLog(
 					root,
-					`/system ${systemId} generate stats: proposed ${String(outcome.proposals.length)} write(s)`,
+					`/system ${systemId} generate ${what}: proposed ${String(outcome.proposals.length)} write(s)`,
 				);
 				await handlePlanned(outcome);
 			} catch (caught) {
@@ -808,7 +815,7 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 				await openAdoption(result.adopt.proposals, result.adopt.title);
 			} else if (result.generateStats) {
 				append(result.lines);
-				await runStatsGeneration(result.generateStats.system);
+				await runStatsGeneration(result.generateStats.system, result.generateStats.what);
 			} else if (result.ingest) {
 				append(result.lines);
 				await runIngest(

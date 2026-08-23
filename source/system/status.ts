@@ -1,5 +1,6 @@
 import {readFile, writeFile} from 'node:fs/promises';
 import {term} from '../genre/lexicon.js';
+import type {SystemDef} from '../domain/schema.js';
 import type {ResolvedProfile} from '../genre/types.js';
 import type {CharacterState} from '../ledger/replay.js';
 import {upsertBlock} from '../vault/markers.js';
@@ -156,12 +157,17 @@ export function renderStatusBlock(
 		 * guess is still better than nothing.
 		 */
 		readonly drawn?: string | undefined;
+		/** The system whose bands turn a value into a reading. */
+		readonly system?: SystemDef | undefined;
 	},
 ): string {
 	const displayName = options.displayName ?? character.id;
 
 	if (options.drawn !== undefined && options.drawn.trim() !== '') {
-		return renderInterface(options.drawn, character, {displayName});
+		return renderInterface(options.drawn, character, {
+			displayName,
+			...(options.system === undefined ? {} : {system: options.system}),
+		});
 	}
 
 	const template = options.template ?? options.profile.status_template;

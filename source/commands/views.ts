@@ -405,7 +405,12 @@ export function renderSituationSheet(
 				items: {...state.items},
 				artifacts: [...state.artifacts],
 			},
-			{profile, drawn, displayName: state.character},
+			{
+				profile,
+				drawn,
+				displayName: state.character,
+				system: project.vault.systems.find(one => one.id === state.system),
+			},
 		);
 
 		lines.push(

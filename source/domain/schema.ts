@@ -58,6 +58,29 @@ export const statDefSchema = z.object({
 	 * so the sandbox contract does not change to accommodate it.
 	 */
 	formula: idSchema.optional(),
+	/**
+	 * How the system reads this number back, in its own voice.
+	 *
+	 * A LitRPG system that judges says more than a figure: 31 is a number, and
+	 * "Fragmenting" is what the world makes of it. Bands are that judgement,
+	 * written once and applied by code — so the same value always reads the same
+	 * way, which is a continuity property rather than a convenience. A reader
+	 * who sees Coherence 31 called "Fragmenting" in one chapter and "Unsettled"
+	 * in another with the number unchanged has caught a mistake.
+	 *
+	 * Ascending by `upto`, which is inclusive. The last band may omit it and
+	 * takes everything above the one before.
+	 */
+	bands: z
+		.array(
+			z.object({
+				/** Inclusive upper bound. Absent on the final band only. */
+				upto: z.number().optional(),
+				/** What the system says at this range. One phrase, not a sentence. */
+				reads: z.string().min(1),
+			}),
+		)
+		.default([]),
 });
 
 export const skillDefSchema = z.object({

@@ -216,6 +216,57 @@ stats:
 The tool will write formulas for you. It will never write events — what happens
 in a scene is the story, and that is yours.
 
+### What the system makes of it
+
+A number is a number. A system that _judges_ says what it means:
+
+```
+COHERENCE  31  Unsettled
+```
+
+`{coherence-interpretation}` renders the system's reading of that stat. It comes
+from bands you accept once, not from a model asked each time:
+
+```yaml
+stats:
+  - id: coherence
+    bands:
+      - upto: 20
+        reads: Fragmenting
+      - upto: 60
+        reads: Unsettled
+      - reads: Laminar
+```
+
+`upto` is inclusive and the bands ascend; the last omits it and takes everything
+above, so a value can never fall through.
+
+Let the system write them itself:
+
+```
+/system core generate interpretations
+```
+
+That pass is told to **be** the system rather than describe it, and its only
+guide to voice is your own prose on the page — clinical if you wrote it
+clinical, liturgical if you wrote it liturgical. It reads a table of values if
+your text has one, and says so in its notes if it had to choose thresholds you
+never stated.
+
+::: tip Why not ask the model each time it renders?
+Because `/wiki build` is free, offline and deterministic, and a call per stat
+per character per scene is none of those.
+
+The better reason is continuity. A reader who sees Coherence 31 called
+"Fragmenting" in chapter two and "Unsettled" in chapter nine — with the number
+unchanged — has caught a mistake you did not make. Bands are written once and
+read back for ever: the judgement is the system's, applying it is arithmetic.
+:::
+
+A reading names a **state, not a verdict** — "Fragmenting" rather than "Poor".
+A system reports what it observes; whether that is good news is yours to decide
+and your reader's to feel.
+
 ### Showing a ceiling
 
 A screen that wants `7/10` has two ways to get the 10.

@@ -291,7 +291,10 @@ function sheetSection(project: Project, cast: SituationCast): string[] {
 				items: {...state.items},
 				artifacts: [...state.artifacts],
 			},
-			{displayName: state.character},
+			{
+				displayName: state.character,
+				system: project.vault.systems.find(one => one.id === state.system),
+			},
 		);
 
 		// Fenced, because a status screen is drawn and its whitespace is content:

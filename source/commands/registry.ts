@@ -25,6 +25,7 @@ import {
 	type IngestKind,
 } from '../ingest/index.js';
 import {planAdoption} from '../ingest/adopt.js';
+import {statsWantingBands} from '../system/generate.js';
 import {
 	agendaFor,
 	askable,
@@ -369,7 +370,10 @@ const status: Command = {
 			}
 
 			const drawn = context.project.vault.interfaces[character.system ?? ''];
-			const block = renderStatusBlock(character, {profile, drawn});
+			const system = context.project.vault.systems.find(
+				one => one.id === character.system,
+			);
+			const block = renderStatusBlock(character, {profile, drawn, system});
 			await writeStatusBlock(file, block, {char: characterId, at: situationId});
 
 			return {
@@ -404,7 +408,8 @@ const status: Command = {
 
 		context.setActiveCharacter(characterId);
 		const drawn = context.project.vault.interfaces[character.system ?? ''];
-		const block = renderStatusBlock(character, {profile, drawn});
+		const system = context.project.vault.systems.find(one => one.id === character.system);
+		const block = renderStatusBlock(character, {profile, drawn, system});
 
 		const lines = [
 			heading(`status — ${characterId}${at === undefined ? '' : `  @ ${at}`}`),
@@ -2398,7 +2403,7 @@ const provider: Command = {
  */
 const system: Command = {
 	name: 'system',
-	usage: '/system [<id>] [edit | generate stats]',
+	usage: '/system [<id>] [edit | generate stats|interpretations]',
 	summary: 'the rules a character is tracked by',
 	async run(args, context) {
 		if (!context.project) {
@@ -2430,10 +2435,12 @@ const system: Command = {
 		}
 
 		if (args.includes('generate')) {
-			return generateStats(
-				args.find(one => one !== 'generate' && one !== 'stats'),
-				context,
+			const named = args.find(
+				one => one !== 'generate' && one !== 'stats' && one !== 'interpretations',
 			);
+			return args.includes('interpretations')
+				? generateStats(named, context, 'interpretations')
+				: generateStats(named, context, 'stats');
 		}
 
 		// `renderSystem` decides all three cases itself — several systems listed,
@@ -2457,6 +2464,7 @@ const system: Command = {
 async function generateStats(
 	named: string | undefined,
 	context: CommandContext,
+	what: 'stats' | 'interpretations',
 ): Promise<CommandResult> {
 	const systems = context.project!.vault.systems;
 	const id = named ?? (systems.length === 1 ? systems[0]?.id : undefined);
@@ -2486,6 +2494,32 @@ async function generateStats(
 	}
 
 	const drawn = context.project!.vault.interfaces[id];
+
+	if (what === 'interpretations') {
+		const wanted = statsWantingBands(system, drawn);
+		if (wanted.length === 0) {
+			return {
+				lines: [
+					ok(
+						drawn === undefined
+							? `${id} draws no status screen, so nothing asks for a reading`
+							: `every reading ${id}'s screen asks for is already written`,
+					),
+					muted('a screen shows one with {<stat>-interpretation}'),
+				],
+			};
+		}
+
+		return {
+			lines: [
+				muted(`asking ${id} how it reads ${wanted.join(', ')}`),
+				muted('it answers in its own voice, from its own text — as itself,'),
+				muted('not as something describing it'),
+			],
+			generateStats: {system: id, what: 'interpretations'},
+		};
+	}
+
 	return {
 		lines: [
 			muted(
@@ -2501,7 +2535,7 @@ async function generateStats(
 				: []),
 			muted('every formula arrives with a worked table, in the file, for you to judge'),
 		],
-		generateStats: {system: id},
+		generateStats: {system: id, what: 'stats'},
 	};
 }
 

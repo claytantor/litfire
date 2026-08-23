@@ -1,3 +1,4 @@
+import type {SystemDef} from '../domain/schema.js';
 import type {CharacterState} from '../ledger/replay.js';
 
 /**
@@ -28,6 +29,14 @@ import type {CharacterState} from '../ledger/replay.js';
  * drawing, kept byte for byte. Anything cleverer is a template language, and a
  * template language in a vault is a second thing to learn, a second thing to
  * document, and a second thing for a generated interface to get wrong.
+ *
+ * The one thing a placeholder can be that is not a stat's value is that stat's
+ * *reading* — `{coherence-interpretation}` for what the system makes of 31.
+ * That is still substitution: the phrase comes from a band table the author
+ * accepted, looked up in code, not from a model asked at render time. A system
+ * that judges is most of what makes one worth having, and judgement that
+ * changed between two renderings of the same number would be a continuity bug
+ * rather than a feature.
  */
 
 /** `{stat-id}` — ids are kebab-case, and so is everything else addressable. */
@@ -63,6 +72,31 @@ export function fieldsOf(template: string): string[] {
 	return [...seen];
 }
 
+/** The suffix that asks for a stat's reading rather than its value. */
+const INTERPRETATION = '-interpretation';
+
+/**
+ * What the system says about a value, or undefined when it says nothing.
+ *
+ * Bands are ascending and `upto` is inclusive, so the first one the value fits
+ * under is the answer. A stat with no bands has no reading — the system has not
+ * been asked what it makes of the number, which is different from making
+ * nothing of it.
+ */
+export function readingOf(
+	system: SystemDef | undefined,
+	statId: string,
+	value: number,
+): string | undefined {
+	const bands = system?.stats.find(stat => stat.id === statId)?.bands ?? [];
+	for (const band of bands) {
+		if (band.upto === undefined || value <= band.upto) {
+			return band.reads;
+		}
+	}
+	return undefined;
+}
+
 /**
  * Fills an interface in for one character.
  *
@@ -74,7 +108,7 @@ export function fieldsOf(template: string): string[] {
 export function renderInterface(
 	template: string,
 	character: CharacterState,
-	options: {readonly displayName?: string} = {},
+	options: {readonly displayName?: string; readonly system?: SystemDef} = {},
 ): string {
 	return template.replaceAll(PLACEHOLDER, (whole, field: string) => {
 		switch (field) {
@@ -91,6 +125,14 @@ export function renderInterface(
 				return character.skills.length === 0 ? '—' : character.skills.join(', ');
 			}
 			default: {
+				if (field.endsWith(INTERPRETATION)) {
+					const statId = field.slice(0, -INTERPRETATION.length);
+					const value = character.stats[statId];
+					const reading =
+						value === undefined ? undefined : readingOf(options.system, statId, value);
+					return reading ?? whole;
+				}
+
 				const value = character.stats[field];
 				return value === undefined ? whole : String(value);
 			}
