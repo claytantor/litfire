@@ -1840,6 +1840,7 @@ const SITUATION_VERBS = new Set([
 	'place',
 	'moment',
 	'cast',
+	'uncast',
 ]);
 
 /**
@@ -1859,7 +1860,7 @@ async function patchSituation(
 
 const situation: Command = {
 	name: 'situation',
-	usage: '/situation <id> [show|sheet|edit|extract|cast|place|moment|arc] · new [title]',
+	usage: '/situation <id> [show|sheet|edit|cast|uncast|place|moment|arc] · new [title]',
 	summary: 'show a scene\u2019s cast, write it, and link it to the world',
 	async run(args, context) {
 		if (!context.project) {
@@ -2009,6 +2010,42 @@ const situation: Command = {
 
 		// Who is in it. Additive, because a cast is assembled over several passes
 		// and replacing it on every call would make each new name cost the last.
+		// The other half of `cast`, which was additive and had no inverse — so a
+		// name typed wrong, or one that turned out to be the note's filename
+		// rather than the character's id, could only be taken out by hand-editing
+		// frontmatter the buffer deliberately will not touch.
+		if (verb === 'uncast') {
+			const [id, ...names] = positional;
+			if (!id || names.length === 0) {
+				return {lines: [error('usage: /situation <id> uncast <character>…')]};
+			}
+
+			const found = context.project.vault.situations.find(one => one.id === id);
+			if (!found) {
+				return {lines: [error(`no situation '${id}'`)]};
+			}
+
+			const removing = new Set(names);
+			const absent = names.filter(name => !found.characters.includes(name));
+			const cast = found.characters.filter(name => !removing.has(name));
+
+			const patched = await patchSituation(context.root, id, {characters: cast});
+			if ('error' in patched) {
+				return {lines: [error(patched.error)]};
+			}
+
+			return {
+				lines: [
+					ok(cast.length === 0 ? `${id} has no cast` : `${id} cast: ${cast.join(', ')}`),
+					...adoptionNote(patched),
+					// Said rather than passed over: removing a name that was never
+					// there usually means a typo in the removal, not in the cast.
+					...absent.map(name => muted(`'${name}' was not in this scene`)),
+				],
+				dirty: true,
+			};
+		}
+
 		if (verb === 'cast') {
 			const [id, ...names] = positional;
 			if (!id || names.length === 0) {

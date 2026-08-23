@@ -486,3 +486,39 @@ describe('/arc', () => {
 		expect(said(await run('/arc arc-01 after nowhere'))).toContain("no moment 'nowhere'");
 	});
 });
+
+/**
+ * `cast` was additive with no inverse, so a name typed wrong — or one that
+ * turned out to be a note's filename rather than the character's id — could
+ * only be taken out by hand-editing frontmatter the buffer will not touch.
+ */
+describe('taking someone out of a scene', () => {
+	it('removes the name and leaves the rest', async () => {
+		await run('/situation sit-001 cast carl donut');
+
+		const output = said(await run('/situation sit-001 uncast donut'));
+
+		expect(output).toContain('carl');
+		expect(output).not.toContain('donut');
+	});
+
+	it('says so when the name was never in the scene', async () => {
+		await run('/situation sit-001 cast carl');
+
+		expect(said(await run('/situation sit-001 uncast nobody'))).toContain(
+			"'nobody' was not in this scene",
+		);
+	});
+
+	it('reports an empty cast rather than an empty list', async () => {
+		const only =
+			context.project!.vault.situations.find(s => s.id === 'sit-001')?.characters ?? [];
+		const output = said(await run(`/situation sit-001 uncast ${only.join(' ')}`));
+
+		expect(output).toContain('has no cast');
+	});
+
+	it('asks for a name rather than emptying the scene', async () => {
+		expect(said(await run('/situation sit-001 uncast'))).toContain('usage:');
+	});
+});
