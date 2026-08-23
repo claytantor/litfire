@@ -122,3 +122,17 @@ describe('the prologue arc', () => {
 		expect(prologue?.starts_after).toBeUndefined();
 	});
 });
+
+describe('where interviews land', () => {
+	/**
+	 * Not a primitive folder — a transcript is a source that touches several
+	 * kinds at once — but a real place things are written, and `/init` never
+	 * made it. Its absence was indistinguishable from being in the wrong vault.
+	 */
+	it('exists from the first scaffold', async () => {
+		await scaffoldVault(root, 'arcane');
+		const {readdir} = await import('node:fs/promises');
+
+		await expect(readdir(path.join(root, VAULT.raw, 'interviews'))).resolves.toEqual([]);
+	});
+});

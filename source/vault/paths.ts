@@ -141,6 +141,10 @@ export const VAULT_DIRECTORIES: readonly string[] = [
 	VAULT.meta,
 	VAULT.raw,
 	...RAW_DIRECTORIES,
+	// Where interviews land. Not a primitive folder — a transcript is a source
+	// that touches several kinds at once — but a real place things are written,
+	// and its absence was indistinguishable from being in the wrong vault.
+	`${VAULT.raw}/interviews`,
 	VAULT.setting,
 	VAULT.corpus,
 	...CORPUS_DIRECTORIES,
