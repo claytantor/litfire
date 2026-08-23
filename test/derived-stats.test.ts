@@ -49,12 +49,12 @@ async function derivedVault(extraStats = '', formulas = '') {
 			'stats:',
 			'  - id: constitution',
 			'    default: 10',
-			'  - id: max-hp',
-			'    formula: max-hp',
+			'  - id: carry',
+			'    formula: carry',
 			extraStats,
 			'---',
 			'',
-			'```js id=max-hp',
+			'```js id=carry',
 			'({constitution, level}) => 50 + constitution * 8 + level * 12;',
 			'```',
 			formulas,
@@ -76,7 +76,7 @@ describe('a stat the system computes', () => {
 		const project = await consented();
 
 		// 50 + 12*8 + 1*12
-		expect(project.replay.state.characters['carl']?.stats['max-hp']).toBe(158);
+		expect(project.replay.state.characters['carl']?.stats['carry']).toBe(158);
 	});
 
 	/**
@@ -92,19 +92,19 @@ describe('a stat the system computes', () => {
 		const project = await consented();
 
 		// constitution 17 → 50 + 136 + 12
-		expect(project.replay.state.characters['carl']?.stats['max-hp']).toBe(198);
+		expect(project.replay.state.characters['carl']?.stats['carry']).toBe(198);
 	});
 
 	it('is reported when a scene tries to change it directly', async () => {
 		await derivedVault();
 		await file(
 			`${VAULT.situations}/sit-901.md`,
-			'---\nid: sit-901\ntitle: Contradiction\narc: arc-01\norder: 5\nevents:\n  - {actor: carl, type: stat, stat: max-hp, delta: 40}\n---\n\nProse.\n',
+			'---\nid: sit-901\ntitle: Contradiction\narc: arc-01\norder: 5\nevents:\n  - {actor: carl, type: stat, stat: carry, delta: 40}\n---\n\nProse.\n',
 		);
 		const project = await consented();
 
 		const finding = project.questions.find(q => q.kind === 'derived_stat_driven');
-		expect(finding?.detail).toContain('max-hp');
+		expect(finding?.detail).toContain('carry');
 		expect(finding?.detail).toContain('overwrites it');
 	});
 });
@@ -205,5 +205,41 @@ describe('a system whose stats do nothing', () => {
 		const project = await computeProject(root);
 
 		expect(project.questions.map(q => q.kind)).toContain('system_stats_unset');
+	});
+});
+
+/**
+ * Every system's curve defaults to the same formula id, so formulas are stored
+ * under a key that includes the system that defined them — and calling with the
+ * bare id finds only the shared file. A formula written in a system's own body
+ * was never reached, and the first test of this passed anyway because the
+ * scaffold happens to define `max-hp` in `setting/formulas.md` as well.
+ */
+describe('a formula in the system’s own body', () => {
+	it('is found, and not confused with a shared one of the same name', async () => {
+		await derivedVault();
+		// Same id, different arithmetic, in the shared file. The system's own
+		// definition has to win.
+		await file(VAULT.formulas, '# Formulas\n\n```js id=carry\n() => 1;\n```\n');
+		const project = await consented();
+
+		expect(project.replay.state.characters['carl']?.stats['carry']).toBe(158);
+	});
+
+	it('reports a formula no system and no shared file defines', async () => {
+		await file(
+			`${VAULT.systems}/core.md`,
+			'---\nid: core\nstats:\n  - id: ghost\n    formula: nowhere\n---\n\nNothing.\n',
+		);
+		await file(
+			`${VAULT.characters}/carl.md`,
+			'---\nid: carl\nsystem: core\n---\n\nHim.\n',
+		);
+		await rm(path.join(root, VAULT.systems, 'system-01.md'), {force: true});
+		const project = await consented();
+
+		expect(
+			project.questions.find(q => q.detail.includes("formula 'nowhere'")),
+		).toBeDefined();
 	});
 });

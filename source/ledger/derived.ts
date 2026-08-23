@@ -107,11 +107,26 @@ export async function applyDerived(
 			continue;
 		}
 
+		// Scoped first, then the shared file. Every system's curve defaults to the
+		// same id, so formulas are stored under a key that includes the system
+		// that defined them — and calling with the bare id finds only the shared
+		// one. A formula written in a system's own body was never reached.
+		const key = formulas.resolve(stat.formula, system.id);
+		if (key === undefined) {
+			findings.push({
+				kind: 'broken_reference',
+				detail: `stat '${id}' names formula '${stat.formula}', which '${system.id}' does not define and no shared file supplies`,
+				where,
+				actor: character.id,
+			});
+			continue;
+		}
+
 		try {
 			// The whole state, not a hand-picked subset: a formula destructures
 			// what it needs, and deciding here what it is allowed to read would be
 			// a second place to keep in step with the author's own arithmetic.
-			const value = await formulas.call(stat.formula, {
+			const value = await formulas.call(key, {
 				...character.stats,
 				level: character.level,
 				xp: character.xp,
