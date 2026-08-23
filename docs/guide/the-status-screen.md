@@ -168,7 +168,28 @@ system_stats_inert: system 'core' declares 6 stat(s) that nothing changes
 and none derives — every sheet under it shows defaults
 ```
 
-Two things move a number, and you need at least one:
+### Where a character starts
+
+Before anything moves, a number has to begin somewhere. Two levers, and they do
+different jobs:
+
+```
+/character carl stat hp 50      # this person starts here
+/character carl level 3
+```
+
+```yaml
+# corpus/systems/core.md — everyone under it starts here
+stats:
+  - id: hp
+    default: 20
+```
+
+Replay seeds each stat from the character's own page and falls back to the
+system's `default`. Set neither and every stat begins at **0**, which is how a
+vault ends up with a status screen that is real, correct, and entirely blank.
+
+### Two things move a number, and you need at least one:
 
 **Events in scenes**, which are what happened:
 
@@ -194,6 +215,43 @@ stats:
 
 The tool will write formulas for you. It will never write events — what happens
 in a scene is the story, and that is yours.
+
+### Showing a ceiling
+
+A screen that wants `7/10` has two ways to get the 10.
+
+**Write it into the drawing** when it never changes:
+
+```
+HP  {hp}/10
+```
+
+A stat's `max:` lives in frontmatter and the screen cannot read it, so a fixed
+ceiling belongs in the drawing as plain text. A number that never changes is
+not state.
+
+**Make it a derived stat** when it does change — which is usually the
+interesting case, because a ceiling that rises with level is how a character
+grows into a system:
+
+````markdown
+```js id=hp-cap
+({level}) => 40 + level * 10;
+```
+````
+
+```yaml
+stats:
+  - id: hp-cap
+    formula: hp-cap
+```
+
+```
+HP  {hp}/{hp-cap}
+```
+
+Now the ceiling moves as they level, and `/system generate stats` will propose
+exactly this shape when your screen shows one placeholder over another.
 
 ## A worked example, start to finish
 

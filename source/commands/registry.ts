@@ -3,6 +3,7 @@ import path from 'node:path';
 import {
 	arcSchema,
 	chapterSchema,
+	characterSchema,
 	momentSchema,
 	placeSchema,
 	situationSchema,
@@ -2504,16 +2505,21 @@ async function generateStats(
 	};
 }
 
+const CHARACTER_VERBS = new Set(['show', 'edit', 'stat', 'level']);
+
 const character: Command = {
 	name: 'character',
-	usage: '/character <name>',
-	summary: 'a character as the corpus has them',
+	usage: '/character <name> [edit | stat <id> <n> | level <n>]',
+	summary: 'a character as the corpus has them, and where they start',
 	async run(args, context) {
 		if (!context.project) {
 			return needsProject();
 		}
 
-		const focus = args.find(one => one !== 'show');
+		const verb = args.find(one => CHARACTER_VERBS.has(one));
+		const positional = args.filter(one => !CHARACTER_VERBS.has(one));
+		const focus = positional[0];
+
 		if (focus === undefined) {
 			return {
 				lines: [
@@ -2521,6 +2527,85 @@ const character: Command = {
 					muted('/questions character <name> interviews you about one'),
 				],
 			};
+		}
+
+		if (verb === 'edit') {
+			const opened = await authoredFile(context.root, 'character', focus);
+			return 'error' in opened
+				? {lines: [error(opened.error)]}
+				: {lines: adoptionNote(opened), openEditor: opened.file};
+		}
+
+		/**
+		 * Where a character starts, before anything in the story has happened.
+		 *
+		 * Replay seeds each stat from the character's own page, falling back to
+		 * the system's `default` — so a system's default is where everyone under
+		 * it begins and this is where one person begins differently. Without
+		 * either, every sheet in the book opens on zero, which is how a vault
+		 * ends up with a status screen that is real and entirely blank.
+		 *
+		 * Merged rather than replaced: `setAuthored` patches frontmatter
+		 * shallowly, so passing one stat would drop every other the author had
+		 * set.
+		 */
+		if (verb === 'stat') {
+			const [, statId, raw] = positional;
+			if (statId === undefined || raw === undefined) {
+				return {lines: [error('usage: /character <name> stat <stat> <value>')]};
+			}
+
+			const value = Number(raw);
+			if (!Number.isFinite(value)) {
+				return {lines: [error(`'${raw}' is not a number`)]};
+			}
+
+			const existing =
+				context.project.vault.characters.find(one => one.id === focus)?.stats ?? {};
+			const done = await setAuthored(
+				context.root,
+				'character',
+				focus,
+				{stats: {...existing, [statId]: value}},
+				parsed => characterSchema.parse(parsed),
+			);
+
+			return 'error' in done
+				? {lines: [error(done.error)]}
+				: {
+						lines: [
+							ok(`${focus} starts with ${statId} ${String(value)}`),
+							...adoptionNote(done),
+							muted('this is where they begin — scenes move it from here'),
+						],
+						dirty: true,
+					};
+		}
+
+		if (verb === 'level') {
+			const [, raw] = positional;
+			const value = Number(raw);
+			if (raw === undefined || !Number.isInteger(value)) {
+				return {lines: [error('usage: /character <name> level <n>')]};
+			}
+
+			const done = await setAuthored(
+				context.root,
+				'character',
+				focus,
+				{level: value},
+				parsed => characterSchema.parse(parsed),
+			);
+
+			return 'error' in done
+				? {lines: [error(done.error)]}
+				: {
+						lines: [
+							ok(`${focus} starts at level ${String(value)}`),
+							...adoptionNote(done),
+						],
+						dirty: true,
+					};
 		}
 
 		const lines = renderCharacter(context.project, focus);
