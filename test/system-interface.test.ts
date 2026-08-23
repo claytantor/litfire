@@ -9,6 +9,7 @@ import {buildIngest, readRaw} from '../source/ingest/index.js';
 import {extractInterface, fieldsOf, renderInterface} from '../source/system/interface.js';
 import {VAULT} from '../source/vault/paths.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
+import {buildWiki} from '../source/wiki/build.js';
 
 let root = '';
 let context: CommandContext;
@@ -275,5 +276,60 @@ describe('an empty sheet says why it is empty', () => {
 
 		expect(output).toContain('nobody is cast in it');
 		expect(output).toContain('/situation sit-900 cast <character>');
+	});
+});
+
+/**
+ * The cast list answers "who is here and what are their numbers", a line each.
+ * This answers what the scene is actually about: what each of them would be
+ * looking at, standing there — which is why an author drew the screen at all.
+ */
+describe('the wiki shows a scene as its cast sees it', () => {
+	async function scenePage() {
+		await file(
+			`${VAULT.situations}/sit-900.md`,
+			'---\nid: sit-900\ntitle: The Room\narc: arc-01\norder: 5\ncharacters:\n  - carl\n---\n\nProse.\n',
+		);
+		const project = await computeProject(root);
+		return (
+			buildWiki(project).pages.find(page => page.path.endsWith('situations/sit-900.md'))
+				?.body ?? ''
+		);
+	}
+
+	it('draws each character on their own system’s screen', async () => {
+		await vaultWithScreen();
+		const body = await scenePage();
+
+		expect(body).toContain('## As they see it');
+		expect(body).toContain('THE LATHE');
+		expect(body).toContain('COHERENCE   7');
+	});
+
+	it('fences it, because the whitespace is the drawing', async () => {
+		await vaultWithScreen();
+		const body = await scenePage();
+		const section = body.slice(body.indexOf('## As they see it'));
+
+		// Markdown would collapse the runs of spaces the author aligned by hand.
+		expect(section).toContain('```');
+	});
+
+	it('says nothing when no system in the scene draws one', async () => {
+		// A profile template is a guess made from the idiom — worth showing in the
+		// TUI where it was asked for, not worth pasting into a wiki page.
+		context = {
+			root,
+			project: await computeProject(root),
+			activeCharacter: undefined,
+			setActiveCharacter: () => {},
+			consentFormulas: () => {},
+		};
+		const project = await computeProject(root);
+		const body =
+			buildWiki(project).pages.find(page => page.path.endsWith('situations/sit-001.md'))
+				?.body ?? '';
+
+		expect(body).not.toContain('## As they see it');
 	});
 });

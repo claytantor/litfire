@@ -19,10 +19,11 @@ import {
 	type Setting,
 } from '../genre/types.js';
 import type {Step} from '../ledger/replay.js';
-import {castOf, momentByStep} from '../ledger/state.js';
+import {castOf, momentByStep, type SituationCast} from '../ledger/state.js';
 import {compareInstants, grouped} from '../time/instant.js';
 import {calendarFor} from '../time/binding.js';
 import {findBlocks} from '../vault/markers.js';
+import {renderInterface} from '../system/interface.js';
 import type {Calendar} from '../time/calendar.js';
 import {parseDocument} from '../vault/frontmatter.js';
 import {homesOf, resolve, VAULT} from '../vault/paths.js';
@@ -256,6 +257,56 @@ function authorSection(
 		'',
 		prose === '' ? `_Nothing written in \`${source}\` yet._` : prose,
 	].join('\n');
+}
+
+/**
+ * Every character in a scene, drawn on their own system's status screen.
+ *
+ * The cast list above answers "who is here and what are their numbers", as a
+ * line each. This answers the question the scene is actually about: what each
+ * of them would be looking at, standing there — which is the thing an author
+ * put an interface block in their system to decide.
+ *
+ * Only for systems that draw one. The three built-in templates are a guess made
+ * from the idiom, and a guess is worth showing in the TUI, where the author
+ * asked for it, and not worth pasting into a wiki page nobody asked to have
+ * filled with it.
+ */
+function sheetSection(project: Project, cast: SituationCast): string[] {
+	const drawn = cast.states.flatMap(state => {
+		const template = project.vault.interfaces[state.system ?? ''];
+		if (template === undefined) {
+			return [];
+		}
+
+		const screen = renderInterface(
+			template,
+			{
+				id: state.character,
+				system: state.system,
+				level: state.level,
+				xp: state.xp,
+				stats: {...state.stats},
+				skills: [...state.skills],
+				items: {...state.items},
+				artifacts: [...state.artifacts],
+			},
+			{displayName: state.character},
+		);
+
+		// Fenced, because a status screen is drawn and its whitespace is content:
+		// markdown would collapse the runs of spaces an author aligned by hand.
+		return [
+			`**[[${state.character}]]** — [[${state.system ?? ''}]]`,
+			'',
+			'```',
+			screen,
+			'```',
+			'',
+		];
+	});
+
+	return drawn.length === 0 ? [] : ['## As they see it', '', ...drawn];
 }
 
 // ---------------------------------------------------------------------------
@@ -1325,12 +1376,16 @@ function buildSituationPage(
 		);
 	} else if (
 		project.vault.arcs.find(candidate => candidate.id === situation.arc)?.starts_after ===
-		undefined
+			undefined &&
+		situation.moment === undefined
 	) {
-		// Easiest gap to miss: the scene is placed, but its arc has no clock
-		// position for the scene to inherit.
+		// The scene is placed, but neither it nor its arc says where on the clock
+		// it sits. An arc with no `starts_after` is legitimate — an opening has
+		// nothing before it and takes its position from the earliest moment its
+		// own scenes claim — so this is only a gap when the scenes do not claim
+		// one either.
 		steps.push(
-			`**Anchor its arc to the clock** — \`/arc ${situation.arc} after <moment>\`. The arc has no \`starts_after\`, so its scenes have nothing on the clock before them.`,
+			`**Give it a moment, or anchor its arc** — \`/situation ${own} moment <moment>\`, or \`/arc ${situation.arc} after <moment>\`. Neither the scene nor its arc says where on the clock this sits.`,
 		);
 	}
 
@@ -1394,6 +1449,7 @@ function buildSituationPage(
 		'',
 		...castLines,
 		'',
+		...sheetSection(project, cast),
 		...(situation.themes.length > 0
 			? ['## Themes', '', situation.themes.map(t => `- [[${t}]]`).join('\n'), '']
 			: []),

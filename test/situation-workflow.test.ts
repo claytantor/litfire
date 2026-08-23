@@ -251,7 +251,13 @@ describe('the documented workflow', () => {
 		expect(body).toContain('/moment new <name>');
 	});
 
-	it('flags an arc that has no clock position for its scenes to inherit', async () => {
+	/**
+	 * An arc with no `starts_after` used to be a gap on its own. It is not any
+	 * more: an opening has nothing before it and takes its position from the
+	 * earliest moment its own scenes claim, so this is a gap only when the
+	 * scenes do not claim one either.
+	 */
+	it('flags a scene whose arc and moment both leave it off the clock', async () => {
 		// The scaffold's arc-01 is already anchored, so this needs a bare one.
 		await run('/arc new The Long Descent');
 		await run('/situation new A Bare Scene');
@@ -263,10 +269,27 @@ describe('the documented workflow', () => {
 				p => p.kind === 'situation' && p.id === 'sit-002',
 			)?.body ?? '';
 
-		// Placed, so the arc step is done — but the arc itself is unanchored.
+		// Placed, so the arc step is done — but nothing says when it happens.
 		expect(body).not.toContain('Put it on an arc');
-		expect(body).toContain('Anchor its arc to the clock');
+		expect(body).toContain('Give it a moment, or anchor its arc');
 		expect(body).toContain('/arc arc-02 after <moment>');
+	});
+
+	it('says nothing about the clock once the scene names its own moment', async () => {
+		// The scene anchors itself, so its unanchored arc follows it there — which
+		// is exactly how a prologue is meant to work.
+		await run('/arc new The Long Descent');
+		await run('/situation new A Placed Scene');
+		await refresh();
+		await run('/situation sit-002 arc arc-02');
+		await run('/situation sit-002 moment we-001');
+
+		const body =
+			buildWiki(context.project!).pages.find(
+				p => p.kind === 'situation' && p.id === 'sit-002',
+			)?.body ?? '';
+
+		expect(body).not.toContain('anchor its arc');
 	});
 
 	it('refuses a link to something that does not exist, and says how to make it', async () => {
