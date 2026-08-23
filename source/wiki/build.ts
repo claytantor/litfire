@@ -23,7 +23,7 @@ import {castOf, momentByStep, type SituationCast} from '../ledger/state.js';
 import {compareInstants, grouped} from '../time/instant.js';
 import {calendarFor} from '../time/binding.js';
 import {findBlocks} from '../vault/markers.js';
-import {renderInterface} from '../system/interface.js';
+import {fieldsOf, renderInterface} from '../system/interface.js';
 import type {Calendar} from '../time/calendar.js';
 import {parseDocument} from '../vault/frontmatter.js';
 import {homesOf, resolve, VAULT} from '../vault/paths.js';
@@ -309,7 +309,47 @@ function sheetSection(project: Project, cast: SituationCast): string[] {
 		];
 	});
 
-	return drawn.length === 0 ? [] : ['## As they see it', '', ...drawn];
+	if (drawn.length === 0) {
+		return [];
+	}
+
+	/**
+	 * What is still standing on the screen, and what would fill it.
+	 *
+	 * A placeholder that renders as itself is the honest output — a blank would
+	 * be indistinguishable from a zero — but on its own it says only that
+	 * something is missing. The vault knows which of two quite different things
+	 * it is: a stat nobody declared, or a stat nobody has said how to read.
+	 */
+	const unresolved = [
+		...new Set(drawn.flatMap(line => (line.startsWith('```') ? [] : fieldsOf(line)))),
+	].toSorted();
+
+	if (unresolved.length === 0) {
+		return ['## As they see it', '', ...drawn];
+	}
+
+	const readings = unresolved.filter(field => field.endsWith('-interpretation'));
+	const missing = unresolved.filter(field => !field.endsWith('-interpretation'));
+
+	return [
+		'## As they see it',
+		'',
+		...drawn,
+		'_Still standing on these screens:_',
+		'',
+		...(missing.length > 0
+			? [
+					`- ${missing.map(field => `\`{${field}}\``).join(', ')} — no stat of that name. \`/system <id> generate stats\` derives them from the screen.`,
+				]
+			: []),
+		...(readings.length > 0
+			? [
+					`- ${readings.map(field => `\`{${field}}\``).join(', ')} — the stat exists, nothing says how it reads. \`/system <id> generate interpretations\` writes the bands.`,
+				]
+			: []),
+		'',
+	];
 }
 
 // ---------------------------------------------------------------------------

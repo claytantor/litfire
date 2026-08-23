@@ -333,3 +333,53 @@ describe('the wiki shows a scene as its cast sees it', () => {
 		expect(body).not.toContain('## As they see it');
 	});
 });
+
+/**
+ * A placeholder rendering as itself is the honest output — a blank would be
+ * indistinguishable from a zero — but on its own it says only that something is
+ * missing. The vault knows which of two different things it is, and they have
+ * different fixes.
+ */
+describe('the wiki says why a placeholder is still standing', () => {
+	async function pageWith(screen: string, stats: string) {
+		await file(
+			`${VAULT.systems}/core.md`,
+			`---\nid: core\nstats:\n${stats}---\n\n\`\`\`interface\n${screen}\n\`\`\`\n`,
+		);
+		await file(
+			`${VAULT.characters}/carl.md`,
+			'---\nid: carl\nsystem: core\nstats:\n  coherence: 7\n---\n\nHim.\n',
+		);
+		await file(
+			`${VAULT.situations}/sit-900.md`,
+			'---\nid: sit-900\narc: arc-01\norder: 5\ncharacters:\n  - carl\n---\n\nx.\n',
+		);
+		await rm(path.join(root, VAULT.systems, 'system-01.md'), {force: true});
+		const project = await computeProject(root);
+		return (
+			buildWiki(project).pages.find(page => page.path.endsWith('situations/sit-900.md'))
+				?.body ?? ''
+		);
+	}
+
+	it('separates a missing stat from an unwritten reading', async () => {
+		const body = await pageWith(
+			'{coherence}/{coherence-cap} {coherence-interpretation}',
+			'  - id: coherence\n',
+		);
+
+		expect(body).toContain('`{coherence-cap}` — no stat of that name');
+		expect(body).toContain('`{coherence-interpretation}` — the stat exists');
+		expect(body).toContain('generate interpretations');
+	});
+
+	it('says nothing when every placeholder resolved', async () => {
+		const body = await pageWith(
+			'{coherence} {coherence-interpretation}',
+			'  - id: coherence\n    bands:\n      - reads: Laminar\n',
+		);
+
+		expect(body).toContain('## As they see it');
+		expect(body).not.toContain('Still standing');
+	});
+});
