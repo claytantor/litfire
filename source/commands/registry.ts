@@ -1336,6 +1336,25 @@ const ingest: Command = {
 		// about, and a request that costs money should not be sent to discover an
 		// empty directory.
 		if (documents.length === 0) {
+			// An absent directory and an empty one produce the same empty read, and
+			// "has no markdown" implies the folder is sitting there waiting. When
+			// it is missing the vault is not where the author thinks it is, and
+			// telling them to write notes into it sends them somewhere else again.
+			const here = await readdir(resolve(context.root, directory)).then(
+				() => true,
+				() => false,
+			);
+
+			if (!here) {
+				return {
+					lines: [
+						error(`no ${directory}/ in ${displayPath(context.root)}`),
+						muted('this vault may not be the one you meant —'),
+						muted('/project lists the recent ones and switches'),
+					],
+				};
+			}
+
 			return {
 				lines: [
 					error(

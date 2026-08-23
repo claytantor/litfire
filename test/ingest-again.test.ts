@@ -1,4 +1,4 @@
-import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readdir, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
@@ -95,5 +95,32 @@ describe('reading notes the corpus already reflects', () => {
 	it('is off unless asked for, so a normal ingest stays free', async () => {
 		const result = await run('/ingest character');
 		expect(result.ingest?.again).toBeUndefined();
+	});
+});
+
+/**
+ * An absent directory and an empty one produce the same empty read, and "has
+ * no markdown" implies the folder is sitting there waiting. When it is missing
+ * the vault is usually not the one the author thinks they are in, and telling
+ * them to write notes into it sends them somewhere else again.
+ */
+describe('a raw folder that is not there at all', () => {
+	it('says the folder is missing, and points at /project', async () => {
+		await rm(path.join(root, 'raw/arcs'), {recursive: true, force: true});
+		const output = said(await run('/ingest arc'));
+
+		expect(output).toContain('no raw/arcs/');
+		expect(output).toContain('/project');
+		expect(output).not.toContain('has no markdown');
+	});
+
+	it('still says "no markdown" when the folder is there and empty', async () => {
+		for (const name of await readdir(path.join(root, 'raw/arcs'))) {
+			await rm(path.join(root, 'raw/arcs', name), {force: true});
+		}
+		const output = said(await run('/ingest arc'));
+
+		expect(output).toContain('has no markdown');
+		expect(output).toContain('write your arc notes there');
 	});
 });
