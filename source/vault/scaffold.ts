@@ -182,6 +182,43 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 		'\n# The Third Floor Opens\n\nA hundred seconds after the origin. Closes [[arc-01]].\n',
 	);
 
+	/**
+	 * The opening, with nothing before it.
+	 *
+	 * A story's first scenes have no earlier moment to start after, and until
+	 * arcs could anchor on their own scenes there was nowhere to put them: on
+	 * `arc-01` they replayed after its anchor, which is wrong for anything that
+	 * happens before the story proper, and on no arc at all they replayed never.
+	 *
+	 * Seeded empty and without `starts_after`, which is the whole point — it
+	 * waits for the earliest moment its own scenes claim. An author who never
+	 * writes a prologue has one unused arc; one who does has somewhere for it to
+	 * go on the first day, rather than discovering the need at the point of
+	 * having written the scene.
+	 */
+	authored(
+		files,
+		'arc',
+		'arc-00',
+		{name: 'Prologue', order: 0, example: true},
+		[
+			'',
+			'# Prologue',
+			'',
+			'> Scaffold example. Delete `example: true` once this is really your arc.',
+			'',
+			'Whatever happens before the story proper — a first memory, an origin, a',
+			'thing done long ago that the book is about the consequences of.',
+			'',
+			'It names no `starts_after`, because nothing precedes it. Its position',
+			'comes from the earliest moment its own scenes are anchored to, so a scene',
+			'set aeons back replays after those aeons rather than before them.',
+			'',
+			'Delete it if your book opens where it opens.',
+			'',
+		].join('\n'),
+	);
+
 	authored(
 		files,
 		'arc',
@@ -288,6 +325,7 @@ function seedFiles(profile: ResolvedProfile): Record<string, string> {
 		'',
 		'## Timeline',
 		'',
+		'- [[arc-00]]',
 		'- [[we-001]]',
 		'- [[we-002]]',
 		'- [[arc-01]]',

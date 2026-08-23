@@ -425,7 +425,12 @@ const chapter: Command = {
 				return {lines: [error(`a chapter already opens on ${startsAt}`)]};
 			}
 
-			const id = `ch-${String(context.project.vault.chapters.length + 1).padStart(3, '0')}`;
+			const takenChapters = new Set(context.project.vault.chapters.map(each => each.id));
+			let nextChapter = 1;
+			while (takenChapters.has(`ch-${String(nextChapter).padStart(3, '0')}`)) {
+				nextChapter++;
+			}
+			const id = `ch-${String(nextChapter).padStart(3, '0')}`;
 			const order = nextOrder(context.project.vault.chapters.map(c => c.order));
 			const file = resolve(context.root, VAULT.chapters, `${id}.md`);
 
@@ -1700,7 +1705,16 @@ const arc: Command = {
 		// As with `/situation new`, the verb leads because the rest is a title.
 		if (sub === 'new') {
 			const arcs = context.project.vault.arcs;
-			const id = `arc-${String(arcs.length + 1).padStart(2, '0')}`;
+			// Counted past what is taken rather than from the length, for the same
+			// reason `/situation new` is: a vault holding only `arc-02` would mint
+			// `arc-02` again, and a vault seeded with `arc-00` and `arc-01` would
+			// skip straight to `arc-03`.
+			const takenArcs = new Set(arcs.map(each => each.id));
+			let nextArc = 1;
+			while (takenArcs.has(`arc-${String(nextArc).padStart(2, '0')}`)) {
+				nextArc++;
+			}
+			const id = `arc-${String(nextArc).padStart(2, '0')}`;
 			const title = rest.join(' ') || 'Untitled';
 			const file = resolve(context.root, VAULT.arcs, `${id}.md`);
 

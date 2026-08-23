@@ -2,6 +2,7 @@ import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
+import {findCommand} from '../source/commands/registry.js';
 import {computeProject} from '../source/core/project.js';
 import {VAULT} from '../source/vault/paths.js';
 import {scaffoldVault} from '../source/vault/scaffold.js';
@@ -155,5 +156,44 @@ describe('a scene on no arc', () => {
 		expect(found).toHaveLength(1);
 		expect(found[0]?.detail).toContain('4 scene(s)');
 		expect(found[0]?.detail).toContain('and 1 more');
+	});
+});
+
+/**
+ * Minting an id from the collection's length is wrong the moment ids are not a
+ * dense 1..N run — a vault holding only `arc-02` mints `arc-02` again, and one
+ * seeded with `arc-00` and `arc-01` skips to `arc-03`. `/situation new` already
+ * counted past what was taken; these two did not.
+ */
+describe('minting an id for a new arc or chapter', () => {
+	it('takes the first free number, not the count', async () => {
+		// The scaffold seeds arc-00 and arc-01, so length + 1 would give arc-03.
+		const project = await computeProject(root);
+		const context = {
+			root,
+			project,
+			activeCharacter: undefined,
+			setActiveCharacter: () => {},
+			consentFormulas: () => {},
+		};
+		const result = await findCommand('arc')!.run(['new', 'The', 'Descent'], context);
+
+		expect(result.lines.map(l => l.text).join('\n')).toContain('arc-02');
+	});
+
+	it('does not reuse an id a gap left behind', async () => {
+		await rm(path.join(root, VAULT.arcs, 'arc-01.md'), {force: true});
+		const project = await computeProject(root);
+		const context = {
+			root,
+			project,
+			activeCharacter: undefined,
+			setActiveCharacter: () => {},
+			consentFormulas: () => {},
+		};
+		// arc-00 remains, so the first free number is 1.
+		const result = await findCommand('arc')!.run(['new', 'Next'], context);
+
+		expect(result.lines.map(l => l.text).join('\n')).toContain('arc-01');
 	});
 });
