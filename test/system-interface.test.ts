@@ -230,3 +230,50 @@ describe('/system edit', () => {
 		expect(said(await run('/system core'))).toContain('Core');
 	});
 });
+
+/**
+ * The message that made this necessary: "nobody in this scene has a state to
+ * show", and nothing else — the least useful true sentence available, when
+ * every reason below is already computed and each has a different fix.
+ */
+describe('an empty sheet says why it is empty', () => {
+	async function looseScene(frontmatter: string) {
+		await file(
+			`${VAULT.situations}/sit-900.md`,
+			`---\nid: sit-900\n${frontmatter}---\n\nx.\n`,
+		);
+		context = {...context, project: await computeProject(root)};
+		return said(await run('/situation sit-900 sheet'));
+	}
+
+	beforeEach(async () => {
+		context = {
+			root,
+			project: await computeProject(root),
+			activeCharacter: undefined,
+			setActiveCharacter: () => {},
+			consentFormulas: () => {},
+		};
+	});
+
+	it('names the arc as the reason, and the command that fixes it', async () => {
+		const output = await looseScene('characters:\n  - protagonist\n');
+
+		expect(output).toContain('on no arc');
+		expect(output).toContain('/situation sit-900 arc <arc>');
+	});
+
+	it('names a cast member who has no page', async () => {
+		const output = await looseScene('arc: arc-01\ncharacters:\n  - nobody\n');
+
+		expect(output).toContain('no character page for nobody');
+		expect(output).toContain('/primitives character');
+	});
+
+	it('says when nobody is cast at all', async () => {
+		const output = await looseScene('arc: arc-01\n');
+
+		expect(output).toContain('nobody is cast in it');
+		expect(output).toContain('/situation sit-900 cast <character>');
+	});
+});

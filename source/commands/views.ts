@@ -360,7 +360,35 @@ export function renderSituationSheet(
 	}
 
 	if (cast.states.length === 0) {
-		lines.push(blank(), muted('nobody in this scene has a state to show'));
+		// The tool knows exactly why and used to say only that nobody had a
+		// state, which is the least useful true sentence available: every reason
+		// below is already computed and each has a different fix.
+		lines.push(blank(), warn('nobody in this scene has a state to show'));
+
+		if (situation.arc === undefined) {
+			lines.push(
+				muted('  this scene is on no arc, so it is in no replay at all —'),
+				muted(`  /situation ${situation.id} arc <arc> places it`),
+			);
+		}
+
+		const unknown = cast.missing.filter(
+			name => !project.vault.characters.some(one => one.id === name),
+		);
+		if (unknown.length > 0) {
+			lines.push(
+				muted(`  no character page for ${unknown.join(', ')} —`),
+				muted('  /primitives character lists the ids that exist'),
+			);
+		}
+
+		if (situation.characters.length === 0) {
+			lines.push(
+				muted('  and nobody is cast in it —'),
+				muted(`  /situation ${situation.id} cast <character> names someone`),
+			);
+		}
+
 		return lines;
 	}
 
