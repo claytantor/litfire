@@ -59,6 +59,17 @@ export const statDefSchema = z.object({
 	 */
 	formula: idSchema.optional(),
 	/**
+	 * Another stat that supplies this one's ceiling, when the ceiling moves.
+	 *
+	 * `max` is a constant, which is right for a bound the world fixes and wrong
+	 * for one a character grows into — a system where the cap rises with level
+	 * cannot state it as a number. Naming the stat that holds it lets the ceiling
+	 * be derived like anything else, and lets the checks enforce it: without
+	 * this, a level-scaled cap is drawn on the screen and enforced nowhere,
+	 * which is a decoration rather than a rule.
+	 */
+	max_from: idSchema.optional(),
+	/**
 	 * How the system reads this number back, in its own voice.
 	 *
 	 * A LitRPG system that judges says more than a figure: 31 is a number, and

@@ -71,6 +71,8 @@ disk, so `/lint` reports:
   are still read, so no vault breaks — `/init` just stops creating them, and the
   finding names what now replaces each one.
 - **`duplicate_id`** — two files declaring one id, named by path.
+- **`stat_over_ceiling`** — a stat above the ceiling another stat holds for it.
+  For a cap that rises with level, where a constant `max:` cannot express it.
 - **`stat_unread`** — a screen shows what the system makes of a stat, and no
   bands say how it reads. The stat is there; nobody has said what it means.
 - **`stat_unread`** — a screen shows what the system makes of a stat, and no

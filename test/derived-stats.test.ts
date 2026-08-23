@@ -243,3 +243,58 @@ describe('a formula in the system’s own body', () => {
 		).toBeDefined();
 	});
 });
+
+/**
+ * `max` is a constant, which is right for a bound the world fixes and wrong for
+ * one a character grows into. A system whose limits rise with level cannot
+ * state its cap as a number, and before `max_from` such a cap was drawn on the
+ * screen and enforced nowhere.
+ */
+describe('a ceiling that moves with level', () => {
+	async function cappedVault(level: number, alpha: number) {
+		await rm(path.join(root, VAULT.systems, 'system-01.md'), {force: true});
+		await file(
+			`${VAULT.systems}/core.md`,
+			[
+				'---',
+				'id: core',
+				'stats:',
+				'  - id: alpha',
+				'    max_from: alpha-max',
+				'  - id: alpha-max',
+				'    formula: alpha-max',
+				'---',
+				'',
+				'```js id=alpha-max',
+				'({level}) => 20 + level * 4;',
+				'```',
+				'',
+			].join('\n'),
+		);
+		await file(
+			`${VAULT.characters}/carl.md`,
+			`---\nid: carl\nsystem: core\nlevel: ${String(level)}\nstats:\n  alpha: ${String(alpha)}\n---\n\nHim.\n`,
+		);
+		return consented();
+	}
+
+	it('rises as the character does', async () => {
+		const project = await cappedVault(3, 10);
+		expect(project.replay.state.characters['carl']?.stats['alpha-max']).toBe(32);
+	});
+
+	it('reports a value above the ceiling it has now', async () => {
+		const project = await cappedVault(1, 40);
+		const finding = project.questions.find(q => q.kind === 'stat_over_ceiling');
+
+		expect(finding?.detail).toContain('alpha=40');
+		expect(finding?.detail).toContain('alpha-max 24');
+		expect(finding?.detail).toContain('at level 1');
+	});
+
+	it('says nothing once the level has caught up', async () => {
+		// The same 40, at a level whose ceiling allows it.
+		const project = await cappedVault(6, 40);
+		expect(project.questions.filter(q => q.kind === 'stat_over_ceiling')).toEqual([]);
+	});
+});

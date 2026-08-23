@@ -293,6 +293,8 @@ grows into a system:
 
 ```yaml
 stats:
+  - id: hp
+    max_from: hp-cap # ← the cap is this stat, whatever it currently is
   - id: hp-cap
     formula: hp-cap
 ```
@@ -301,8 +303,25 @@ stats:
 HP  {hp}/{hp-cap}
 ```
 
-Now the ceiling moves as they level, and `/system generate stats` will propose
+Now the ceiling moves as they level, and `/system generate stats` proposes
 exactly this shape when your screen shows one placeholder over another.
+
+::: tip `max_from` is what makes it a rule
+`max:` is a constant — right for a bound your world fixes, and unable to
+express one a character grows into. `max_from` names the stat holding the
+current ceiling, and the checks enforce it:
+
+```
+stat_over_ceiling: carl alpha=40 above alpha-max 24 at level 1
+```
+
+Without it a rising cap is drawn on the screen and enforced nowhere, which is a
+decoration rather than a rule.
+:::
+
+If your system's prose has a table of levels and limits, put it there and let
+`/system generate stats` read it — the same way it read your α/β table into the
+Ω formula. The table is the specification; the formula is what falls out of it.
 
 ## A worked example, start to finish
 

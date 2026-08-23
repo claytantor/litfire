@@ -218,6 +218,22 @@ function statRanges(input: CheckInput): Finding[] {
 					actor: character.id,
 				});
 			}
+
+			// A ceiling that moves. `max` is a constant and cannot express a cap a
+			// character grows into, so a system whose limits rise with level names
+			// the stat holding the current one — and without this that cap is drawn
+			// on the screen and enforced nowhere.
+			if (definition.max_from !== undefined) {
+				const ceiling = character.stats[definition.max_from];
+				if (ceiling !== undefined && value > ceiling) {
+					findings.push({
+						kind: 'stat_over_ceiling',
+						detail: `${character.id} ${statId}=${value} above ${definition.max_from} ${ceiling} at level ${String(character.level)}`,
+						where: 'ledger',
+						actor: character.id,
+					});
+				}
+			}
 		}
 	}
 
