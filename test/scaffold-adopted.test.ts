@@ -95,7 +95,7 @@ describe('what /init no longer creates', () => {
 	it('leaves the superseded system layout alone', async () => {
 		await scaffoldVault(root);
 
-		for (const legacy of [VAULT.stats, VAULT.skills, VAULT.curves]) {
+		for (const legacy of [VAULT.stats, VAULT.legacySkills, VAULT.curves]) {
 			expect(await exists(legacy), legacy).toBe(false);
 		}
 		// The shared formula file is not legacy — it is deliberately unscoped, the

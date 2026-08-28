@@ -157,6 +157,7 @@ const KIND_LABEL: Readonly<Record<InterviewKind, string>> = {
 	situation: 'situation',
 	faction: 'faction',
 	artifact: 'artifact',
+	skill: 'skill',
 	theme: 'theme',
 	chapter: 'chapter',
 };

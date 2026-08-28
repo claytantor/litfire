@@ -29,6 +29,7 @@ export const INGEST_KINDS = [
 	'arc',
 	'faction',
 	'artifact',
+	'skill',
 	'theme',
 	'chapter',
 ] as const;
@@ -117,6 +118,15 @@ export const INGEST: Readonly<Record<IngestKind, Spec>> = {
 			'id, name, kind, outcome (what it achieves — the defining field), ' +
 			'requires_skills (ids), requires_level (int)',
 		summary: 'what it achieves · what using it costs · who cannot use it',
+	},
+	skill: {
+		from: `${VAULT.raw}/skills`,
+		to: VAULT.skills,
+		fields:
+			'id, name, system (id of the system that grants it — omit it when the ' +
+			'vault has one system, or when every system grants it), ' +
+			'requires_skills (ids), requires_level (int)',
+		summary: 'what it lets someone do · what it costs to use · who cannot learn it',
 	},
 	theme: {
 		from: `${VAULT.raw}/themes`,

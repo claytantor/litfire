@@ -5,6 +5,7 @@ import type {
 	Faction,
 	Place,
 	Situation,
+	Skill,
 	SystemDef,
 	Theme,
 	Moment,
@@ -40,6 +41,8 @@ export type CheckInput = {
 	/** Superseded files the loader still read, vault-relative. */
 	readonly legacy: readonly string[];
 	readonly artifacts: readonly Artifact[];
+	/** Skills written as their own pages. Systems may also declare skills. */
+	readonly skills: readonly Skill[];
 	readonly themes: readonly Theme[];
 	readonly replay: ReplayResult;
 	readonly formulas: FormulaRunner | undefined;
@@ -118,9 +121,24 @@ function skillPrerequisites(input: CheckInput): Finding[] {
 	// Skills are resolved through the acquiring character's own system, so a
 	// skill the Seed grants is not "undefined" merely because the Custodian has
 	// never heard of it.
+	//
+	// A skill written as its own page joins the same lookup. Its `system` says
+	// which system grants it; a note without one is available under every
+	// system, which is what an author with a single system means by leaving the
+	// field out and never having to learn it exists.
 	const defsFor = (actor: string) => {
-		const system = systemFor(input.replay.state.characters[actor]?.system, input.systems);
-		return new Map((system?.skills ?? []).map(skill => [skill.id, skill]));
+		const systemId = input.replay.state.characters[actor]?.system;
+		const system = systemFor(systemId, input.systems);
+		const defs = new Map((system?.skills ?? []).map(skill => [skill.id, skill]));
+		for (const note of input.skills) {
+			if (note.system === undefined || note.system === systemId) {
+				// The page wins. It is the more specific statement, and an author
+				// editing a skill will edit the page they wrote, not a row in a
+				// system's frontmatter they may have forgotten is there.
+				defs.set(note.id, note);
+			}
+		}
+		return defs;
 	};
 	const held = new Map<string, Set<string>>();
 
@@ -289,6 +307,34 @@ function brokenReferences(input: CheckInput): Finding[] {
 					kind: 'broken_reference',
 					detail: `situation '${situation.id}' tags unknown sub-theme '${theme}'`,
 					where: situation.id,
+				});
+			}
+		}
+	}
+
+	// A skill's page can name a system and other skills, and both can be typos.
+	// The same reporting standard as everywhere else: a dangling name is worth
+	// saying out loud and never worth refusing to load over.
+	const systemIds = new Set(input.systems.map(system => system.id));
+	const skillIds = new Set([
+		...input.skills.map(skill => skill.id),
+		...input.systems.flatMap(system => system.skills.map(skill => skill.id)),
+	]);
+	for (const skill of input.skills) {
+		if (skill.system !== undefined && !systemIds.has(skill.system)) {
+			findings.push({
+				kind: 'broken_reference',
+				detail: `skill '${skill.id}' is granted by system '${skill.system}', which does not exist`,
+				where: skill.id,
+			});
+		}
+
+		for (const prerequisite of skill.requires_skills) {
+			if (!skillIds.has(prerequisite)) {
+				findings.push({
+					kind: 'broken_reference',
+					detail: `skill '${skill.id}' requires '${prerequisite}', which nothing defines`,
+					where: skill.id,
 				});
 			}
 		}

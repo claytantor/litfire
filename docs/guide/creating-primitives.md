@@ -14,6 +14,7 @@ where the typed page ends up.
 | **situation** | A scene                                | `raw/situations/` |
 | **faction**   | A group working toward a goal          | `raw/factions/`   |
 | **artifact**  | A thing used to achieve an outcome     | `raw/artifacts/`  |
+| **skill**     | Something a character can do           | `raw/skills/`     |
 | **theme**     | What the book argues about             | `raw/themes/`     |
 | **chapter**   | A cut in the sequence, for a reader    | `raw/chapters/`   |
 

@@ -309,6 +309,7 @@ describe('the anchor', () => {
 			legacy: [],
 			interfaces: {},
 			artifacts: [],
+			skills: [],
 			themes: [],
 			replay: result,
 			formulas: undefined,

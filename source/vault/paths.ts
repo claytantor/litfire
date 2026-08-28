@@ -36,6 +36,8 @@ export const VAULT = {
 	factions: 'corpus/factions',
 	/** Things characters use to achieve outcomes (§3): spells, rifles, instruments. */
 	artifacts: 'corpus/artifacts',
+	/** What a character can do, as opposed to what they carry (§3). */
+	skills: 'corpus/skills',
 	situations: 'corpus/situations',
 	/** One page per character system (§3). */
 	systems: 'corpus/systems',
@@ -78,7 +80,7 @@ export const VAULT = {
 	legacySetting: 'system',
 	stats: 'system/stats.md',
 	curves: 'system/curves.md',
-	skills: 'system/skills.md',
+	legacySkills: 'system/skills.md',
 	legacyFormulas: 'system/formulas.md',
 	legacySettingFile: 'system/system.md',
 	legacyIdiom: 'system/idiom.md',
@@ -110,6 +112,7 @@ export const RAW_KINDS: readonly string[] = [
 	'moments',
 	'places',
 	'situations',
+	'skills',
 	'systems',
 	'themes',
 ];
@@ -133,6 +136,7 @@ export const CORPUS_DIRECTORIES: readonly string[] = [
 	VAULT.places,
 	VAULT.factions,
 	VAULT.artifacts,
+	VAULT.skills,
 	VAULT.situations,
 	VAULT.chapters,
 ];

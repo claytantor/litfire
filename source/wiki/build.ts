@@ -700,6 +700,12 @@ function buildFactionPage(faction: Faction, project: Project): WikiPage {
 
 function allSkillIds(project: Project, ctx: StepContext): Set<string> {
 	const ids = new Set(project.vault.systems.flatMap(sys => sys.skills.map(s => s.id)));
+	// A skill with a page of its own gets one here even if no system lists it
+	// and nobody has acquired it yet — which is the normal state of a skill the
+	// author has just written down.
+	for (const skill of project.vault.skills) {
+		ids.add(skill.id);
+	}
 	for (const events of ctx.eventsByStep.values()) {
 		for (const event of events) {
 			if (event.type === 'acquire_skill' || event.type === 'lose_skill') {
@@ -710,12 +716,59 @@ function allSkillIds(project: Project, ctx: StepContext): Set<string> {
 	return ids;
 }
 
-function buildSkillPage(skillId: string, project: Project, ctx: StepContext): WikiPage {
+/**
+ * What the vault says about one skill, from both places it can be said.
+ *
+ * A skill is either a row in some system's `skills:` list or a page of its own
+ * in `raw/skills/`, and both are legal at once. The note wins field by field
+ * rather than wholesale: an author who wrote a page to describe what the skill
+ * *is* has not thereby retracted a `requires_level` they set on the system
+ * months ago, and silently dropping it would be the tool deciding something
+ * nobody asked it to decide.
+ *
+ * `requires_skills` merges on non-empty rather than on presence, because the
+ * schema defaults it to `[]` — an omitted list and a deliberately empty one are
+ * the same value by the time they reach here, and the recoverable mistake is
+ * keeping a prerequisite the author meant to clear rather than dropping one
+ * they meant to keep.
+ */
+function skillDefinition(
+	skillId: string,
+	project: Project,
+): {
+	readonly name: string | undefined;
+	readonly requiresSkills: readonly string[];
+	readonly requiresLevel: number | undefined;
+	readonly systems: readonly string[];
+	readonly hasNote: boolean;
+	readonly declared: boolean;
+} {
+	const note = project.vault.skills.find(candidate => candidate.id === skillId);
+	const declaring = project.vault.systems.filter(sys =>
+		sys.skills.some(skill => skill.id === skillId),
+	);
 	// First system that declares it. Two systems naming the same skill is the
 	// author's business; the page shows the definition that exists.
-	const def = project.vault.systems
-		.flatMap(sys => sys.skills)
-		.find(s => s.id === skillId);
+	const listed = declaring[0]?.skills.find(skill => skill.id === skillId);
+
+	return {
+		name: note?.name ?? listed?.name,
+		requiresSkills:
+			note !== undefined && note.requires_skills.length > 0
+				? note.requires_skills
+				: (listed?.requires_skills ?? []),
+		requiresLevel: note?.requires_level ?? listed?.requires_level,
+		systems:
+			note?.system === undefined
+				? declaring.map(sys => sys.id)
+				: [...new Set([note.system, ...declaring.map(sys => sys.id)])].toSorted(),
+		hasNote: note !== undefined,
+		declared: listed !== undefined,
+	};
+}
+
+function buildSkillPage(skillId: string, project: Project, ctx: StepContext): WikiPage {
+	const def = skillDefinition(skillId, project);
 	const acquirers: Array<{readonly actor: string; readonly step: Step}> = [];
 	for (const step of ctx.sequence) {
 		for (const event of ctx.eventsByStep.get(step.id) ?? []) {
@@ -725,8 +778,7 @@ function buildSkillPage(skillId: string, project: Project, ctx: StepContext): Wi
 		}
 	}
 
-	const requiresSkills = def?.requires_skills ?? [];
-	const requiresLevel = def?.requires_level;
+	const {requiresSkills, requiresLevel} = def;
 
 	const summary = [
 		`${plural(acquirers.length, 'character')} acquired it`,
@@ -737,19 +789,29 @@ function buildSkillPage(skillId: string, project: Project, ctx: StepContext): Wi
 		.join('; ');
 
 	const definitionLines = [
+		def.systems.length > 0
+			? `Granted by ${def.systems.map(id => `[[${id}]]`).join(', ')}.`
+			: undefined,
 		requiresSkills.length > 0
 			? `Requires: ${requiresSkills.map(id => `[[${id}]]`).join(', ')}.`
 			: 'No skill prerequisites.',
 		requiresLevel !== undefined ? `Requires level **${requiresLevel}**.` : undefined,
 	].filter((p): p is string => p !== undefined);
 
+	// Undefined in both places at once is the only state worth calling out. A
+	// skill with a page but no system row is a perfectly ordinary way to write
+	// one; a skill that exists solely because somebody acquired it is a typo
+	// until proven otherwise, and the page should say so where the author will
+	// see it.
+	const undeclared = !def.hasNote && !def.declared;
+
 	const body = [
-		`# ${def?.name ?? skillId}`,
+		`# ${def.name ?? skillId}`,
 		'',
 		BANNER,
 		'',
-		def === undefined
-			? `_Not declared in \`${VAULT.skills}\` — only seen in events._`
+		undeclared
+			? `_No page in \`${VAULT.raw}/skills/\` and no system declares it — only seen in events._`
 			: definitionLines.join('\n'),
 		'',
 		'## Acquired by',
@@ -757,6 +819,13 @@ function buildSkillPage(skillId: string, project: Project, ctx: StepContext): Wi
 		acquirers.length === 0
 			? '_Nobody yet._'
 			: acquirers.map(a => `- [[${a.actor}]] at ${stepLink(a.step)}`).join('\n'),
+		'',
+		authorSection(
+			project.vault.root,
+			VAULT.skills,
+			skillId,
+			`${VAULT.skills}/${skillId}.md`,
+		),
 		'',
 		'Back to [[index]].',
 		'',
@@ -766,7 +835,7 @@ function buildSkillPage(skillId: string, project: Project, ctx: StepContext): Wi
 		path: `${VAULT.wiki}/skills/${skillId}.md`,
 		kind: 'skill',
 		id: skillId,
-		title: def?.name ?? skillId,
+		title: def.name ?? skillId,
 		summary,
 		body,
 	};

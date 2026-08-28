@@ -43,7 +43,7 @@ async function buildFixture(): Promise<void> {
 	await rm(resolve(root, VAULT.situations, 'sit-001.md'), {force: true});
 	await rm(resolve(root, VAULT.themes, 'commodification.md'), {force: true});
 
-	await put(VAULT.skills, {
+	await put(VAULT.legacySkills, {
 		skills: [{id: 'ember-bolt', name: 'Ember Bolt', requires_skills: []}],
 	});
 	await put(path.join(VAULT.moments, 'we-90.md'), {

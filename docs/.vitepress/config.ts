@@ -50,6 +50,7 @@ export default defineConfig({
 					{text: 'Drawing your status screen', link: '/guide/the-status-screen'},
 					{text: 'Moments', link: '/guide/moments'},
 					{text: 'Places', link: '/guide/places'},
+					{text: 'Skills', link: '/guide/skills'},
 					{text: 'Interviews', link: '/guide/interviews'},
 					{text: 'Ingesting your notes', link: '/guide/ingest'},
 					{text: 'Review gate', link: '/guide/review-gate'},

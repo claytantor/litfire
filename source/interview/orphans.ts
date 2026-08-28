@@ -43,7 +43,7 @@ function targetsFor(
 	// still read.
 	if (kind === 'system') {
 		return {
-			files: [VAULT.stats, VAULT.skills, VAULT.curves, VAULT.formulas],
+			files: [VAULT.stats, VAULT.legacySkills, VAULT.curves, VAULT.formulas],
 			directories: [VAULT.systems],
 		};
 	}

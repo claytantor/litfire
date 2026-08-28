@@ -13,7 +13,7 @@ import {
 import type {ResolvedProfile} from '../genre/types.js';
 import {formatStat} from '../system/interface.js';
 import {renderStatusBlock} from '../system/status.js';
-import type {Calendar} from '../time/calendar.js';
+import {isTimeZone, type Calendar} from '../time/calendar.js';
 import {
 	allStates,
 	castOf,
@@ -235,6 +235,19 @@ export function renderPrimitives(project: Project, focus?: string): Line[] {
 						artifact.outcome === undefined ? 'no outcome' : (artifact.kind ?? 'artifact'),
 					] as const,
 			),
+		},
+		{
+			kind: 'skill',
+			rows: vault.skills.map(skill => {
+				const granted = skill.system ?? '(every system)';
+				return [
+					skill.id,
+					skill.name ?? '',
+					skill.requires_skills.length > 0
+						? `${granted} · after ${skill.requires_skills.join(', ')}`
+						: granted,
+				] as const;
+			}),
 		},
 		{
 			kind: 'theme',
@@ -1428,9 +1441,128 @@ export function renderUnreadableTime(
 		];
 	}
 
+	// A zone the runtime does not know is the single most likely reason a
+	// well-formed date is rejected, and the message above sends the author to
+	// check their date format instead — which is fine.
+	const last = /\s(\S+)$/.exec(written.trim())?.[1];
+	const badZone =
+		last !== undefined && last.includes('/') && !isTimeZone(last) ? last : undefined;
+
 	return [
 		error(`${calendar.name} cannot read '${written}'`),
+		...(badZone === undefined
+			? []
+			: [muted(`'${badZone}' is not a time zone this system knows`)]),
 		muted('try 2036-08-15 02:30:00, or give whole seconds'),
+		...(calendar.inZone === undefined
+			? []
+			: [muted('a trailing IANA zone is read too — 2036-08-15 02:30:00 Etc/UTC')]),
+		...trailer,
+	];
+}
+
+/** How many moments a zone preview lists before it starts summarising. */
+const ZONE_PREVIEW_LIMIT = 12;
+
+/**
+ * `/time in <zone>` — the vault's clock as another zone would read it.
+ *
+ * A preview and nothing else: it writes nothing, and the binding it is
+ * previewing against is untouched. That is the whole point of it. Once a vault
+ * is bound the way its author wants, asking "what would this look like in
+ * Tokyo" should not require rebinding it to Tokyo and back, and the round trip
+ * through a rebind is not even safe — it rewrites `setting/time.md` twice and
+ * every date the tool prints in between.
+ *
+ * Only the instants are real. Nothing here is stored, and the seconds column is
+ * the same in both zones by construction — which is the fact the preview exists
+ * to make obvious.
+ */
+export function renderTimeZone(
+	project: Project,
+	zone: string,
+	calendar: Calendar,
+	note?: string,
+): Line[] {
+	const trailer = note === undefined ? [] : [muted(note)];
+
+	if (!isTimeZone(zone)) {
+		return [
+			error(`'${zone}' is not a time zone this system knows`),
+			muted('IANA names, e.g. Etc/UTC, America/Los_Angeles, Asia/Tokyo'),
+			...trailer,
+		];
+	}
+
+	const other = calendar.inZone?.(zone);
+	if (other === undefined) {
+		return [
+			error(`${calendar.name} has no time zones to preview`),
+			muted('zones apply to the Gregorian calendar — bind one with:'),
+			text('  /time gregorian <epoch> [zone]'),
+			...trailer,
+		];
+	}
+
+	const dated = project.vault.moments
+		.filter(moment => moment.at !== undefined)
+		.toSorted((a, b) => compareInstants(a.at!, b.at!));
+	const differing = dated.filter(
+		moment => other.format(moment.at!) !== calendar.format(moment.at!),
+	);
+
+	// Compared by what they render, not by what they are called. `UTC` and
+	// `Etc/UTC` are one zone under two spellings, so matching on the name told
+	// an author their vault was not in the zone it is in — and two genuinely
+	// different zones that happen to agree across everything this vault dates
+	// have nothing to preview either. Both are the same answer to the only
+	// question being asked: would this show me something?
+	if (differing.length === 0 && other.format(0n) === calendar.format(0n)) {
+		return [
+			ok(`${zone} reads exactly as this vault already does`),
+			text(`origin       ${calendar.format(0n)}`),
+			...(dated.length === 0
+				? []
+				: [
+						muted(`and so does every one of its ${plural(dated.length, 'dated moment')}`),
+					]),
+			...trailer,
+		];
+	}
+	const shown = differing.slice(0, ZONE_PREVIEW_LIMIT);
+	const same = dated.length - differing.length;
+
+	const rows: string[][] = [
+		['', 'seconds', calendar.name, other.name],
+		['origin', '0', calendar.format(0n), other.format(0n)],
+		...shown.map(moment => [
+			moment.id,
+			moment.at!.toString(),
+			calendar.format(moment.at!),
+			other.format(moment.at!),
+		]),
+	];
+
+	return [
+		ok(`preview only — this vault stays bound to ${calendar.name}`),
+		blank(),
+		...columns(rows).map(line => text(line)),
+		blank(),
+		...(same === 0
+			? []
+			: [
+					muted(
+						`${plural(same, 'other dated moment')} read the same in both — beyond this calendar, or unaffected`,
+					),
+				]),
+		...(differing.length > shown.length
+			? [
+					muted(
+						`${plural(differing.length - shown.length, 'more')} not listed; every one of them keeps its seconds`,
+					),
+				]
+			: []),
+		muted('nothing here is stored — the seconds column is what the vault holds'),
 		...trailer,
 	];
 }

@@ -20,6 +20,30 @@ const flush = async (ms = 60) => {
 	await new Promise(resolve => setTimeout(resolve, ms));
 };
 
+/**
+ * Waits for a condition instead of guessing how long it takes.
+ *
+ * A fixed sleep after a keypress is a bet on how loaded the machine is, and
+ * this suite runs alongside sixty other files. The write-and-callback path here
+ * lost that bet about once in fourteen full runs — which is the worst kind of
+ * failing test, because the honest response to it is to re-run rather than to
+ * look. Same helper, and same reasoning, as `confirm.test.tsx`.
+ */
+async function until(
+	predicate: () => boolean,
+	what: string,
+	timeout = 4000,
+): Promise<void> {
+	const deadline = Date.now() + timeout;
+	while (Date.now() < deadline) {
+		if (predicate()) {
+			return;
+		}
+		await new Promise(resolve => setTimeout(resolve, 20));
+	}
+	throw new Error(`timed out waiting for ${what}`);
+}
+
 async function mount(proposals: {path: string; contents: string}[]) {
 	const batch = await ReviewBatch.create(root, proposals);
 	const onDone = vi.fn<(outcome: ApplyOutcome) => void>();
@@ -117,7 +141,7 @@ describe('DiffReview', () => {
 		stdin.write('r');
 		await flush();
 		stdin.write('\r');
-		await flush(120);
+		await until(() => onDone.mock.calls.length > 0, 'the write to land');
 
 		expect(onDone).toHaveBeenCalledTimes(1);
 		const outcome = onDone.mock.calls[0]![0];
@@ -216,7 +240,7 @@ describe('DiffReview', () => {
 		stdin.write('X');
 		await flush();
 		stdin.write('\x1b');
-		await flush(120);
+		await until(() => lastFrame()?.includes('a accept') === true, 'the list to return');
 
 		expect(batch.items[0]?.contents).toBe(two[0]!.contents);
 		expect(batch.items[0]?.edited).toBe(false);
@@ -242,7 +266,7 @@ describe('DiffReview', () => {
 		stdin.write('e');
 		await flush();
 		stdin.write('\x05');
-		await flush(120);
+		await until(() => onExternalEdit.mock.calls.length > 0, 'the hand-off to fire');
 
 		expect(onExternalEdit).toHaveBeenCalledWith(two[0]!.contents, 'characters/a.md');
 		expect(batch.items[0]?.edited).toBe(true);
@@ -331,7 +355,7 @@ describe('ctrl+s saves, with a confirmation', () => {
 		stdin.write(CTRL_S);
 		await flush();
 		stdin.write(CTRL_S);
-		await flush(120);
+		await until(() => onDone.mock.calls.length > 0, 'the write to land');
 
 		expect(onDone).toHaveBeenCalledTimes(1);
 		expect(onDone.mock.calls[0]![0].written).toEqual(['characters/a.md']);
@@ -375,6 +399,8 @@ describe('ctrl+s saves, with a confirmation', () => {
 		await flush();
 		expect(lastFrame()).toContain('nothing is accepted');
 
+		// A sleep, deliberately. This asserts an absence, and the only way to be
+		// confident nothing happened is to give it time to happen.
 		stdin.write(CTRL_S);
 		await flush(120);
 		expect(onDone).not.toHaveBeenCalled();

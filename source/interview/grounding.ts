@@ -56,6 +56,9 @@ const RELEVANT: Readonly<Record<InterviewKind, readonly string[]>> = {
 	situation: [VAULT.situations, VAULT.characters, VAULT.places, VAULT.moments],
 	faction: [VAULT.factions, VAULT.characters, VAULT.places, VAULT.themes],
 	artifact: [VAULT.artifacts, VAULT.systems, VAULT.characters],
+	// Who already holds one is the question a skill interview keeps running
+	// into, so the characters come before the system that defines it.
+	skill: [VAULT.skills, VAULT.characters, VAULT.systems],
 	theme: [VAULT.themes, VAULT.characters, VAULT.factions],
 	chapter: [VAULT.chapters, VAULT.situations, VAULT.arcs],
 };

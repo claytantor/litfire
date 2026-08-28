@@ -15,7 +15,10 @@ import {
 	gregorian,
 	grouped,
 	readWhen,
+	resolveEpoch,
+	splitZone,
 	timeSchema,
+	type Calendar,
 } from '../time/index.js';
 import {
 	INGEST_KINDS,
@@ -116,6 +119,7 @@ import {
 	renderThemes,
 	renderTime,
 	renderTimeline,
+	renderTimeZone,
 	renderUnreadableTime,
 } from './views.js';
 
@@ -1018,6 +1022,71 @@ const questions: Command = {
 };
 
 /**
+ * What a new binding did, in the terms an author is actually asking about.
+ *
+ * "clock read as gregorian" is true and tells you nothing you did not just
+ * type. The two things worth knowing are what second zero now reads as — which
+ * is the only proof the zone took effect — and, when the vault already has
+ * dated moments, that their readings just moved and their stored numbers did
+ * not.
+ *
+ * There is deliberately no timestamp for the epoch itself. The epoch *is*
+ * instant zero: it is the definition of where the clock starts, not a date
+ * being converted into one, and printing `0` beside it would suggest a
+ * calculation happened. What changed is how zero is spelled.
+ */
+function describeBinding(
+	bound: Calendar,
+	previous: Calendar,
+	context: CommandContext,
+): Line[] {
+	const origin = bound.format(0n);
+	const lines: Line[] = [
+		// The seconds first, and stated even though they are always zero. "Where
+		// is the integer" is the reasonable question to ask of a command that
+		// takes a timestamp, and the honest answer — that the origin *is* instant
+		// zero, so binding a calendar converts nothing — is far better said than
+		// left to be inferred from its absence.
+		text(`origin       0  ${origin}`),
+		// Only against a calendar of the same kind. When the previous binding was
+		// unreadable — a bad epoch, an unconsented formula — it fell back to raw
+		// seconds, and "0s before this" is not a previous reading of anything.
+		...(previous.id !== bound.id || previous.format(0n) === origin
+			? []
+			: [muted(`                ${previous.format(0n)} before this`)]),
+		muted(
+			'             the origin is second zero — a binding renames it, never moves it',
+		),
+		text(`reads as     ${bound.name}`),
+	];
+
+	// Only moments the author has actually dated. An undated moment has no
+	// reading to change, and counting it would overstate the disruption.
+	const dated = (context.project?.vault.moments ?? []).filter(
+		moment => moment.at !== undefined,
+	);
+	const moved = dated.filter(
+		moment => bound.format(moment.at!) !== previous.format(moment.at!),
+	);
+	const example = moved[0];
+
+	if (example === undefined) {
+		return lines;
+	}
+
+	return [
+		...lines,
+		muted(
+			`${moved.length} dated moment${moved.length === 1 ? '' : 's'} read differently now — none of them moved`,
+		),
+		muted(
+			`  ${example.id} is still ${example.at!.toString()}, and now reads ${bound.format(example.at!)}`,
+		),
+		muted('  /time at <date> gives the seconds for any other date'),
+	];
+}
+
+/**
  * `/time` — read the in-world clock, and bind it to a calendar.
  *
  * The clock itself is not configurable: every instant is whole seconds from
@@ -1027,7 +1096,8 @@ const questions: Command = {
  */
 const time: Command = {
 	name: 'time',
-	usage: '/time [at <date> | seconds | gregorian <epoch> [zone] | custom]',
+	usage:
+		'/time [at <date> [zone] | in <zone> | seconds | gregorian <epoch> [zone] | custom]',
 	summary: 'the in-world clock, and the calendar it is read through',
 	async run(args, context) {
 		if (!context.project) {
@@ -1039,7 +1109,16 @@ const time: Command = {
 
 		const write = async (patch: Record<string, unknown>) => {
 			const file = resolve(context.root, VAULT.time);
-			const raw = await readFile(file, 'utf8').catch(() => undefined);
+			// Both homes, canonical first. A vault written before the layout change
+			// keeps its binding in `timeline/time.md`, and reading only the modern
+			// path meant every field the author had already set — the origin above
+			// all — was dropped on the first `/time` command that wrote anything.
+			// The new file is still where it lands; that is the migration.
+			const raw =
+				(await readFile(file, 'utf8').catch(() => undefined)) ??
+				(await readFile(resolve(context.root, VAULT.legacyTime), 'utf8').catch(
+					() => undefined,
+				));
 			const document = raw === undefined ? {data: {}, body: ''} : parseDocument(raw);
 			const data = {...document.data, ...patch};
 			try {
@@ -1047,6 +1126,10 @@ const time: Command = {
 			} catch (caught) {
 				return caught instanceof Error ? caught.message.split('\n')[0]! : String(caught);
 			}
+			// `setting/` may not exist at all — it is created by `/init`, and a
+			// vault from before it was a directory has never had one. Writing the
+			// clock is not the moment to fail over a missing folder.
+			await mkdir(path.dirname(file), {recursive: true});
 			await writeFile(
 				file,
 				stringifyDocument({
@@ -1063,6 +1146,12 @@ const time: Command = {
 
 		if (sub === 'seconds' || sub === 'custom' || sub === 'gregorian') {
 			const patch: Record<string, unknown> = {calendar: sub};
+			// What the vault read like before, so the confirmation can say what
+			// changed rather than only what was set.
+			const {calendar: previous} = calendarFor(current, {
+				formatted: context.project.calendarText,
+			});
+			let bound: Calendar | undefined;
 
 			if (sub === 'gregorian') {
 				const [epoch, zone] = rest;
@@ -1079,13 +1168,18 @@ const time: Command = {
 				// surfaces as raw seconds later reads as the command having done
 				// nothing at all.
 				try {
-					gregorian({epoch, timeZone: zone});
+					bound = gregorian({epoch, timeZone: zone});
 				} catch (caught) {
 					return {
 						lines: [error(caught instanceof Error ? caught.message : String(caught))],
 					};
 				}
-				patch['epoch'] = epoch;
+				// Stored with its offset resolved, so the file records an instant
+				// rather than a reading that depends on the zone sitting beside it.
+				// A later `/time gregorian <same epoch> <other zone>` then moves the
+				// zone without moving the anchor, which is what changing a zone
+				// ought to mean.
+				patch['epoch'] = resolveEpoch(epoch, zone) ?? epoch;
 				if (zone !== undefined) {
 					patch['timezone'] = zone;
 				}
@@ -1099,6 +1193,7 @@ const time: Command = {
 			return {
 				lines: [
 					ok(`clock read as ${sub}`),
+					...(bound === undefined ? [] : describeBinding(bound, previous, context)),
 					...(sub === 'custom'
 						? [
 								muted(
@@ -1110,6 +1205,26 @@ const time: Command = {
 				],
 				dirty: true,
 			};
+		}
+
+		if (sub === 'in') {
+			const zone = rest.join(' ').trim();
+			if (zone === '') {
+				return {
+					lines: [
+						error('usage: /time in <zone>'),
+						muted(
+							'shows this vault\u2019s clock as that zone reads it, and changes nothing',
+						),
+						muted('e.g. /time in America/Los_Angeles'),
+					],
+				};
+			}
+
+			const {calendar, note} = calendarFor(current, {
+				formatted: context.project.calendarText,
+			});
+			return {lines: renderTimeZone(context.project, zone, calendar, note)};
 		}
 
 		if (sub === 'origin') {
@@ -1138,8 +1253,9 @@ const time: Command = {
 			if (written === '') {
 				return {
 					lines: [
-						error('usage: /time at <date | seconds>'),
+						error('usage: /time at <date | seconds> [zone]'),
 						muted('converts either way — a date to seconds, or seconds to a date'),
+						muted('a trailing IANA zone reads the date in that zone, e.g. Etc/UTC'),
 					],
 				};
 			}
@@ -1154,11 +1270,19 @@ const time: Command = {
 				return {lines: renderUnreadableTime(written, calendar, note)};
 			}
 
+			// Which zone a date was read in is not visible in the answer, and the
+			// answer is a number the author is about to paste into a moment. Said
+			// out loud, because two readings of the same text eight hours apart is
+			// exactly the kind of thing nobody catches later.
+			const {zone} = splitZone(written);
+			const readIn = zone !== undefined && calendar.inZone?.(zone) !== undefined;
+
 			return {
 				lines: [
 					// Bare and unpunctuated first, because the next thing the author
 					// does with it is paste it into a moment's frontmatter.
 					ok(`at: ${instant.toString()}`),
+					...(readIn ? [muted(`read in     ${zone!}`)] : []),
 					text(`reads as     ${calendar.format(instant)}`),
 					text(`from origin  ${describeDuration(instant)}`),
 					...(note === undefined ? [] : [muted(note)]),
@@ -1170,7 +1294,7 @@ const time: Command = {
 			return {
 				lines: [
 					error(
-						'usage: /time [at <date> | seconds | gregorian <epoch> [zone] | custom | origin <name>]',
+						'usage: /time [at <date> [zone] | in <zone> | seconds | gregorian <epoch> [zone] | custom | origin <name>]',
 					),
 				],
 			};

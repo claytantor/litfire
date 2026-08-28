@@ -80,11 +80,20 @@ describe('binding', () => {
 		expect(server.url).not.toContain('localhost');
 	});
 
-	it('falls through to the next port when the requested one is taken', async () => {
+	it('falls through to the next free port when the requested one is taken', async () => {
 		const first = await boot({port: 0});
 		const second = await boot({port: first.port});
 
-		expect(second.port).toBe(first.port + 1);
+		// Not `first.port + 1`. The OS hands out `first.port` from the ephemeral
+		// range, and the port above it belongs to whoever asks for it next —
+		// another test file in the same parallel run, most often. Asserting the
+		// exact number made this fail about once in eight runs, which is worse
+		// than useless: the contract is that it finds a free port nearby and
+		// serves on it, and that is what is checked.
+		expect(second.port).toBeGreaterThan(first.port);
+		expect(second.port).toBeLessThanOrEqual(first.port + 10);
+		expect(second.url).toBe(`http://127.0.0.1:${second.port}`);
+		expect((await fetch(`${second.url}/`)).status).toBeLessThan(500);
 	});
 });
 

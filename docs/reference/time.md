@@ -78,7 +78,12 @@ writing a scene.
 ### Earth/Sol — the Gregorian example
 
 ```
+# timezone regional
 /time gregorian 2031-08-15T19:33:00-07:00 America/Los_Angeles
+
+# timezone utc
+/time gregorian 2031-08-15T19:33:00-07:00 Etc/UTC
+
 ```
 
 The epoch is the real instant the origin sits at; the zone is any IANA name.

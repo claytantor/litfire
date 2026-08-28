@@ -88,6 +88,7 @@ export async function computeProject(
 			interfaces: vault.interfaces,
 			legacy: vault.legacy,
 			artifacts: vault.artifacts,
+			skills: vault.skills,
 			themes: vault.themes,
 			replay: replayResult,
 			formulas: runner,

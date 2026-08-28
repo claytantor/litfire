@@ -102,6 +102,38 @@ export const skillDefSchema = z.object({
 });
 
 /**
+ * A skill as a page of its own, written in `raw/skills/` and ingested.
+ *
+ * `skillDefSchema` above is the same thing declared inside a system's
+ * frontmatter, which is where every skill lived until now. That form is a list
+ * entry: an id, a display name, and what it needs first. It has nowhere to say
+ * what the skill *is* — and "Precision Genome Architecture" is not a row in a
+ * table, it is a discipline someone spent a life learning.
+ *
+ * So a skill gets a note like every other primitive: prose in the body,
+ * mechanics in the frontmatter. Both forms stay legal and the note wins on a
+ * clash, because an author who has written the page has said which they mean.
+ *
+ * `system` is the one field this has that the list entry does not. Skills
+ * resolve through the acquiring character's own system — a skill The Seed
+ * grants is not undefined merely because the Custodian never heard of it — and
+ * a free-standing note has no enclosing system to inherit that from. Left out,
+ * the skill is available under every system, which is the right default for a
+ * vault with one.
+ */
+export const skillSchema = z.object({
+	id: idSchema,
+	name: z.string().optional(),
+	/** The system that grants it. Omitted means every system in the vault. */
+	system: idSchema.optional(),
+	/** Skills a character needs before this one can be acquired. */
+	requires_skills: z.array(idSchema).default([]),
+	requires_level: z.number().int().optional(),
+	stub: stubFlag,
+	example: exampleFlag,
+});
+
+/**
  * Replay walks `1..max_level` to derive a level from XP, so this number is a
  * loop bound, not a display value. It is also model-written — an extraction
  * fills `system/curves.md` — so it is capped here rather than trusted. A curve
@@ -453,4 +485,5 @@ export type Theme = z.infer<typeof themeSchema>;
 export type Character = z.infer<typeof characterSchema>;
 export type Faction = z.infer<typeof factionSchema>;
 export type Artifact = z.infer<typeof artifactSchema>;
+export type Skill = z.infer<typeof skillSchema>;
 export type Chapter = z.infer<typeof chapterSchema>;

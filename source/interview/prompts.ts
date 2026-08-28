@@ -18,12 +18,13 @@ export const interviewKindSchema = z.enum([
 	'situation',
 	'faction',
 	'artifact',
+	'skill',
 	'theme',
 	'chapter',
 ]);
 export type InterviewKind = z.infer<typeof interviewKindSchema>;
 
-/** The same ten, as a list — for anything that has to walk every kind. */
+/** The same eleven, as a list — for anything that has to walk every kind. */
 export const INTERVIEW_KINDS = interviewKindSchema.options;
 
 /**
@@ -434,6 +435,40 @@ Territory:
 If the author gives you numbers, note them and move on — another process handles
 those. Ask instead what happens the first time it fails.`;
 
+const SKILL_BRIEF = `You are surfacing something a character can do that they could not always do.
+
+A skill is not an artifact and the difference matters: an artifact can be taken
+away, and a skill is in the person. Nobody can be disarmed of it. That is the
+whole reason a story spends chapters on someone acquiring one, so the useful
+questions are about the acquiring, not about the ability in the abstract.
+
+Do not ask what tier it is or what it costs in points. Another process handles
+mechanics, and the author is much better at answering "who taught her" than
+"what should the prerequisite be".
+
+Territory:
+
+- What can they do with it that they could not do before? Concretely, in a
+  scene. "Better at reading people" is not usable; "knows within a sentence
+  which of two people is lying, and cannot tell which lie" is.
+- How is it acquired — taught, granted, stolen, survived? Each of those is a
+  different scene and a different relationship to whoever holds it already.
+- Who has it now, and how did they come by it? Two people with the same skill
+  and different teachers is most of a plot.
+- What has to be true first? Not a level number — a prerequisite in the world.
+  Something you cannot learn without having already done something else.
+- What does using it cost? Not a resource bar. What it takes out of the person,
+  or what it makes them into over time.
+- Who is barred from it, and is that a rule the System enforces or a thing
+  people merely believe? Those behave completely differently under pressure.
+- What can it not do? A skill with no edge is a solution looking for a plot, and
+  the edge is usually where the interesting scene is.
+- Is it known to exist? A skill nobody believes in and a skill everyone tests
+  for are different worlds.
+
+If the author names the moment somebody first had it, that is worth more than
+any description of the ability — write it down and ask what changed.`;
+
 const CHAPTER_BRIEF = `You are surfacing where the cuts go: how this book is divided for a reader
 coming to it fresh.
 
@@ -471,6 +506,7 @@ export const BRIEFS: Readonly<Record<InterviewKind, string>> = {
 	situation: SITUATION_BRIEF,
 	faction: FACTION_BRIEF,
 	artifact: ARTIFACT_BRIEF,
+	skill: SKILL_BRIEF,
 	theme: THEMES_BRIEF,
 	chapter: CHAPTER_BRIEF,
 };
@@ -485,6 +521,7 @@ export const KIND_SUMMARY: Readonly<Record<InterviewKind, string>> = {
 	situation: 'what a scene needs — cast, place, moment, arc',
 	faction: 'what a group wants, and what it does instead',
 	artifact: 'what a thing achieves, and what using it costs',
+	skill: 'what someone can do that they could not always do, and how they came by it',
 	theme: 'what the book is arguing about',
 	chapter: 'where the cuts go, for a reader coming fresh',
 };

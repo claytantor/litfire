@@ -96,7 +96,7 @@ describe('systems as a primitive', () => {
 			'utf8',
 		);
 		await writeFile(
-			path.join(root, VAULT.skills),
+			path.join(root, VAULT.legacySkills),
 			stringifyDocument({data: {skills: [{id: 'graft'}]}, body: '\n'}),
 			'utf8',
 		);

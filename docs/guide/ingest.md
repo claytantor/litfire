@@ -32,6 +32,7 @@ One directory per kind, under `raw/`:
 | `arc`       | `raw/arcs/`       | `corpus/arcs/`       |
 | `faction`   | `raw/factions/`   | `corpus/factions/`   |
 | `artifact`  | `raw/artifacts/`  | `corpus/artifacts/`  |
+| `skill`     | `raw/skills/`     | `corpus/skills/`     |
 | `theme`     | `raw/themes/`     | `corpus/themes/`     |
 
 One more source is not a primitive folder:

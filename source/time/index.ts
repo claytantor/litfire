@@ -12,9 +12,12 @@ export {
 } from './instant.js';
 export {
 	gregorian,
+	isTimeZone,
 	OUT_OF_RANGE,
 	readWhen,
 	rawSeconds,
+	resolveEpoch,
+	splitZone,
 	type Calendar,
 	type GregorianOptions,
 } from './calendar.js';

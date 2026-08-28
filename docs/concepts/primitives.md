@@ -47,12 +47,18 @@ places with no situations produces an almost empty wiki — see
 | **character** | A person the ledger tracks           | `corpus/characters/` |
 | **faction**   | A group working toward a goal        | `corpus/factions/`   |
 | **artifact**  | Something used to achieve an outcome | `corpus/artifacts/`  |
+| **skill**     | Something a character can do         | `corpus/skills/`     |
 | **theme**     | What the book argues about           | `corpus/themes/`     |
 | **chapter**   | A cut in the replay sequence         | `corpus/chapters/`   |
 
-Two more have ids but no files of their own. **Skills** and **items** are
-declared by a system or named by ledger events, and their wiki pages are built
-from every use. **Character state** is derived — see below.
+**Items** have ids but no files of their own: they are named by ledger events,
+and their wiki pages are built from every use. **Character state** is derived —
+see below.
+
+A **skill** is the one primitive with two legal homes. It can be a page like any
+other, and it can also be a row in a system's `skills:` list — the shorthand
+that was the only form until skills got pages of their own. Both work at once,
+and the page wins where they disagree.
 
 ## One id, one file
 

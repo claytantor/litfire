@@ -40,6 +40,7 @@ export const BRIEF_FOR: Partial<Record<IngestKind, InterviewKind>> = {
 	situation: 'situation',
 	faction: 'faction',
 	artifact: 'artifact',
+	skill: 'skill',
 	theme: 'theme',
 	chapter: 'chapter',
 };
@@ -147,6 +148,7 @@ export function idsOf(project: Project, kind: IngestKind): Set<string> {
 		arc: vault.arcs,
 		faction: vault.factions,
 		artifact: vault.artifacts,
+		skill: vault.skills,
 		theme: vault.themes,
 		chapter: vault.chapters,
 	}[kind];

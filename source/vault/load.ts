@@ -8,6 +8,7 @@ import {
 	factionSchema,
 	placeSchema,
 	situationSchema,
+	skillSchema,
 	systemSchema,
 	themeSchema,
 	DEFAULT_SYSTEM_ID,
@@ -19,6 +20,7 @@ import {
 	type Faction,
 	type Place,
 	type Situation,
+	type Skill,
 	type SystemDef,
 	type Theme,
 	type Moment,
@@ -79,6 +81,15 @@ export type Vault = {
 	/** Somewhere a scene happens. Body is prose; only id and name are data. */
 	readonly places: readonly Place[];
 	readonly artifacts: readonly Artifact[];
+	/**
+	 * Skills written as pages of their own, id-sorted.
+	 *
+	 * A skill declared inside a system's frontmatter is not here — it is on the
+	 * `SystemDef`, where it has always been. Both forms are legal and the
+	 * consumers merge them, so this list is "skills the author gave a page to",
+	 * not "every skill in the vault".
+	 */
+	readonly skills: readonly Skill[];
 	readonly themes: readonly Theme[];
 	readonly chapters: readonly Chapter[];
 	/** Where each page was read from, for reports that have to name a file. */
@@ -288,7 +299,7 @@ export async function loadVault(root: string): Promise<Vault> {
 		issues,
 	);
 	const skillsDocument = await loadOne(
-		resolve(root, VAULT.skills),
+		resolve(root, VAULT.legacySkills),
 		{parse: value => systemSchema.pick({skills: true}).parse(value)},
 		issues,
 	);
@@ -347,7 +358,7 @@ export async function loadVault(root: string): Promise<Vault> {
 		legacy.push(VAULT.stats);
 	}
 	if (skillsDocument !== undefined) {
-		legacy.push(VAULT.skills);
+		legacy.push(VAULT.legacySkills);
 	}
 	if (curvesDocument !== undefined) {
 		legacy.push(VAULT.curves);
@@ -392,41 +403,43 @@ export async function loadVault(root: string): Promise<Vault> {
 	}
 	moments.sort((a, b) => a.id.localeCompare(b.id));
 
-	const [arcs, characters, factions, places, artifacts, themes, situations, chapters] =
-		await Promise.all([
-			loadKind(root, VAULT.arcs, arcSchema, 'arc', issues, sources, legacy),
-			loadKind(
-				root,
-				VAULT.characters,
-				characterSchema,
-				'character',
-				issues,
-				sources,
-				legacy,
-			),
-			loadKind(root, VAULT.factions, factionSchema, 'faction', issues, sources, legacy),
-			loadKind(root, VAULT.places, placeSchema, 'place', issues, sources, legacy),
-			loadKind(
-				root,
-				VAULT.artifacts,
-				artifactSchema,
-				'artifact',
-				issues,
-				sources,
-				legacy,
-			),
-			loadKind(root, VAULT.themes, themeSchema, 'theme', issues, sources, legacy),
-			loadKind(
-				root,
-				VAULT.situations,
-				situationSchema,
-				'situation',
-				issues,
-				sources,
-				legacy,
-			),
-			loadKind(root, VAULT.chapters, chapterSchema, 'chapter', issues, sources, legacy),
-		]);
+	const [
+		arcs,
+		characters,
+		factions,
+		places,
+		artifacts,
+		skills,
+		themes,
+		situations,
+		chapters,
+	] = await Promise.all([
+		loadKind(root, VAULT.arcs, arcSchema, 'arc', issues, sources, legacy),
+		loadKind(
+			root,
+			VAULT.characters,
+			characterSchema,
+			'character',
+			issues,
+			sources,
+			legacy,
+		),
+		loadKind(root, VAULT.factions, factionSchema, 'faction', issues, sources, legacy),
+		loadKind(root, VAULT.places, placeSchema, 'place', issues, sources, legacy),
+		loadKind(root, VAULT.artifacts, artifactSchema, 'artifact', issues, sources, legacy),
+		loadKind(root, VAULT.skills, skillSchema, 'skill', issues, sources, legacy),
+		loadKind(root, VAULT.themes, themeSchema, 'theme', issues, sources, legacy),
+		loadKind(
+			root,
+			VAULT.situations,
+			situationSchema,
+			'situation',
+			issues,
+			sources,
+			legacy,
+		),
+		loadKind(root, VAULT.chapters, chapterSchema, 'chapter', issues, sources, legacy),
+	]);
 
 	// A scene in the old inbox carried no arc by virtue of being there, and the
 	// loader has always forced that rather than trusting the frontmatter (§5).
@@ -463,6 +476,7 @@ export async function loadVault(root: string): Promise<Vault> {
 		factions,
 		places,
 		artifacts,
+		skills,
 		themes,
 		chapters,
 		sources,

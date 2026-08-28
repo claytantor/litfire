@@ -26,6 +26,9 @@ const MINIMUM_EXCHANGES: Readonly<Record<InterviewKind, number>> = {
 	situation: 4,
 	faction: 5,
 	artifact: 4,
+	// What it lets someone do, how it is acquired, and what it costs. Three
+	// answers is a skill; the fourth is usually the author inventing a tier.
+	skill: 3,
 	theme: 5,
 	chapter: 4,
 };
