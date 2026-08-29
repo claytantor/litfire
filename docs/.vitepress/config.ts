@@ -77,6 +77,7 @@ export default defineConfig({
 					{text: 'The in-world clock', link: '/reference/time'},
 					{text: 'Model providers', link: '/reference/providers'},
 					{text: 'The formula sandbox', link: '/reference/formula-sandbox'},
+					{text: 'Exec (headless)', link: '/reference/exec'},
 					{text: 'Scripts', link: '/reference/scripts'},
 				],
 			},

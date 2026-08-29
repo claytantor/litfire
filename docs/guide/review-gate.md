@@ -38,6 +38,17 @@ a accept · r reject · e edit · A accept-all · ←→ item · ↑↓ scroll
   `.litrpg/` (tool cache), `ledger/` (derived), and `raw/` (author input) are
   refused. A bad path fails that one item; the rest of the batch still applies.
 
+## The gate holds headlessly too
+
+`litfire exec` cannot apply a proposal. It can build a batch and write it to a
+file — `/ingest <kind> --propose --out <file>` — and that is where it stops.
+Landing one is `litfire review apply`, a separate invocation taking an explicit
+list of items, and no flag anywhere combines the two.
+
+So the guarantee above is unconditional: **a proposal reaches disk only on an
+explicit accept**, whether a person is at the keyboard or not. See
+[exec](../reference/exec.md).
+
 ## Where proposals come from
 
 Extraction, `/reviewer`'s correction pass, and `/curator` all produce them.

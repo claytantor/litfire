@@ -35,16 +35,8 @@ import {
 } from './interview/index.js';
 import {loadProvider, type Provider} from './llm/index.js';
 import {ReviewBatch, type Proposal} from './review/index.js';
-import {buildIngest, readRaw, type SourceKind} from './ingest/index.js';
-import {
-	hashSource,
-	honourAuthored,
-	readIngestState,
-	stampSource,
-	statusOf,
-} from './ingest/state.js';
-import {resolveDates} from './ingest/dates.js';
-import {calendarFor} from './time/binding.js';
+import {readRaw, type SourceKind} from './ingest/index.js';
+import {runIngestPass} from './ingest/run.js';
 import {runPlan} from './curator/index.js';
 import {buildInterpretationGeneration, buildStatsGeneration} from './system/generate.js';
 import {editText, resolveEditor} from './vault/editor.js';
@@ -499,102 +491,47 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 				return;
 			}
 
-			const {profile} = await loadSetting(root);
-			const {calendar} = calendarFor(resolved.vault.time);
-			const state = await readIngestState(root, kind);
-			// `again` reads them all, including the ones the corpus already reflects:
-			// a change to what ingest asks for leaves every page stale with no hash
-			// able to see it, because the note did not move.
-			const pending = again
-				? documents
-				: documents.filter(
-						document => statusOf(state, document.path, document.contents) !== 'unchanged',
-					);
-			if (pending.length === 0) {
-				return;
-			}
-
 			setBusy(true);
 			const controller = new AbortController();
-			const proposals: Proposal[] = [];
-			const notes: string[] = [];
+			let proposals: readonly Proposal[] = [];
+			let notes: readonly string[] = [];
 
 			try {
-				/**
-				 * One note per pass, rather than all of them in one context.
-				 *
-				 * Provenance needs it: a page has to record which note it came from,
-				 * and a single pass over four notes cannot say which of them produced
-				 * what. It is also better curation — four characters in one request
-				 * bleed into each other, and one at a time each gets the whole
-				 * instruction.
-				 *
-				 * The cost of doing it this way is paid once. An unchanged note never
-				 * reaches here at all.
-				 */
-				for (const [index, document] of pending.entries()) {
-					setBusyLabel(
-						`reading ${document.path} (${String(index + 1)}/${String(pending.length)})…`,
-					);
+				// The same pass the headless surface runs. Shared rather than
+				// mirrored: two implementations of this would give a vault pages
+				// that differ by which door the author came through.
+				const pass = await runIngestPass(
+					root,
+					resolved,
+					loaded.provider,
+					kind,
+					{focus, again, signal: controller.signal},
+					{
+						onProgress: (path, index, total) => {
+							setBusyLabel(`reading ${path} (${String(index)}/${String(total)})…`);
+						},
+						onProblem: message => {
+							append([error(message)]);
+						},
+					},
+				);
+				proposals = pass.proposals;
+				notes = pass.notes;
 
-					const {instruction, context} = await buildIngest(root, resolved, kind, [
-						document,
-					]);
-					const outcome = await runPlan(
-						loaded.provider,
-						root,
-						instruction,
-						context,
-						profile.register ?? '',
-						controller.signal,
-					);
-
-					if (outcome.error !== undefined) {
-						append([error(`${document.path}: ${outcome.error}`)]);
-						continue;
-					}
-					for (const refusal of outcome.refusals) {
-						append([error(`refused ${refusal.path}: ${refusal.reason}`)]);
-					}
-
-					// Stamped here, in code. The model cannot compute a digest, and a
-					// page carrying a plausible-looking one would be trusted by every
-					// later ingest.
-					const hash = hashSource(document.contents);
-					for (const proposal of outcome.proposals) {
-						if (proposal.remove === true) {
-							proposals.push(proposal);
-							continue;
-						}
-
-						// A date the note stated becomes a position on the clock here,
-						// in code. The model was asked for the date because it can read
-						// one off the page; it was not asked for the arithmetic, across
-						// a timezone with daylight saving and spans of geological time,
-						// because a plausible-looking number that lands in the ledger is
-						// the failure this whole tool is built to prevent.
-						const dated = resolveDates(proposal.contents, calendar);
-						notes.push(...dated.notes.map(note => `${document.path}: ${note}`));
-
-						proposals.push({
-							...proposal,
-							// The author's own fields go back on last, so a decision
-							// they made outranks anything the model chose.
-							contents: stampSource(
-								honourAuthored(dated.contents, document),
-								document.path,
-								hash,
-							),
-						});
-					}
-					notes.push(...outcome.notes.map(note => `${document.path}: ${note}`));
+				if (pass.read === 0) {
+					return;
 				}
 
 				await appendLog(
 					root,
-					`/ingest ${kind}: read ${String(pending.length)} note(s), proposed ${String(proposals.length)} page(s)`,
+					`/ingest ${kind}: read ${String(pass.read)} note(s), proposed ${String(proposals.length)} page(s)`,
 				);
-				await handlePlanned({proposals, refusals: [], notes, error: undefined});
+				await handlePlanned({
+					proposals: [...proposals],
+					refusals: [],
+					notes: [...notes],
+					error: undefined,
+				});
 			} catch (caught) {
 				append([error(caught instanceof Error ? caught.message : String(caught))]);
 			} finally {
