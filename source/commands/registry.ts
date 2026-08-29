@@ -43,9 +43,12 @@ import {renderManuscript} from '../chapters/manuscript.js';
 import {
 	findProvider,
 	forgetKey,
+	LOCAL_BASE_URLS,
 	maskKey,
+	PLACEHOLDER_KEY,
 	PROVIDERS,
 	resolveKey,
+	testConnection,
 	verifyStoredKey,
 	type ProviderId,
 	type ResolvedKey,
@@ -72,7 +75,7 @@ import {
 	stopWikiServe,
 	writeServeScript,
 } from '../wiki/host.js';
-import {readConfig, recordConsent} from '../vault/config.js';
+import {readConfig, recordConsent, saveProvider} from '../vault/config.js';
 import {parseDocument, stringifyDocument} from '../vault/frontmatter.js';
 import {LEGACY_DIRECTORIES, VAULT, resolve} from '../vault/paths.js';
 import {
@@ -2386,7 +2389,7 @@ function describeKey(resolved: ResolvedKey): string {
 
 const provider: Command = {
 	name: 'provider',
-	usage: '/provider [status|test|clear]',
+	usage: '/provider [status|test|clear|local <url> [model]]',
 	summary: 'choose an LLM provider, key, and model',
 	async run(args, context) {
 		const [sub] = args;
@@ -2394,6 +2397,81 @@ const provider: Command = {
 		if (sub === undefined) {
 			// Hands off to the interactive wizard (select → key → test → model).
 			return {lines: [], wizard: 'provider'};
+		}
+
+		/**
+		 * `/provider local <url> [model]` — point the vault at your own machine.
+		 *
+		 * Every other provider goes through the wizard because it needs a key,
+		 * and a key is worth entering carefully once. A local endpoint has no
+		 * key: what it needs is a URL and a model name, both of which an author
+		 * already has in front of them when they start the server. Typing them
+		 * is faster than four wizard screens, and — the reason this exists — it
+		 * is a single line an agent or a setup script can run, with no secret
+		 * anywhere in it.
+		 *
+		 * The model is verified against the endpoint before anything is saved,
+		 * so a typo fails here rather than at the first interview.
+		 */
+		if (sub === 'local') {
+			const [url, model] = args.slice(1);
+			if (!url) {
+				return {
+					lines: [
+						error('usage: /provider local <base-url> [model]'),
+						muted('e.g. /provider local http://localhost:11434/v1 qwen3:8b'),
+						...LOCAL_BASE_URLS.map(one => muted(`  ${one.url} — ${one.label}`)),
+					],
+				};
+			}
+
+			const outcome = await testConnection({
+				id: 'local',
+				apiKey: PLACEHOLDER_KEY,
+				baseUrl: url,
+				...(model === undefined ? {} : {model}),
+			});
+			if (!outcome.ok) {
+				return {
+					lines: [
+						error(`cannot reach ${url}`),
+						muted(outcome.reason),
+						...(outcome.hint === undefined ? [] : [muted(outcome.hint)]),
+					],
+				};
+			}
+
+			const available = outcome.models.map(one => one.id);
+			if (model === undefined) {
+				return {
+					lines: [
+						ok(`${url} — ${String(available.length)} model(s) available`),
+						...available.map(id => text(`  ${id}`)),
+						blank(),
+						muted(`/provider local ${url} <model> selects one`),
+					],
+				};
+			}
+
+			// Reported, not refused. A server can be mid-pull, and an endpoint that
+			// lists nothing is a normal state for some of them — so a name that is
+			// not on the list is worth flagging and not worth blocking.
+			const known = available.includes(model);
+			await saveProvider(context.root, {id: 'local', model, baseUrl: url});
+
+			return {
+				lines: [
+					ok(`provider set to local · ${model}`),
+					muted(`at ${url} — no key stored`),
+					...(known
+						? []
+						: [
+								warn(`'${model}' was not in the endpoint's model list`),
+								muted(`it lists: ${available.join(', ') || '(nothing)'}`),
+							]),
+				],
+				dirty: true,
+			};
 		}
 
 		if (sub === 'status') {

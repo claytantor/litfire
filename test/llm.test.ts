@@ -2,7 +2,12 @@ import {chmod, mkdtemp, readFile, rm, stat, writeFile as write} from 'node:fs/pr
 import {homedir, tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {baseUrlEnvVar, findProvider, PROVIDERS} from '../source/llm/catalog.js';
+import {
+	baseUrlEnvVar,
+	findProvider,
+	LOCAL_BASE_URLS,
+	PROVIDERS,
+} from '../source/llm/catalog.js';
 import {
 	credentialsPath,
 	forgetKey,
@@ -11,7 +16,12 @@ import {
 	resolveKey,
 	saveKey,
 } from '../source/llm/credentials.js';
-import {testConnection, verifyStoredKey} from '../source/llm/index.js';
+import {
+	loadProvider,
+	PLACEHOLDER_KEY,
+	testConnection,
+	verifyStoredKey,
+} from '../source/llm/index.js';
 
 let configHome = '';
 const savedEnv: Record<string, string | undefined> = {};
@@ -38,11 +48,12 @@ afterEach(async () => {
 });
 
 describe('catalog', () => {
-	it('covers the requested providers, with both Kimi hosts', () => {
+	it('covers the requested providers, with both Kimi hosts and a local one', () => {
 		expect(PROVIDERS.map(p => p.id).toSorted()).toEqual([
 			'anthropic',
 			'kimi',
 			'kimi-code',
+			'local',
 			'openai',
 			'together',
 		]);
@@ -470,5 +481,57 @@ describe('/provider command', () => {
 		});
 
 		expect(result.lines[0]?.text).toContain('usage:');
+	});
+});
+
+/**
+ * §9 requires "any local OpenAI-compatible endpoint". Ollama, llama.cpp,
+ * LM Studio and vLLM differ in exactly one thing — the port — so they are one
+ * catalog entry rather than four, and what makes it different from every other
+ * entry is that there is no key to have.
+ */
+describe('the local provider', () => {
+	const local = PROVIDERS.find(spec => spec.id === 'local')!;
+
+	it('needs no key and needs a base URL', () => {
+		expect(local.keyless).toBe(true);
+		expect(local.needsBaseUrl).toBe(true);
+		// No keys page, because there are no keys.
+		expect(local.keysUrl).toBeUndefined();
+	});
+
+	it('names the servers it covers, so they are findable', () => {
+		for (const server of ['Ollama', 'llama.cpp', 'LM Studio', 'vLLM']) {
+			expect(local.label, server).toContain(server);
+		}
+		expect(LOCAL_BASE_URLS.map(one => one.url)).toContain('http://localhost:11434/v1');
+		expect(LOCAL_BASE_URLS.map(one => one.url)).toContain('http://localhost:8080/v1');
+	});
+
+	it('is the only keyless provider — the hosted ones still need keys', () => {
+		expect(PROVIDERS.filter(spec => spec.keyless === true).map(spec => spec.id)).toEqual([
+			'local',
+		]);
+	});
+
+	it('builds without a stored key, where a hosted provider will not', async () => {
+		const built = await loadProvider('local', 'qwen3:8b', 'http://127.0.0.1:1/v1');
+		expect('provider' in built).toBe(true);
+
+		// The rule that keyless relaxes is relaxed for this one provider only.
+		const hosted = await loadProvider('openai', 'gpt-4o', 'http://127.0.0.1:1/v1');
+		expect('error' in hosted && hosted.error).toMatch(/no API key/);
+	});
+
+	it('says so when it has not been pointed anywhere', async () => {
+		const built = await loadProvider('local', 'qwen3:8b', undefined);
+		expect('error' in built && built.error).toMatch(/no base URL/);
+	});
+
+	it('sends a non-empty Authorization header', () => {
+		// llama-server rejects an empty one with a 401, which reads like a
+		// credential problem on a server that has no credentials. The placeholder
+		// exists to make that impossible, and is never written to the key store.
+		expect(PLACEHOLDER_KEY).not.toBe('');
 	});
 });

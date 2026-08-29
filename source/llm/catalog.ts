@@ -85,7 +85,54 @@ export const PROVIDERS: readonly ProviderSpec[] = [
 		authHint:
 			'this host takes a subscription key from kimi.ai/code — a platform key (sk-…) belongs under "Kimi — Moonshot API key"',
 	},
+	/**
+	 * Anything speaking the OpenAI shape on a host you control.
+	 *
+	 * One entry rather than one per server, because Ollama, llama.cpp,
+	 * LM Studio and vLLM differ here in exactly one thing — the port — and the
+	 * wire protocol, the auth story and the model list are identical. The two
+	 * Kimi entries above are two because they are two products with two kinds of
+	 * key; these are one product with several front doors.
+	 *
+	 * The label names them anyway, so an author looking for "Ollama" finds this
+	 * rather than concluding it is unsupported.
+	 */
+	{
+		id: 'local',
+		label: 'Local — Ollama, llama.cpp, LM Studio, vLLM',
+		// Ollama's default, and the most common thing behind this entry. The
+		// wizard asks and llama.cpp's :8080 is offered beside it, so this is a
+		// first guess rather than an assumption.
+		baseUrl: 'http://localhost:11434/v1',
+		auth: 'bearer',
+		envVar: 'LITFIRE_LOCAL_API_KEY',
+		keyless: true,
+		needsBaseUrl: true,
+		// Live from the endpoint in practice: a local server lists exactly what it
+		// has pulled, which is far more useful than anything guessable. These only
+		// show when it is unreachable, and are named to look like examples.
+		suggestedModels: ['qwen3:8b', 'llama3.3:70b', 'gpt-oss:20b'],
+		// A ceiling asked for, not a promise the server makes: llama-server and
+		// Ollama both clamp to whatever they were started with. It matters because
+		// extraction emits whole file bodies as JSON, and a budget too small cuts
+		// the reply mid-string — which surfaces as a parse error blaming the
+		// parser. 16384 is what a llama-server on a 24GB card is typically run
+		// with, and headroom here is free.
+		maxOutputTokens: 16_384,
+		note: 'your own machine — no API key needed',
+		authHint:
+			'a local server usually needs no key at all; if yours sits behind a proxy that does, set LITFIRE_LOCAL_API_KEY',
+	},
 ];
+
+/** Base URLs offered beside the default, for a provider the author must point somewhere. */
+export const LOCAL_BASE_URLS: readonly {readonly url: string; readonly label: string}[] =
+	[
+		{url: 'http://localhost:11434/v1', label: 'Ollama'},
+		{url: 'http://localhost:8080/v1', label: 'llama.cpp — llama-server'},
+		{url: 'http://localhost:1234/v1', label: 'LM Studio'},
+		{url: 'http://localhost:8000/v1', label: 'vLLM'},
+	];
 
 /**
  * §9 requires supporting "any local OpenAI-compatible endpoint", so every
@@ -99,6 +146,11 @@ export const PROVIDERS: readonly ProviderSpec[] = [
  */
 export function baseUrlEnvVar(id: ProviderId): string {
 	return `LITFIRE_${id.toUpperCase().replace(/-/g, '_')}_BASE_URL`;
+}
+
+/** Whether the environment has already pointed this provider somewhere. */
+export function hasBaseUrlOverride(id: ProviderId): boolean {
+	return (process.env[baseUrlEnvVar(id)] ?? '').trim() !== '';
 }
 
 export function findProvider(id: ProviderId): ProviderSpec {

@@ -6,6 +6,7 @@ export const providerIdSchema = z.enum([
 	'together',
 	'kimi',
 	'kimi-code',
+	'local',
 ]);
 export type ProviderId = z.infer<typeof providerIdSchema>;
 
@@ -61,7 +62,27 @@ export type ProviderSpec = {
 	readonly auth: AuthStyle;
 	/** Environment variable consulted before any stored key. */
 	readonly envVar: string;
-	readonly keysUrl: string;
+	/** Where to get a key. Absent for a provider that does not need one. */
+	readonly keysUrl?: string;
+	/**
+	 * The endpoint has no key worth having.
+	 *
+	 * A local server takes any non-empty string, or ignores the header outright,
+	 * so demanding one is a step that teaches an author their own machine needs
+	 * a credential. A stored key still wins when there is one — somebody who has
+	 * put a reverse proxy in front of their GPU box has a real token and it must
+	 * keep working — but its absence is not a failure.
+	 */
+	readonly keyless?: boolean;
+	/**
+	 * The base URL is the setup, not an override.
+	 *
+	 * Every hosted provider has one right answer and `baseUrl` above is it. A
+	 * local one does not: the port depends on whether it is Ollama, llama.cpp or
+	 * something else, and the host depends on whether the model is on this
+	 * machine. So the wizard asks, and the catalog default is only a suggestion.
+	 */
+	readonly needsBaseUrl?: boolean;
 	/** Shown before a live model list is available. */
 	readonly suggestedModels: readonly string[];
 	readonly note?: string;

@@ -1026,11 +1026,19 @@ export function App({root: initialRoot, version, watch = true, startup}: Props) 
 					void (async () => {
 						// Save before clearing the wizard: the footer re-reads config when
 						// `wizard` changes, so clearing first would read a stale file.
-						await saveProvider(root, {id: result.provider, model: result.model});
+						await saveProvider(root, {
+							id: result.provider,
+							model: result.model,
+							...(result.baseUrl === undefined ? {} : {baseUrl: result.baseUrl}),
+						});
 						setWizard(undefined);
 						append([
 							ok(`provider set to ${result.provider} · ${result.model}`),
-							muted('key stored outside the vault; /provider status to review'),
+							...(result.baseUrl === undefined
+								? [muted('key stored outside the vault; /provider status to review')]
+								: // A local endpoint has no key to have stored, and saying one
+									// was would be untrue in the one place an author checks.
+									[muted(`at ${result.baseUrl} — no key stored`)]),
 						]);
 						recompute();
 					})();

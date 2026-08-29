@@ -63,6 +63,7 @@ Then, in the TUI:
 | `/provider`                      | Choose an LLM provider, key, and model                |
 | `/provider status`               | Show configured providers and masked keys             |
 | `/provider clear <id>`           | Remove a stored key                                   |
+| `/provider local <url> [model]`  | Point the vault at Ollama, llama.cpp, LM Studio, vLLM |
 | `/situation <id>`                | A scene’s cast: who is in it, and what they hold      |
 | `/situation <id> edit`           | Write a scene in the native buffer                    |
 | `/situation <id> cast <name>…`   | Add characters to the scene                           |

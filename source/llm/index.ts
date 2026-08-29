@@ -1,5 +1,5 @@
 import {createAnthropicProvider} from './anthropic.js';
-import {findProvider} from './catalog.js';
+import {baseUrlEnvVar, findProvider, hasBaseUrlOverride} from './catalog.js';
 import {resolveKey, type ResolvedKey} from './credentials.js';
 import {createOpenAiCompatProvider} from './openai-compat.js';
 import {
@@ -15,6 +15,16 @@ export function createProvider(config: ProviderConfig): Provider {
 		? createAnthropicProvider(config)
 		: createOpenAiCompatProvider(config);
 }
+
+/**
+ * What a keyless provider sends when nothing is stored.
+ *
+ * Not a secret and never treated as one: llama.cpp requires the header to be
+ * non-empty and does not look at it, Ollama ignores it. A literal is honest
+ * here — the alternative is omitting the header, which llama.cpp rejects with a
+ * 401 that reads like a credential problem when there is no credential.
+ */
+export const PLACEHOLDER_KEY = 'litfire-local';
 
 const TEST_TIMEOUT_MS = 15_000;
 
@@ -110,8 +120,16 @@ export async function loadProvider(
 		return {error: `no model selected for ${id} — run /provider`};
 	}
 
+	const spec = findProvider(id);
 	const resolved = await resolveKey(id);
-	if (!resolved.key) {
+
+	// A keyless provider is one on a host the author controls, and it takes any
+	// non-empty string or ignores the header entirely. A stored key still wins
+	// where there is one — a GPU box behind a proxy has a real token — but its
+	// absence is not a failure, and demanding one would teach an author that
+	// their own machine needs a credential.
+	const apiKey = resolved.key ?? (spec.keyless === true ? PLACEHOLDER_KEY : undefined);
+	if (apiKey === undefined) {
 		return {
 			error:
 				resolved.problem ??
@@ -119,17 +137,26 @@ export async function loadProvider(
 		};
 	}
 
+	// The catalog default is only a first guess for a local endpoint, so a
+	// missing base URL there means the author never finished pointing it
+	// anywhere — worth saying plainly rather than failing against localhost.
+	if (spec.needsBaseUrl === true && baseUrl === undefined && !hasBaseUrlOverride(id)) {
+		return {
+			error: `no base URL for ${id} — run /provider, or set ${baseUrlEnvVar(id)}`,
+		};
+	}
+
 	return {
 		provider: createProvider({
 			id,
 			model,
-			apiKey: resolved.key,
+			apiKey,
 			...(baseUrl === undefined ? {} : {baseUrl}),
 		}),
 	};
 }
 
-export {PROVIDERS, baseUrlEnvVar, findProvider} from './catalog.js';
+export {LOCAL_BASE_URLS, PROVIDERS, baseUrlEnvVar, findProvider} from './catalog.js';
 export {
 	credentialsPath,
 	forgetKey,
