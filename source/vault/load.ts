@@ -1,5 +1,6 @@
 import {readdir, readFile} from 'node:fs/promises';
 import path from 'node:path';
+import {ZodError} from 'zod';
 import {
 	arcSchema,
 	artifactSchema,
@@ -33,9 +34,101 @@ import {homesOf, resolve, VAULT} from './paths.js';
 import {timeSchema, type TimeBinding} from '../time/binding.js';
 
 export type LoadIssue = {
+	/** Vault-relative, like every other path the tool reports. */
 	readonly file: string;
+	/** One line: the field, what was expected, and what was actually there. */
 	readonly message: string;
+	/** The frontmatter fields that failed, for a report that wants them typed. */
+	readonly fields: readonly string[];
 };
+
+/**
+ * A schema failure, in a sentence an author can act on.
+ *
+ * Zod's own `message` is a pretty-printed JSON array, and the renderer took
+ * `split('\n')[0]` of it — so a rejected page reported itself as `[`. The file
+ * was named and nothing else was, which is a worse failure than silence: it
+ * looks like a diagnostic.
+ *
+ * The value that was actually there is the part zod cannot supply. It says
+ * "received string", which is true of both `TODO` and a genuine typo, and the
+ * difference is the whole question the author has to answer.
+ */
+function describeSchemaFailure(
+	caught: unknown,
+	data: Record<string, unknown>,
+): {message: string; fields: string[]} {
+	if (!(caught instanceof ZodError)) {
+		return {
+			message: caught instanceof Error ? caught.message : String(caught),
+			fields: [],
+		};
+	}
+
+	const fields: string[] = [];
+	const parts = caught.issues.map(issue => {
+		const field = issue.path.join('.');
+		if (field !== '') {
+			fields.push(field);
+		}
+
+		// Walk the path rather than reading `data[field]`, so a nested field
+		// reports the value that actually failed and not `undefined`.
+		let found: unknown = data;
+		for (const step of issue.path) {
+			found =
+				typeof found === 'object' && found !== null
+					? (found as Record<string | number, unknown>)[step as string | number]
+					: undefined;
+		}
+
+		const expectation =
+			'expected' in issue && typeof issue.expected === 'string'
+				? `expected ${issue.expected}`
+				: issue.message;
+
+		return `${field === '' ? 'frontmatter' : field}: ${expectation}, found ${show(found)}`;
+	});
+
+	return {message: parts.join('; '), fields};
+}
+
+/**
+ * A value as it should appear inside a one-line diagnostic.
+ *
+ * Total by construction. This runs only when something has already gone wrong,
+ * and a formatter that throws while describing a bad value turns a reportable
+ * page into a crashed load — strictly worse than the bug it was added to
+ * report. `JSON.stringify` alone is not total: a moment's `at` is a bigint,
+ * which it refuses outright, and that is not a hypothetical here because an
+ * out-of-range instant is one of the things that fails to parse.
+ */
+function show(value: unknown): string {
+	if (value === undefined) {
+		return 'nothing';
+	}
+	if (typeof value === 'string') {
+		return truncate(`'${value}'`);
+	}
+	if (typeof value === 'bigint') {
+		return truncate(value.toString());
+	}
+
+	let rendered: string;
+	try {
+		rendered = JSON.stringify(value) ?? String(value);
+	} catch {
+		// A symbol, a cycle, or something else JSON declines. The type is still
+		// worth saying; the value is not worth crashing over.
+		rendered = `a ${typeof value}`;
+	}
+	return truncate(rendered);
+}
+
+/** Long enough to identify a value, short enough that thirty read as a list. */
+function truncate(rendered: string): string {
+	return rendered.length > 40 ? `${rendered.slice(0, 39)}…` : rendered;
+}
 
 /**
  * Where a loaded page came from.
@@ -136,25 +229,36 @@ async function loadOne<T>(
 	schema: {parse: (value: unknown) => T},
 	issues: LoadIssue[],
 	fallbackId?: string,
+	root?: string,
 ): Promise<T | undefined> {
 	const raw = await readIfPresent(file);
 	if (raw === undefined) {
 		return undefined;
 	}
 
+	let data: Record<string, unknown> = {};
 	try {
-		const {data} = parseDocument(raw);
+		data = parseDocument(raw).data;
 		if (fallbackId !== undefined && data['id'] === undefined) {
 			data['id'] = fallbackId;
 		}
 		return schema.parse(data);
 	} catch (caught) {
-		issues.push({
-			file,
-			message: caught instanceof Error ? caught.message : String(caught),
-		});
+		const {message, fields} = describeSchemaFailure(caught, data);
+		issues.push({file: relativeTo(root, file), message, fields});
 		return undefined;
 	}
+}
+
+/**
+ * Paths in a report are vault-relative, and this one was not.
+ *
+ * A finding that names `/tmp/x/corpus/situations/a.md` while every other
+ * finding names `corpus/situations/a.md` is one the author cannot match up
+ * against anything else they are looking at.
+ */
+function relativeTo(root: string | undefined, file: string): string {
+	return root === undefined ? file : path.relative(root, file).split(path.sep).join('/');
 }
 
 async function loadDirectory<T>(
@@ -166,7 +270,7 @@ async function loadDirectory<T>(
 	const loaded: T[] = [];
 	for (const file of await listMarkdown(directory)) {
 		const stem = path.basename(file, '.md');
-		const one = await loadOne(file, schema, issues, stem);
+		const one = await loadOne(file, schema, issues, stem, track?.root);
 		if (one !== undefined) {
 			loaded.push(one);
 			if (track !== undefined) {
@@ -229,10 +333,8 @@ async function loadSystems(
 					}
 				}
 			} catch (caught) {
-				issues.push({
-					file,
-					message: caught instanceof Error ? caught.message : String(caught),
-				});
+				const {message, fields} = describeSchemaFailure(caught, data);
+				issues.push({file: relativeTo(root, file), message, fields});
 			}
 		}
 	}
@@ -297,23 +399,41 @@ export async function loadVault(root: string): Promise<Vault> {
 		resolve(root, VAULT.stats),
 		{parse: value => systemSchema.pick({stats: true}).parse(value)},
 		issues,
+		undefined,
+		root,
 	);
 	const skillsDocument = await loadOne(
 		resolve(root, VAULT.legacySkills),
 		{parse: value => systemSchema.pick({skills: true}).parse(value)},
 		issues,
+		undefined,
+		root,
 	);
 	const curvesDocument = await loadOne(
 		resolve(root, VAULT.curves),
 		{parse: value => systemSchema.pick({curves: true}).parse({curves: value})},
 		issues,
+		undefined,
+		root,
 	);
 
 	// The clock binding moved from timeline/ to setting/ with the layout; a vault
 	// that has not moved still has to be able to tell the time.
-	let time = await loadOne(resolve(root, VAULT.time), timeSchema, issues);
+	let time = await loadOne(
+		resolve(root, VAULT.time),
+		timeSchema,
+		issues,
+		undefined,
+		root,
+	);
 	if (time === undefined) {
-		time = await loadOne(resolve(root, VAULT.legacyTime), timeSchema, issues);
+		time = await loadOne(
+			resolve(root, VAULT.legacyTime),
+			timeSchema,
+			issues,
+			undefined,
+			root,
+		);
 		if (time !== undefined) {
 			legacy.push(VAULT.legacyTime);
 		}
@@ -394,10 +514,11 @@ export async function loadVault(root: string): Promise<Vault> {
 					known.add(moment.id);
 				}
 			} catch (caught) {
-				issues.push({
-					file: VAULT.legacyMoments,
-					message: caught instanceof Error ? caught.message : String(caught),
-				});
+				const {message, fields} = describeSchemaFailure(
+					caught,
+					(entry ?? {}) as Record<string, unknown>,
+				);
+				issues.push({file: VAULT.legacyMoments, message, fields});
 			}
 		}
 	}

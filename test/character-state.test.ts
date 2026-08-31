@@ -310,6 +310,7 @@ describe('the anchor', () => {
 			interfaces: {},
 			artifacts: [],
 			skills: [],
+			issues: [],
 			themes: [],
 			replay: result,
 			formulas: undefined,

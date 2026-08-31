@@ -760,11 +760,23 @@ export function renderLint(
 	}
 
 	if (project.vault.issues.length > 0) {
-		lines.push(error(`${project.vault.issues.length} file(s) failed to parse`));
+		lines.push(
+			error(`${plural(project.vault.issues.length, 'page')} rejected and not loaded`),
+		);
 		for (const issue of project.vault.issues) {
-			lines.push(muted(`  ${issue.file}: ${issue.message.split('\n')[0] ?? ''}`));
+			// The whole message, on its own line. This used to be
+			// `message.split('\n')[0]` of zod's pretty-printed JSON, which is the
+			// single character `[` — so a rejected page named itself and said
+			// nothing, which reads as a diagnostic while being none.
+			lines.push(
+				text(`  ${issue.file}`, {color: '#e0af68'}),
+				muted(`    ${issue.message}`),
+			);
 		}
-		lines.push(blank());
+		lines.push(
+			muted('  a rejected page is in no list — no timeline entry, no wiki page'),
+			blank(),
+		);
 	}
 
 	if (byKind.size === 0) {

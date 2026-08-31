@@ -12,7 +12,7 @@ import type {
 } from '../domain/schema.js';
 import type {FormulaRunner} from '../system/sandbox.js';
 import {LEGACY_DIRECTORIES, LEGACY_FILES, VAULT} from '../vault/paths.js';
-import type {Source} from '../vault/load.js';
+import type {LoadIssue, Source} from '../vault/load.js';
 import {BUILT_IN_FIELDS, fieldsOf} from '../system/interface.js';
 import {systemFor, type Finding, type LedgerState, type ReplayResult} from './replay.js';
 
@@ -40,6 +40,8 @@ export type CheckInput = {
 	readonly sources: readonly Source[];
 	/** Superseded files the loader still read, vault-relative. */
 	readonly legacy: readonly string[];
+	/** Pages the loader could not parse. Absent from every list above. */
+	readonly issues: readonly LoadIssue[];
 	readonly artifacts: readonly Artifact[];
 	/** Skills written as their own pages. Systems may also declare skills. */
 	readonly skills: readonly Skill[];
@@ -937,6 +939,28 @@ function unplaced(input: CheckInput): Finding[] {
 	return findings;
 }
 
+/**
+ * Pages the loader rejected, which are in none of the lists above.
+ *
+ * This is the only finding about a page that is *not there*. A rejected page
+ * does not merely lose its own frontmatter — it is absent from the timeline,
+ * from the wiki, from every cross-reference, and from the cast of any scene
+ * that names it, because all of those are computed from a model it never
+ * entered. Nothing else notices, because from the model's point of view the
+ * file does not exist.
+ *
+ * `/lint` has always printed these; the queue an author actually works did not,
+ * so the way to find out was to notice something missing. A vanished page is
+ * exactly the kind of thing an open question is for.
+ */
+function schemaRejected(input: CheckInput): Finding[] {
+	return input.issues.map(issue => ({
+		kind: 'schema_rejected',
+		detail: `${issue.message} — the page is not loaded, so nothing references it`,
+		where: issue.file,
+	}));
+}
+
 function formulaErrors(input: CheckInput): Finding[] {
 	return (input.formulas?.errors ?? []).map(error => ({
 		kind: 'formula_error',
@@ -982,6 +1006,7 @@ export function runChecks(input: CheckInput): OpenQuestion[] {
 		...artifactUse(input),
 		...artifactOutcomes(input),
 		...formulaErrors(input),
+		...schemaRejected(input),
 	];
 
 	const sorted = findings.toSorted(

@@ -226,6 +226,7 @@ describe('deterministic checks', () => {
 			interfaces: {},
 			artifacts: [],
 			skills: [],
+			issues: [],
 			themes: [],
 			replay: replayResult,
 			formulas: runner,

@@ -144,6 +144,33 @@ same one is two things pretending to be one thing, and everything that resolves
 it silently picks whichever loaded first. `/lint` reports it as `duplicate_id`
 and names both paths. Rename or delete one; the tool will not choose for you.
 
+**Unparseable.** A page whose frontmatter breaks its schema is not loaded at
+all — it has no timeline entry, no wiki page, and no cross-references, because
+every one of those is computed from a model the page never entered. It is
+reported as `schema_rejected`, naming the file, the field, what was expected and
+what was actually there:
+
+```
+schema_rejected
+  order: expected number, found 'TODO' — the page is not loaded, so nothing
+  references it
+  at corpus/situations/ancestors-addressed-shrines.md
+```
+
+::: warning `TODO` is not a value a typed field can hold
+`TODO` is this project's convention for a decision you have not made, and it
+belongs in **prose**, where it is a note to yourself. In `order:`, `at:`, `arc:`
+or any other typed field it is a string where a number or an id was expected,
+and it takes the whole page out of the vault — including the fields that were
+fine.
+
+The fix is to leave the field out. An absent `order:` means _unplaced_, which is
+a state the tool understands and reports; `order: TODO` means nothing to
+anybody. Nothing coerces one into the other on your behalf, because a page that
+loaded by having its `TODO` quietly ignored is a decision you would never be
+reminded to make.
+:::
+
 **Invented.** Nothing in litfire will make up a proper noun, a number or a date
 on your behalf. If an interview does not know when something happened, it leaves
 `at:` out and the checks report the moment as undated — which is a normal state
